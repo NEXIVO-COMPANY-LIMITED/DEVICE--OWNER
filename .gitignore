@@ -1,0 +1,52 @@
+# Gradle
+.gradle/
+/build/
+*.gradle.bak
+
+# Android Studio
+*.iml
+.idea/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/misc.xml
+.idea/vcs.xml
+
+# Build artifacts
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration
+local.properties
+gradle.properties
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Kotlin
+.kotlin/
+.kotlin/errors/
+.kotlin/sessions/
+
+# Kiro
+.kiro/
+
+# IDE
+*.swp
+*.swo
+*~
+.vscode/
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# App specific
+app/build/
+app/.gradle/
