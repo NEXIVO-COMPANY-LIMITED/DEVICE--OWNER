@@ -201,7 +201,7 @@ class ComprehensiveVerificationManager(private val context: Context) {
      */
     private fun verifyDeviceOwnerEnabled(): Boolean {
         return try {
-            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.DeviceAdminReceiver::class.java)
+            val adminComponent = ComponentName(context, "com.example.deviceowner.receivers.DeviceAdminReceiver")
             devicePolicyManager.isAdminActive(adminComponent).also {
                 Log.d(TAG, "Device owner enabled: $it")
             }
@@ -216,7 +216,7 @@ class ComprehensiveVerificationManager(private val context: Context) {
      */
     private fun verifyUninstallBlocked(): Boolean {
         return try {
-            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.DeviceAdminReceiver::class.java)
+            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.AdminReceiver::class.java)
             val isBlocked = devicePolicyManager.isUninstallBlocked(adminComponent, context.packageName)
             Log.d(TAG, "Uninstall blocked: $isBlocked")
             isBlocked
@@ -262,7 +262,7 @@ class ComprehensiveVerificationManager(private val context: Context) {
      */
     private fun verifyAppDisableBlocked(): Boolean {
         return try {
-            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.DeviceAdminReceiver::class.java)
+            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.AdminReceiver::class.java)
             // Check if app is protected from being disabled
             val isProtected = (packageManager.getApplicationInfo(context.packageName, 0).flags 
                 and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0

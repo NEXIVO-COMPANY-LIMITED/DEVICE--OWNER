@@ -23,8 +23,8 @@ object ErrorHandler {
 
     // Error messages
     private val errorMessages = mapOf(
-        "INVALID_LOAN_ID" to "Loan ID must be in format L#YYYY-XXXXXX (e.g., L#2026-123456)",
-        "INVALID_LOAN_ID_PREFIX" to "Loan ID must start with L#",
+        "INVALID_LOAN_ID" to "Loan ID must be in format LN-YYYYMMDD-XXXXX (e.g., LN-20260107-00001)",
+        "INVALID_LOAN_ID_PREFIX" to "Loan ID must start with LN-",
         "INVALID_USER_ID" to "User ID must be in format U#YYYY-XXXXXX (e.g., U#2026-486272)",
         "INVALID_USER_ID_PREFIX" to "User ID must start with U#",
         "INVALID_SHOP_ID" to "Shop ID must be in format S#YYYY-XXXXXX (e.g., S#2026-31944)",

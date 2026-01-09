@@ -3,6 +3,8 @@
     <style name="Base.Theme.DEVICEOWNER" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <!-- Status bar icon color - Black -->
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
     <style name="Theme.DEVICEOWNER" parent="Base.Theme.DEVICEOWNER" />

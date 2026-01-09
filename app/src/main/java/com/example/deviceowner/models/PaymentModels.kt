@@ -11,7 +11,7 @@ data class PaymentRecord(
     @SerializedName("payment_id")
     val paymentId: String,
     
-    @SerializedName("loan_id")
+    @SerializedName("loan_number")
     val loanId: String,
     
     @SerializedName("device_id")

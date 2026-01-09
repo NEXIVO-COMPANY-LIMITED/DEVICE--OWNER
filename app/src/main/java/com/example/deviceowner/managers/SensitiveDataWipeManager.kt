@@ -401,16 +401,16 @@ class SensitiveDataWipeManager(private val context: Context) {
      */
     fun getWipeStatusSummary(): Map<String, Any> {
         return try {
-            mapOf(
+            mapOf<String, Any>(
                 "timestamp" to System.currentTimeMillis(),
                 "sharedPreferencesCount" to SHARED_PREFS_TO_WIPE.size,
                 "directoriesCount" to DIRECTORIES_TO_WIPE.size,
-                "databasesCount" to context.databaseList().size,
+                "databasesCount" to (context.databaseList()?.size ?: 0),
                 "status" to "ready"
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error getting wipe status", e)
-            mapOf("status" to "error", "message" to e.message)
+            mapOf<String, Any>("status" to "error", "message" to (e.message ?: "Unknown error"))
         }
     }
 

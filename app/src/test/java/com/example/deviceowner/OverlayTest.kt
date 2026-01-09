@@ -231,7 +231,7 @@ class OverlayTest {
     @Test
     fun testOverlayMetadata() {
         val metadata = mapOf(
-            "loan_id" to "loan_123",
+            "loan_number" to "loan_123",
             "amount" to "1000",
             "due_date" to "2026-01-15"
         )
@@ -244,7 +244,7 @@ class OverlayTest {
             metadata = metadata
         )
 
-        assertEquals("loan_123", overlay.metadata["loan_id"])
+        assertEquals("loan_123", overlay.metadata["loan_number"])
         assertEquals("1000", overlay.metadata["amount"])
         assertEquals("2026-01-15", overlay.metadata["due_date"])
     }

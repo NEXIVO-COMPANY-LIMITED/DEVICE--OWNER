@@ -191,7 +191,7 @@ class DeviceMismatchHandler(private val context: Context) {
                 // Get device ID
                 val prefs = context.getSharedPreferences("identifier_prefs", Context.MODE_PRIVATE)
                 val deviceId = prefs.getString("device_id", "") ?: ""
-                val loanId = prefs.getString("loan_id", "") ?: ""
+                val loanNumber = prefs.getString("loan_number", "") ?: ""
                 
                 if (deviceId.isEmpty()) {
                     Log.e(TAG, "Device ID not found, cannot alert backend")
@@ -208,7 +208,7 @@ class DeviceMismatchHandler(private val context: Context) {
                     currentValue = details.currentValue,
                     timestamp = details.timestamp,
                     deviceProfile = getCurrentDeviceProfile(),
-                    loanId = loanId
+                    loanNumber = loanNumber
                 )
                 
                 // Send to backend

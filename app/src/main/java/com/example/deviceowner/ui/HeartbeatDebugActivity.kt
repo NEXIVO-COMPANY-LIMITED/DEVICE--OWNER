@@ -24,6 +24,10 @@ class HeartbeatDebugActivity : AppCompatActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Set status bar icons to black
+        window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        
         setContentView(R.layout.activity_heartbeat_debug)
         
         validator = HeartbeatValidator(this)

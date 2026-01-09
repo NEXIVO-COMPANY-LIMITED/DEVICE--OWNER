@@ -9,24 +9,20 @@ object ValidationUtils {
     /**
      * Validate Loan ID format
      * Requirements: Must start with "LN-", followed by date (YYYYMMDD) and numeric ID
-     * Format: LN-YYYYMMDD-XXXXX (e.g., "LN-20260104-00001")
+     * Format: LN-YYYYMMDD-XXXXX (e.g., "LN-20260107-00001")
      */
     fun validateLoanId(loanId: String?): Pair<Boolean, String> {
         return when {
             loanId.isNullOrEmpty() -> Pair(false, "EMPTY_FIELD")
             loanId.trim().isEmpty() -> Pair(false, "EMPTY_FIELD")
             !loanId.startsWith("LN-", ignoreCase = true) -> Pair(false, "INVALID_LOAN_ID_PREFIX")
-            !loanId.matches(Regex("^LN-\\d{8}-\\d+$", RegexOption.IGNORE_CASE)) -> 
+            !loanId.matches(Regex("^LN-\\d{8}-\\d+$", RegexOption.IGNORE_CASE)) ->
                 Pair(false, "INVALID_LOAN_ID")
             else -> Pair(true, "")
         }
     }
 
-    /**
-     * Validate Shop ID format
-     * Requirements: Must start with "S#", followed by year and numeric ID
-     * Format: S#YYYY-XXXXXX (e.g., "S#2026-31944")
-     */
+   
 
     /**
      * Validate IMEI format

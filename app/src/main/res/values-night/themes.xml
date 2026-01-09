@@ -3,5 +3,7 @@
     <style name="Base.Theme.DEVICEOWNER" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your dark theme here. -->
         <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <!-- Status bar icon color - Black (light icons for dark background) -->
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

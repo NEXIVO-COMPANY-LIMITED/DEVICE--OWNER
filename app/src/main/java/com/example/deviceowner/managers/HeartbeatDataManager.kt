@@ -23,6 +23,7 @@ class HeartbeatDataManager(private val context: Context) {
     )
     private val gson = Gson()
     private val deviceIdentifier = DeviceIdentifier(context)
+    private val tamperDetector = TamperDetector(context)
     
     // Protected cache directory - internal to app, not accessible to users
     private val protectedCacheDir: File by lazy {
@@ -56,7 +57,7 @@ class HeartbeatDataManager(private val context: Context) {
     
     /**
      * Collect current device heartbeat data
-     * Collects all device data EXCEPT IMEI and Serial Number
+     * Collects only fields needed for tamper detection and verification
      * Fetches data directly from device
      * Includes location data if available
      */
@@ -70,7 +71,7 @@ class HeartbeatDataManager(private val context: Context) {
         val imei = ""
         val serialNumber = ""
         
-        // Fetch other device data directly (no permission issues)
+        // Fetch device data directly (no permission issues)
         val androidId = getAndroidId()
         val manufacturer = Build.MANUFACTURER
         val model = Build.MODEL
@@ -78,6 +79,9 @@ class HeartbeatDataManager(private val context: Context) {
         val apiLevel = Build.VERSION.SDK_INT
         val buildNumber = Build.DISPLAY
         val deviceFingerprint = getDeviceFingerprint()
+        
+        // Get tamper status from TamperDetector
+        val tamperStatus = tamperDetector.getTamperStatus()
         
         // Get location data
         val locationManager = LocationManager(context)
@@ -94,7 +98,6 @@ class HeartbeatDataManager(private val context: Context) {
             imei = imei,
             serialNumber = serialNumber,
             androidId = androidId,
-            simSerialNumber = "", // Skip SIM serial due to permission issues
             deviceFingerprint = deviceFingerprint,
             manufacturer = manufacturer,
             model = model,
@@ -106,21 +109,19 @@ class HeartbeatDataManager(private val context: Context) {
             product = Build.PRODUCT,
             device = Build.DEVICE,
             brand = Build.BRAND,
-            host = Build.HOST,
-            user = Build.USER,
             securityPatchLevel = Build.VERSION.SECURITY_PATCH,
             systemUptime = getSystemUptime(),
             batteryLevel = getBatteryLevel(),
-            isDeviceRooted = isDeviceRooted(),
-            isUSBDebuggingEnabled = isUSBDebuggingEnabled(),
-            isDeveloperModeEnabled = isDeveloperModeEnabled(),
+            isDeviceRooted = tamperStatus.tamperFlags.contains("ROOTED"),
+            isUSBDebuggingEnabled = tamperStatus.tamperFlags.contains("USB_DEBUG_ENABLED"),
+            isDeveloperModeEnabled = tamperStatus.tamperFlags.contains("DEV_MODE_ENABLED"),
+            isBootloaderUnlocked = tamperStatus.tamperFlags.contains("BOOTLOADER_UNLOCKED"),
+            isCustomROM = tamperStatus.tamperFlags.contains("CUSTOM_ROM"),
+            tamperSeverity = tamperStatus.severity.name,
             installedAppsHash = getInstalledAppsHash(),
             systemPropertiesHash = getSystemPropertiesHash(),
             latitude = locationData?.latitude ?: 0.0,
-            longitude = locationData?.longitude ?: 0.0,
-            locationAccuracy = locationData?.accuracy ?: 0f,
-            locationProvider = locationData?.provider ?: "unknown",
-            locationTimestamp = locationData?.timestamp ?: 0L
+            longitude = locationData?.longitude ?: 0.0
         )
     }
     
@@ -299,6 +300,28 @@ class HeartbeatDataManager(private val context: Context) {
             ))
         }
         
+        // Check bootloader unlock status
+        if (currentData.isBootloaderUnlocked != lastVerifiedData.isBootloaderUnlocked) {
+            changes.add(DataChange(
+                field = "Bootloader Unlock",
+                previousValue = lastVerifiedData.isBootloaderUnlocked.toString(),
+                currentValue = currentData.isBootloaderUnlocked.toString(),
+                severity = "CRITICAL",
+                timestamp = System.currentTimeMillis()
+            ))
+        }
+        
+        // Check custom ROM status
+        if (currentData.isCustomROM != lastVerifiedData.isCustomROM) {
+            changes.add(DataChange(
+                field = "Custom ROM",
+                previousValue = lastVerifiedData.isCustomROM.toString(),
+                currentValue = currentData.isCustomROM.toString(),
+                severity = "CRITICAL",
+                timestamp = System.currentTimeMillis()
+            ))
+        }
+        
         // Check app integrity
         if (currentData.installedAppsHash != lastVerifiedData.installedAppsHash) {
             changes.add(DataChange(
@@ -445,46 +468,26 @@ class HeartbeatDataManager(private val context: Context) {
     
     /**
      * Check if device is rooted
+     * DELEGATED TO: TamperDetector.isRooted()
      */
     private fun isDeviceRooted(): Boolean {
-        return try {
-            val paths = arrayOf(
-                "/system/app/Superuser.apk",
-                "/sbin/su",
-                "/system/bin/su",
-                "/system/xbin/su",
-                "/data/local/xbin/su",
-                "/data/local/bin/su",
-                "/system/sd/xbin/su",
-                "/system/bin/failsafe/su",
-                "/data/local/su"
-            )
-            paths.any { java.io.File(it).exists() }
-        } catch (e: Exception) {
-            false
-        }
+        return tamperDetector.isRooted()
     }
     
     /**
      * Check if USB debugging is enabled
+     * DELEGATED TO: TamperDetector.isUSBDebuggingEnabled()
      */
     private fun isUSBDebuggingEnabled(): Boolean {
-        return try {
-            Settings.Secure.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
-        } catch (e: Exception) {
-            false
-        }
+        return tamperDetector.isUSBDebuggingEnabled()
     }
     
     /**
      * Check if developer mode is enabled
+     * DELEGATED TO: TamperDetector.isDeveloperModeEnabled()
      */
     private fun isDeveloperModeEnabled(): Boolean {
-        return try {
-            Settings.Secure.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-        } catch (e: Exception) {
-            false
-        }
+        return tamperDetector.isDeveloperModeEnabled()
     }
     
     /**
@@ -526,6 +529,7 @@ class HeartbeatDataManager(private val context: Context) {
 
 /**
  * Data class for heartbeat information
+ * Only includes fields that are sent to backend or used for verification
  */
 data class HeartbeatData(
     val deviceId: String,
@@ -533,7 +537,6 @@ data class HeartbeatData(
     val imei: String,
     val serialNumber: String,
     val androidId: String,
-    val simSerialNumber: String,
     val deviceFingerprint: String,
     val manufacturer: String,
     val model: String,
@@ -545,21 +548,19 @@ data class HeartbeatData(
     val product: String,
     val device: String,
     val brand: String,
-    val host: String,
-    val user: String,
     val securityPatchLevel: String,
     val systemUptime: Long,
     val batteryLevel: Int,
     val isDeviceRooted: Boolean,
     val isUSBDebuggingEnabled: Boolean,
     val isDeveloperModeEnabled: Boolean,
+    val isBootloaderUnlocked: Boolean = false,
+    val isCustomROM: Boolean = false,
+    val tamperSeverity: String = "NONE",
     val installedAppsHash: String,
     val systemPropertiesHash: String,
     val latitude: Double = 0.0,
-    val longitude: Double = 0.0,
-    val locationAccuracy: Float = 0f,
-    val locationProvider: String = "unknown",
-    val locationTimestamp: Long = 0L
+    val longitude: Double = 0.0
 )
 
 /**

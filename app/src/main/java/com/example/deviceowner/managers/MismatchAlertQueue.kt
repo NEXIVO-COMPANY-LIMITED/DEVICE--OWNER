@@ -40,12 +40,23 @@ class MismatchAlertQueue(private val context: Context) {
     /**
      * Queue a device owner loss alert
      */
-    fun queueAlert(alert: DeviceOwnerLossAlert) {
+    fun queueAlert(alert: com.example.deviceowner.data.api.MismatchAlert) {
         try {
-            val queue = getDeviceOwnerAlertQueue().toMutableList()
+            val queue = getPendingAlerts().toMutableList()
+            
+            // Convert MismatchAlert to DeviceOwnerLossAlert for storage
+            val deviceOwnerAlert = DeviceOwnerLossAlert(
+                deviceId = alert.deviceId,
+                details = alert.description,
+                severity = alert.severity,
+                timestamp = alert.timestamp,
+                recoveryAttempted = false,
+                recoverySuccessful = false,
+                recoveryAttempts = 0
+            )
             
             // Add new alert
-            queue.add(alert)
+            queue.add(deviceOwnerAlert)
             
             // Keep only recent alerts
             if (queue.size > MAX_QUEUE_SIZE) {
@@ -53,7 +64,7 @@ class MismatchAlertQueue(private val context: Context) {
             }
             
             saveDeviceOwnerAlertQueue(queue)
-            Log.d(TAG, "Device owner alert queued: ${alert.deviceId} - ${alert.details}")
+            Log.d(TAG, "Device owner alert queued: ${alert.deviceId} - ${alert.description}")
         } catch (e: Exception) {
             Log.e(TAG, "Error queuing device owner alert", e)
         }
@@ -91,6 +102,20 @@ class MismatchAlertQueue(private val context: Context) {
             Log.e(TAG, "Error retrieving device owner alerts", e)
             emptyList()
         }
+    }
+    
+    /**
+     * Check if there are pending alerts
+     */
+    fun hasPendingAlerts(): Boolean {
+        return getPendingAlerts().isNotEmpty() || getPendingRemovalAlerts().isNotEmpty()
+    }
+    
+    /**
+     * Get the size of the alert queue
+     */
+    fun getQueueSize(): Int {
+        return getPendingAlerts().size + getPendingRemovalAlerts().size
     }
     
     /**

@@ -87,7 +87,7 @@ fun DeviceInfoScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
-        containerColor = colors.background,
+        containerColor = Color(0xFFF5F5F5),
         topBar = {
             TopAppBar(
                 title = { Text("Device Information") },
@@ -101,7 +101,7 @@ fun DeviceInfoScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.background,
+                    containerColor = Color(0xFFF5F5F5),
                     titleContentColor = colors.onBackground
                 )
             )
@@ -361,6 +361,7 @@ fun DeviceInfoScreen(
                                     Log.d("DeviceInfoScreen", "Serial Number: $serialNumber")
                                     Log.d("DeviceInfoScreen", "Device Info: $deviceInfo")
                                     
+                                    // Call AuthRepository with all comparison data
                                     val result = repository.registerDevice(
                                         loanId = editableLoanId,
                                         deviceId = imeiList.firstOrNull() ?: "",
@@ -380,16 +381,32 @@ fun DeviceInfoScreen(
                                         totalRamBytes = deviceInfo?.totalRAMBytes,
                                         simSerialNumber = deviceInfo?.simNetworkInfo?.simSerialNumber,
                                         batteryCapacity = deviceInfo?.batteryInfo?.capacity,
-                                        batteryTechnology = deviceInfo?.batteryInfo?.technology
+                                        batteryTechnology = deviceInfo?.batteryInfo?.technology,
+                                        // Comparison data
+                                        bootloader = android.os.Build.BOOTLOADER,
+                                        hardware = android.os.Build.HARDWARE,
+                                        product = android.os.Build.PRODUCT,
+                                        device = android.os.Build.DEVICE,
+                                        brand = android.os.Build.BRAND,
+                                        securityPatchLevel = android.os.Build.VERSION.SECURITY_PATCH,
+                                        systemUptime = android.os.SystemClock.uptimeMillis(),
+                                        batteryLevel = 0,  // Battery level not available in deviceInfo
+                                        installedAppsHash = getInstalledAppsHash(context),
+                                        systemPropertiesHash = getSystemPropertiesHash(),
+                                        // Tamper status
+                                        isDeviceRooted = false,
+                                        isUSBDebuggingEnabled = false,
+                                        isDeveloperModeEnabled = false,
+                                        isBootloaderUnlocked = false,
+                                        isCustomROM = false
                                     )
-                                    
-                                    Log.d("DeviceInfoScreen", "Registration result: $result")
                                     
                                     when (result) {
                                         is ApiResult.Success -> {
                                             Log.d("DeviceInfoScreen", "✓ Device registered successfully!")
                                             successMessage = "Device registered successfully!"
                                             errorMessage = null
+                                            
                                             // Navigate to success screen after a short delay
                                             scope.launch {
                                                 kotlinx.coroutines.delay(1000)
@@ -596,5 +613,41 @@ private fun DataRow(
         if (!isLast) {
             HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 0.5.dp)
         }
+    }
+}
+
+/**
+ * Get hash of installed apps for registration
+ */
+private fun getInstalledAppsHash(context: android.content.Context): String {
+    return try {
+        val pm = context.packageManager
+        val packages = pm.getInstalledPackages(0)
+        val appList = packages.map { it.packageName }.sorted().joinToString(",")
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(appList.toByteArray())
+        hash.joinToString("") { "%02x".format(it) }
+    } catch (e: Exception) {
+        ""
+    }
+}
+
+/**
+ * Get hash of system properties for registration
+ */
+private fun getSystemPropertiesHash(): String {
+    return try {
+        val properties = StringBuilder()
+        properties.append(android.os.Build.FINGERPRINT)
+        properties.append(android.os.Build.DEVICE)
+        properties.append(android.os.Build.PRODUCT)
+        properties.append(android.os.Build.HARDWARE)
+        properties.append(android.os.Build.BOOTLOADER)
+        
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(properties.toString().toByteArray())
+        hash.joinToString("") { "%02x".format(it) }
+    } catch (e: Exception) {
+        ""
     }
 }

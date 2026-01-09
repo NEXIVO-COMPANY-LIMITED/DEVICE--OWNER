@@ -118,7 +118,20 @@ class MismatchAlertRetryService : Service() {
             
             for (alert in pendingAlerts) {
                 try {
-                    val response = apiService.reportMismatch(alert.deviceId, alert)
+                    // Convert DeviceOwnerLossAlert to MismatchAlert for API
+                    val mismatchAlert = com.example.deviceowner.data.api.MismatchAlert(
+                        deviceId = alert.deviceId,
+                        mismatchType = "DEVICE_OWNER_LOSS",
+                        description = alert.details,
+                        severity = alert.severity,
+                        storedValue = "",
+                        currentValue = "",
+                        timestamp = alert.timestamp,
+                        deviceProfile = emptyMap(),
+                        loanNumber = ""
+                    )
+                    
+                    val response = apiService.reportMismatch(alert.deviceId, mismatchAlert)
                     
                     if (response.isSuccessful) {
                         Log.d(TAG, "✓ Alert retry successful for device: ${alert.deviceId}")

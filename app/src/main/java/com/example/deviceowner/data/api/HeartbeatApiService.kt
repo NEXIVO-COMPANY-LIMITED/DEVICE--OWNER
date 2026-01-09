@@ -11,6 +11,20 @@ import retrofit2.http.*
 interface HeartbeatApiService {
     
     /**
+     * Register device with all comparison data
+     * POST /api/devices/register
+     * 
+     * Backend will:
+     * 1. Store all device data for future comparison
+     * 2. Create device profile in database
+     * 3. Return verification status
+     */
+    @POST("api/devices/register/")
+    suspend fun registerDevice(
+        @Body registrationData: DeviceRegistrationPayload
+    ): Response<DeviceRegistrationResponse>
+    
+    /**
      * Send device heartbeat data to backend for verification
      * POST /api/devices/{device_id}/data/
      * 
@@ -29,7 +43,7 @@ interface HeartbeatApiService {
      * Get verification status and any pending commands
      * GET /api/devices/{device_id}/verification-status
      */
-    @GET("api/devices/{device_id}/verification-status")
+    @GET("api/devices/{device_id}/verification-status/")
     suspend fun getVerificationStatus(
         @Path("device_id") deviceId: String
     ): Response<VerificationStatusResponse>
@@ -38,7 +52,7 @@ interface HeartbeatApiService {
      * Acknowledge received blocking command
      * POST /api/devices/{device_id}/command-ack
      */
-    @POST("api/devices/{device_id}/command-ack")
+    @POST("api/devices/{device_id}/command-ack/")
     suspend fun acknowledgeCommand(
         @Path("device_id") deviceId: String,
         @Body ackData: CommandAcknowledgment
@@ -48,7 +62,7 @@ interface HeartbeatApiService {
      * Report data change detected locally
      * POST /api/devices/{device_id}/data-change
      */
-    @POST("api/devices/{device_id}/data-change")
+    @POST("api/devices/{device_id}/data-change/")
     suspend fun reportDataChange(
         @Path("device_id") deviceId: String,
         @Body changeReport: DataChangeReport
@@ -58,7 +72,7 @@ interface HeartbeatApiService {
      * Report device identifier mismatch to backend
      * POST /api/devices/{device_id}/mismatch-alert
      */
-    @POST("api/devices/{device_id}/mismatch-alert")
+    @POST("api/devices/{device_id}/mismatch-alert/")
     suspend fun reportMismatch(
         @Path("device_id") deviceId: String,
         @Body alert: MismatchAlert
@@ -144,36 +158,105 @@ data class ChangeReportResponse(
 )
 
 /**
- * Heartbeat data payload sent to backend
- * Includes device verification data with loan ID as primary identifier
+ * Device registration data payload
+ * Sent during device registration to backend
+ * Contains all data needed for future tamper comparison
  */
-data class HeartbeatDataPayload(
-    val loan_id: String,
+data class DeviceRegistrationPayload(
+    val loan_number: String,
     val device_id: String,
-    val serial_number: String,
     val device_type: String = "phone",
     val manufacturer: String,
-    val system_type: String = "Mobile",
     val model: String,
     val platform: String = "Android",
     val os_version: String,
-    val os_edition: String = "Mobile",
     val processor: String,
     val installed_ram: String,
     val total_storage: String,
     val build_number: Int,
     val sdk_version: Int,
-    val device_imeis: List<String>,
     val machine_name: String,
+    // Additional device info
+    val system_type: String = "Mobile",
+    val os_edition: String = "Mobile",
+    // Comparison data - collected at registration
+    val android_id: String,
+    val device_fingerprint: String,
+    val bootloader: String,
+    val hardware: String,
+    val product: String,
+    val device: String,
+    val brand: String,
+    val security_patch_level: String,
+    val system_uptime: Long,
+    val battery_level: Int,
+    val installed_apps_hash: String,
+    val system_properties_hash: String,
     // Location data
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    val location_accuracy: Float? = null,
-    val location_altitude: Double? = null,
-    val location_bearing: Float? = null,
-    val location_speed: Float? = null,
-    val location_timestamp: Long? = null,
-    val location_provider: String? = null
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    // Tamper status at registration
+    val is_device_rooted: Boolean = false,
+    val is_usb_debugging_enabled: Boolean = false,
+    val is_developer_mode_enabled: Boolean = false,
+    val is_bootloader_unlocked: Boolean = false,
+    val is_custom_rom: Boolean = false,
+    val registration_timestamp: Long = System.currentTimeMillis()
+)
+
+/**
+ * Device registration response from backend
+ */
+data class DeviceRegistrationResponse(
+    val success: Boolean,
+    val message: String,
+    val device_id: String?,
+    val registered_at: Long,
+    val verification_status: String, // VERIFIED, PENDING, FAILED
+    val stored_data_hash: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+/**
+ * Heartbeat data payload sent to backend
+ * POST /api/devices/{device_id}/data/
+ * Contains essential fields needed for device verification
+ */
+data class HeartbeatDataPayload(
+    val device_id: String,
+    val device_type: String = "phone",
+    val manufacturer: String,
+    val model: String,
+    val platform: String = "Android",
+    val os_version: String,
+    val processor: String,
+    val installed_ram: String,
+    val total_storage: String,
+    val machine_name: String,
+    val build_number: Int,
+    val sdk_version: Int,
+    val android_id: String,
+    val device_fingerprint: String,
+    val bootloader: String,
+    val security_patch_level: String,
+    val system_uptime: Long,
+    val battery_level: Int,
+    val installed_apps_hash: String,
+    val system_properties_hash: String,
+    val is_device_rooted: Boolean = false,
+    val is_usb_debugging_enabled: Boolean = false,
+    val is_developer_mode_enabled: Boolean = false,
+    val is_bootloader_unlocked: Boolean = false,
+    val is_custom_rom: Boolean = false,
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val tamper_severity: String = "NONE",
+    val tamper_flags: List<String> = emptyList(),
+    val loan_status: String = "loaned",
+    val is_online: Boolean = true,
+    val is_trusted: Boolean = true,
+    val is_locked: Boolean = false,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 /**
@@ -188,7 +271,7 @@ data class MismatchAlert(
     val currentValue: String,
     val timestamp: Long = System.currentTimeMillis(),
     val deviceProfile: Map<String, String>? = null,
-    val loanId: String? = null
+    val loanNumber: String? = null
 )
 
 /**

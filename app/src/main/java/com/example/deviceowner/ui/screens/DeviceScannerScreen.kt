@@ -117,7 +117,7 @@ fun DeviceScannerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
+            .background(Color(0xFFF5F5F5))
             .imePadding()
     ) {
         /* ===== BACK BUTTON (FIXED TOP) ===== */

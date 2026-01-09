@@ -36,7 +36,9 @@ class HeartbeatVerificationService : Service() {
     
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "HeartbeatVerificationService created")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        Log.d(TAG, "HeartbeatVerificationService CREATED")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
         
         heartbeatDataManager = HeartbeatDataManager(this)
         mismatchHandler = DeviceMismatchHandler(this)
@@ -101,7 +103,9 @@ class HeartbeatVerificationService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "HeartbeatVerificationService started")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        Log.d(TAG, "HeartbeatVerificationService onStartCommand() called")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
         
         // Start heartbeat verification
         startHeartbeat()
@@ -115,14 +119,52 @@ class HeartbeatVerificationService : Service() {
      */
     private fun startHeartbeat() {
         if (heartbeatJob?.isActive == true) {
-            Log.d(TAG, "Heartbeat already running")
+            Log.d(TAG, "⚠ Heartbeat already running")
             return
         }
         
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        Log.d(TAG, "Starting heartbeat loop")
+        Log.d(TAG, "Interval: ${HEARTBEAT_INTERVAL}ms (${HEARTBEAT_INTERVAL/1000}s)")
+        Log.d(TAG, "Verification: ${VERIFICATION_INTERVAL}ms (${VERIFICATION_INTERVAL/1000}s)")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        
         heartbeatJob = serviceScope.launch {
             var verificationCounter = 0
+            var registrationVerified = false
             
             try {
+                // Verify registration on first iteration
+                val authRepository = com.example.deviceowner.data.repository.AuthRepository(this@HeartbeatVerificationService)
+                Log.d(TAG, "→ Checking stored registration...")
+                val storedRegistration = authRepository.getStoredRegistration()
+                
+                if (storedRegistration == null) {
+                    Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                    Log.e(TAG, "✗ HEARTBEAT BLOCKED: No stored registration found")
+                    Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                    Log.e(TAG, "Device must be registered first via registration flow")
+                    Log.e(TAG, "Heartbeat will not start until device registration is complete")
+                    Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                    return@launch
+                }
+                
+                if (storedRegistration.deviceId.isEmpty()) {
+                    Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                    Log.e(TAG, "✗ HEARTBEAT BLOCKED: Device ID is empty")
+                    Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                    Log.e(TAG, "Registration incomplete - device_id field is blank")
+                    Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                    return@launch
+                }
+                
+                Log.d(TAG, "═══════════════════════════════════════════════════════════")
+                Log.d(TAG, "✓ Registration verified successfully")
+                Log.d(TAG, "Device ID: ${storedRegistration.deviceId}")
+                Log.d(TAG, "Loan ID: ${storedRegistration.loanId}")
+                Log.d(TAG, "═══════════════════════════════════════════════════════════")
+                registrationVerified = true
+                
                 while (isActive) {
                     try {
                         // Send heartbeat every minute
@@ -140,7 +182,7 @@ class HeartbeatVerificationService : Service() {
                         // Expected when service is destroyed, don't log as error
                         throw e
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error in heartbeat loop", e)
+                        Log.e(TAG, "✗ Error in heartbeat loop: ${e.message}", e)
                         delay(HEARTBEAT_INTERVAL)
                     }
                 }
@@ -160,21 +202,31 @@ class HeartbeatVerificationService : Service() {
             val storedRegistration = authRepository.getStoredRegistration()
             
             if (storedRegistration == null) {
-                Log.w(TAG, "No stored registration found, skipping heartbeat")
+                Log.w(TAG, "⚠ Heartbeat skipped: No stored registration found")
                 return
             }
             
             val deviceId = storedRegistration.deviceId
             
             if (deviceId.isEmpty()) {
-                Log.w(TAG, "Device ID not set, skipping heartbeat")
+                Log.w(TAG, "⚠ Heartbeat skipped: Device ID is empty")
                 return
             }
             
-            Log.d(TAG, "Sending heartbeat for device: $deviceId")
+            Log.d(TAG, "═══════════════════════════════════════════════════════════")
+            Log.d(TAG, "→ SENDING HEARTBEAT")
+            Log.d(TAG, "Device ID: $deviceId")
+            Log.d(TAG, "Endpoint: POST /api/devices/$deviceId/data/")
+            Log.d(TAG, "═══════════════════════════════════════════════════════════")
             
             // Collect heartbeat data with stored registration
             val heartbeatData = heartbeatDataManager.collectHeartbeatData(storedRegistration)
+            Log.d(TAG, "Collected data:")
+            Log.d(TAG, "  - Android ID: ${heartbeatData.androidId}")
+            Log.d(TAG, "  - Fingerprint: ${heartbeatData.deviceFingerprint.take(16)}...")
+            Log.d(TAG, "  - Manufacturer: ${heartbeatData.manufacturer}")
+            Log.d(TAG, "  - Model: ${heartbeatData.model}")
+            Log.d(TAG, "  - Rooted: ${heartbeatData.isDeviceRooted}")
             
             // Convert to API payload format with registration data
             val payload = convertToHeartbeatPayload(heartbeatData, storedRegistration)
@@ -183,30 +235,44 @@ class HeartbeatVerificationService : Service() {
             
             if (response.isSuccessful) {
                 val body = response.body()
-                Log.d(TAG, "✓ Heartbeat sent successfully: ${body?.message}")
+                Log.d(TAG, "═══════════════════════════════════════════════════════════")
+                Log.d(TAG, "✓ HEARTBEAT SENT SUCCESSFULLY")
+                Log.d(TAG, "Response: ${body?.message}")
+                Log.d(TAG, "Verified: ${body?.verified}")
+                Log.d(TAG, "Data Matches: ${body?.dataMatches}")
+                Log.d(TAG, "═══════════════════════════════════════════════════════════")
                 
                 // Save heartbeat data locally
                 heartbeatDataManager.saveHeartbeatData(heartbeatData)
                 
                 // Check if backend detected changes
                 if (body?.dataMatches == false) {
-                    Log.w(TAG, "Backend detected data mismatch!")
+                    Log.w(TAG, "⚠ Backend detected data mismatch!")
                     handleBackendMismatch(body)
                 }
                 
                 // Process any blocking commands
                 body?.command?.let { command ->
-                    Log.w(TAG, "Received blocking command: ${command.type}")
+                    Log.w(TAG, "⚠ Received blocking command: ${command.type}")
                     processBlockingCommand(command, deviceId)
                 }
                 
                 // Check for updates during heartbeat
                 checkForUpdates(deviceId)
             } else {
-                Log.e(TAG, "✗ Heartbeat failed: ${response.code()} - ${response.message()}")
+                Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                Log.e(TAG, "✗ HEARTBEAT FAILED")
+                Log.e(TAG, "HTTP Status: ${response.code()}")
+                Log.e(TAG, "Message: ${response.message()}")
+                Log.e(TAG, "Error Body: ${response.errorBody()?.string()}")
+                Log.e(TAG, "═══════════════════════════════════════════════════════════")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "✗ Error performing heartbeat: ${e.message}", e)
+            Log.e(TAG, "═══════════════════════════════════════════════════════════")
+            Log.e(TAG, "✗ HEARTBEAT EXCEPTION")
+            Log.e(TAG, "Error: ${e.message}")
+            Log.e(TAG, "═══════════════════════════════════════════════════════════")
+            Log.e(TAG, "Stack trace:", e)
         }
     }
     
@@ -465,7 +531,9 @@ class HeartbeatVerificationService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "HeartbeatVerificationService destroyed")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        Log.d(TAG, "HeartbeatVerificationService DESTROYED")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
         heartbeatJob?.cancel()
         serviceScope.cancel()
     }
@@ -533,48 +601,49 @@ class HeartbeatVerificationService : Service() {
     
     /**
      * Convert HeartbeatData to HeartbeatDataPayload for API submission
-     * Includes IMEI, Serial Number, and Loan ID from stored registration data
-     * Includes location data for device tracking
+     * Includes Loan ID from stored registration data
+     * Includes location data (latitude/longitude only) for device tracking
+     * Includes tamper detection and security status
+     * NOTE: IMEI and Serial Number are NOT included for security/privacy reasons
      */
     private fun convertToHeartbeatPayload(
         data: com.example.deviceowner.managers.HeartbeatData,
         registration: com.example.deviceowner.data.local.DeviceRegistrationEntity?
     ): com.example.deviceowner.data.api.HeartbeatDataPayload {
-        // Parse IMEI list from JSON string
-        val imeiList = try {
-            if (!registration?.imeiList.isNullOrEmpty()) {
-                com.google.gson.Gson().fromJson(registration?.imeiList, Array<String>::class.java).toList()
-            } else {
-                emptyList()
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
-        
         return com.example.deviceowner.data.api.HeartbeatDataPayload(
-            loan_id = registration?.loanId ?: "",
             device_id = registration?.deviceId ?: data.deviceId,
-            serial_number = registration?.serialNumber ?: "", // From stored registration
             device_type = "phone",
             manufacturer = registration?.manufacturer ?: data.manufacturer,
-            system_type = "Mobile",
             model = registration?.model ?: data.model,
             platform = "Android",
             os_version = registration?.osVersion ?: data.androidVersion,
-            os_edition = "Mobile",
-            processor = registration?.networkOperatorName ?: data.hardware,
+            processor = data.hardware,  // Use hardware field from HeartbeatData
             installed_ram = registration?.installedRam ?: "Unknown",
             total_storage = registration?.totalStorage ?: "Unknown",
+            machine_name = registration?.machineName ?: data.deviceFingerprint,
             build_number = (registration?.buildNumber?.toIntOrNull() ?: data.buildNumber.toIntOrNull()) ?: 0,
             sdk_version = registration?.sdkVersion?.toIntOrNull() ?: data.apiLevel,
-            device_imeis = imeiList, // From stored registration
-            machine_name = registration?.machineName ?: data.deviceFingerprint,
-            // Include location data
-            latitude = if (data.latitude != 0.0) data.latitude else null,
-            longitude = if (data.longitude != 0.0) data.longitude else null,
-            location_accuracy = if (data.locationAccuracy != 0f) data.locationAccuracy else null,
-            location_timestamp = if (data.locationTimestamp != 0L) data.locationTimestamp else null,
-            location_provider = if (data.locationProvider != "unknown") data.locationProvider else null
+            android_id = data.androidId,
+            device_fingerprint = data.deviceFingerprint,
+            bootloader = data.bootloader,
+            security_patch_level = data.securityPatchLevel,
+            system_uptime = data.systemUptime,
+            battery_level = data.batteryLevel,
+            installed_apps_hash = data.installedAppsHash,
+            system_properties_hash = data.systemPropertiesHash,
+            is_device_rooted = data.isDeviceRooted,
+            is_usb_debugging_enabled = data.isUSBDebuggingEnabled,
+            is_developer_mode_enabled = data.isDeveloperModeEnabled,
+            is_bootloader_unlocked = data.isBootloaderUnlocked,
+            is_custom_rom = data.isCustomROM,
+            latitude = data.latitude,
+            longitude = data.longitude,
+            tamper_severity = data.tamperSeverity,
+            tamper_flags = emptyList(),
+            loan_status = "loaned",
+            is_online = true,
+            is_trusted = !data.isDeviceRooted && !data.isBootloaderUnlocked && !data.isCustomROM,
+            is_locked = false
         )
     }
 }

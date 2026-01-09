@@ -137,7 +137,7 @@ class DeviceOwnerRecoveryManager(private val context: Context) {
      */
     private fun verifyDeviceAdminActive(): Boolean {
         return try {
-            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.DeviceAdminReceiver::class.java)
+            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.AdminReceiver::class.java)
             devicePolicyManager.isAdminActive(adminComponent).also {
                 Log.d(TAG, "Device admin active status: $it")
             }
@@ -154,7 +154,7 @@ class DeviceOwnerRecoveryManager(private val context: Context) {
         return try {
             Log.d(TAG, "Attempting primary recovery: re-enable uninstall prevention")
             
-            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.DeviceAdminReceiver::class.java)
+            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.AdminReceiver::class.java)
             
             // Attempt to set package as uninstallable
             devicePolicyManager.setUninstallBlocked(adminComponent, context.packageName, true)
@@ -229,7 +229,7 @@ class DeviceOwnerRecoveryManager(private val context: Context) {
         return try {
             Log.d(TAG, "Fallback Strategy 2: Re-activating device admin...")
             
-            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.DeviceAdminReceiver::class.java)
+            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.AdminReceiver::class.java)
             
             // Check if admin is still active
             if (!devicePolicyManager.isAdminActive(adminComponent)) {
@@ -260,7 +260,7 @@ class DeviceOwnerRecoveryManager(private val context: Context) {
         return try {
             Log.d(TAG, "Fallback Strategy 3: Forcing policy update...")
             
-            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.DeviceAdminReceiver::class.java)
+            val adminComponent = ComponentName(context, com.example.deviceowner.receivers.AdminReceiver::class.java)
             
             // Lock device to force policy evaluation
             try {
@@ -341,18 +341,22 @@ class DeviceOwnerRecoveryManager(private val context: Context) {
                     return@withContext
                 }
                 
-                val alert = DeviceOwnerLossAlert(
+                // Create MismatchAlert for backend sync
+                val mismatchAlert = com.example.deviceowner.data.api.MismatchAlert(
                     deviceId = deviceId,
+                    mismatchType = "DEVICE_OWNER_LOSS",
+                    description = "Device owner status lost",
+                    severity = if (recoverySuccessful) "MEDIUM" else "CRITICAL",
+                    storedValue = "ACTIVE",
+                    currentValue = "INACTIVE",
                     timestamp = System.currentTimeMillis(),
-                    details = "Device owner status lost",
-                    recoveryAttempted = recoveryAttempted,
-                    recoverySuccessful = recoverySuccessful,
-                    recoveryAttempts = prefs.getInt(KEY_RECOVERY_ATTEMPTS, 0)
+                    deviceProfile = null,
+                    loanNumber = null
                 )
                 
                 // Queue for backend sync
                 val alertQueue = MismatchAlertQueue(context)
-                alertQueue.queueAlert(alert)
+                alertQueue.queueAlert(mismatchAlert)
                 
                 Log.d(TAG, "Device owner loss alert queued for backend")
             } catch (e: Exception) {
@@ -411,6 +415,7 @@ data class DeviceOwnerLossAlert(
     val deviceId: String,
     val timestamp: Long,
     val details: String,
+    val severity: String = "CRITICAL",
     val recoveryAttempted: Boolean,
     val recoverySuccessful: Boolean,
     val recoveryAttempts: Int = 0

@@ -161,23 +161,9 @@ class HeartbeatValidator(private val context: Context) {
             
             // Validate payload fields
             report.checks.add(PayloadFieldCheck(
-                field = "loan_id",
-                value = payload.loan_id,
-                isEmpty = payload.loan_id.isEmpty(),
-                required = true
-            ))
-            
-            report.checks.add(PayloadFieldCheck(
                 field = "device_id",
                 value = payload.device_id,
                 isEmpty = payload.device_id.isEmpty(),
-                required = true
-            ))
-            
-            report.checks.add(PayloadFieldCheck(
-                field = "serial_number",
-                value = payload.serial_number,
-                isEmpty = payload.serial_number.isEmpty(),
                 required = true
             ))
             
@@ -196,10 +182,24 @@ class HeartbeatValidator(private val context: Context) {
             ))
             
             report.checks.add(PayloadFieldCheck(
-                field = "device_imeis",
-                value = payload.device_imeis.size.toString(),
-                isEmpty = payload.device_imeis.isEmpty(),
-                required = false
+                field = "os_version",
+                value = payload.os_version,
+                isEmpty = payload.os_version.isEmpty(),
+                required = true
+            ))
+            
+            report.checks.add(PayloadFieldCheck(
+                field = "android_id",
+                value = payload.android_id,
+                isEmpty = payload.android_id.isEmpty(),
+                required = true
+            ))
+            
+            report.checks.add(PayloadFieldCheck(
+                field = "device_fingerprint",
+                value = payload.device_fingerprint,
+                isEmpty = payload.device_fingerprint.isEmpty(),
+                required = true
             ))
             
             report.allFieldsValid = report.checks.all { !it.isEmpty || !it.required }
@@ -318,39 +318,48 @@ class HeartbeatValidator(private val context: Context) {
     
     /**
      * Convert HeartbeatData to HeartbeatDataPayload
+     * Includes tamper detection and security status
+     * Location data includes latitude/longitude only
+     * NOTE: IMEI and Serial Number are NOT included for security/privacy reasons
      */
     private fun convertToHeartbeatPayload(
         data: com.example.deviceowner.managers.HeartbeatData,
         registration: com.example.deviceowner.data.local.DeviceRegistrationEntity?
     ): HeartbeatDataPayload {
-        val imeiList = try {
-            if (!registration?.imeiList.isNullOrEmpty()) {
-                com.google.gson.Gson().fromJson(registration?.imeiList, Array<String>::class.java).toList()
-            } else {
-                emptyList()
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
-        
         return HeartbeatDataPayload(
-            loan_id = registration?.loanId ?: "",
             device_id = registration?.deviceId ?: data.deviceId,
-            serial_number = registration?.serialNumber ?: "",
             device_type = "phone",
             manufacturer = registration?.manufacturer ?: data.manufacturer,
-            system_type = "Mobile",
             model = registration?.model ?: data.model,
             platform = "Android",
             os_version = registration?.osVersion ?: data.androidVersion,
-            os_edition = "Mobile",
-            processor = registration?.networkOperatorName ?: data.hardware,
+            processor = data.hardware,  // Use hardware field from HeartbeatData
             installed_ram = registration?.installedRam ?: "Unknown",
             total_storage = registration?.totalStorage ?: "Unknown",
+            machine_name = registration?.machineName ?: data.deviceFingerprint,
             build_number = (registration?.buildNumber?.toIntOrNull() ?: data.buildNumber.toIntOrNull()) ?: 0,
             sdk_version = registration?.sdkVersion?.toIntOrNull() ?: data.apiLevel,
-            device_imeis = imeiList,
-            machine_name = registration?.machineName ?: data.deviceFingerprint
+            android_id = data.androidId,
+            device_fingerprint = data.deviceFingerprint,
+            bootloader = data.bootloader,
+            security_patch_level = data.securityPatchLevel,
+            system_uptime = data.systemUptime,
+            battery_level = data.batteryLevel,
+            installed_apps_hash = data.installedAppsHash,
+            system_properties_hash = data.systemPropertiesHash,
+            is_device_rooted = data.isDeviceRooted,
+            is_usb_debugging_enabled = data.isUSBDebuggingEnabled,
+            is_developer_mode_enabled = data.isDeveloperModeEnabled,
+            is_bootloader_unlocked = data.isBootloaderUnlocked,
+            is_custom_rom = data.isCustomROM,
+            latitude = data.latitude,
+            longitude = data.longitude,
+            tamper_severity = data.tamperSeverity,
+            tamper_flags = emptyList(),
+            loan_status = "loaned",
+            is_online = true,
+            is_trusted = !data.isDeviceRooted && !data.isBootloaderUnlocked && !data.isCustomROM,
+            is_locked = false
         )
     }
 }

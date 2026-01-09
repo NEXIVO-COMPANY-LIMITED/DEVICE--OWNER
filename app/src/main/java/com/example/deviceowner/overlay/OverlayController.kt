@@ -68,7 +68,7 @@ class OverlayController(private val context: Context) {
                 dismissible = false,
                 priority = 10,
                 metadata = mapOf(
-                    "loan_id" to loanId,
+                    "loan_number" to loanId,
                     "amount" to amount,
                     "due_date" to dueDate
                 )

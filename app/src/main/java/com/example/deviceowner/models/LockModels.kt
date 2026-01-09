@@ -107,7 +107,7 @@ data class UnlockRequest(
  * Data model for loan record
  */
 data class LoanRecord(
-    @SerializedName("loan_id")
+    @SerializedName("loan_number")
     val loanId: String,
     
     @SerializedName("device_id")
