@@ -2,10 +2,15 @@ package com.example.deviceowner.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.api.*
+import com.example.deviceowner.data.api.ApiClient
+import com.example.deviceowner.data.api.ApiResult
+import com.example.deviceowner.data.api.DeviceRegistrationResponse
+import com.example.deviceowner.data.api.DeviceRegistrationPayload
+import com.example.deviceowner.data.api.HeartbeatApiService
 import com.example.deviceowner.data.local.LocalDataManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.converter.gson.GsonConverterFactory
 
 class AuthRepository(private val context: Context) {
     
@@ -63,46 +68,43 @@ class AuthRepository(private val context: Context) {
     ): ApiResult<DeviceRegistrationResponse> {
         return withContext(Dispatchers.IO) {
             try {
-                // Create new registration payload with all comparison data
+                // Create registration payload with ALL device data for server baseline
+                // Ensure all required fields have valid values (not empty strings)
                 val registrationPayload = DeviceRegistrationPayload(
-                    loan_number = loanId,
-                    device_id = deviceId,
+                    device_id = deviceId.ifBlank { "UNKNOWN" },
+                    serial_number = (serialNumber ?: "UNKNOWN").ifBlank { "UNKNOWN" },
                     device_type = "phone",
-                    manufacturer = manufacturer ?: "",
-                    model = model ?: "",
+                    manufacturer = (manufacturer ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    system_type = "Android",
+                    model = (model ?: "UNKNOWN").ifBlank { "UNKNOWN" },
                     platform = "Android",
-                    os_version = osVersion ?: "",
-                    processor = "",
-                    installed_ram = installedRam ?: "",
-                    total_storage = totalStorage ?: "",
+                    os_version = (osVersion ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    os_edition = "Mobile",
+                    processor = (hardware ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    installed_ram = (installedRam ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    total_storage = (totalStorage ?: "UNKNOWN").ifBlank { "UNKNOWN" },
                     build_number = buildNumber?.toIntOrNull() ?: 0,
                     sdk_version = sdkVersion ?: 0,
-                    machine_name = deviceFingerprint ?: "",
-                    system_type = "Mobile",
-                    os_edition = "Mobile",
-                    // Comparison data
-                    android_id = androidId ?: "",
-                    device_fingerprint = deviceFingerprint ?: "",
-                    bootloader = bootloader ?: "",
-                    hardware = hardware ?: "",
-                    product = product ?: "",
-                    device = device ?: "",
-                    brand = brand ?: "",
-                    security_patch_level = securityPatchLevel ?: "",
-                    system_uptime = systemUptime ?: 0L,
-                    battery_level = batteryLevel ?: 0,
-                    installed_apps_hash = installedAppsHash ?: "",
-                    system_properties_hash = systemPropertiesHash ?: "",
-                    // Location
-                    latitude = latitude ?: 0.0,
-                    longitude = longitude ?: 0.0,
-                    // Tamper status
+                    device_imeis = imeiList?.filter { it.isNotBlank() }?.joinToString(",") ?: "",
+                    loan_number = loanId.ifBlank { "UNKNOWN" },
+                    machine_name = (device ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    android_id = (androidId ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    device_fingerprint = (deviceFingerprint ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    bootloader = (bootloader ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    security_patch_level = (securityPatchLevel ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    system_uptime = android.os.SystemClock.elapsedRealtime(),
+                    installed_apps_hash = (installedAppsHash ?: "UNKNOWN").ifBlank { "UNKNOWN" },
+                    system_properties_hash = (systemPropertiesHash ?: "UNKNOWN").ifBlank { "UNKNOWN" },
                     is_device_rooted = isDeviceRooted,
                     is_usb_debugging_enabled = isUSBDebuggingEnabled,
                     is_developer_mode_enabled = isDeveloperModeEnabled,
                     is_bootloader_unlocked = isBootloaderUnlocked,
                     is_custom_rom = isCustomROM,
-                    registration_timestamp = System.currentTimeMillis()
+                    latitude = latitude ?: 0.0,
+                    longitude = longitude ?: 0.0,
+                    tamper_severity = "NONE",
+                    tamper_flags = "",
+                    battery_level = batteryLevel ?: 0
                 )
                 
                 Log.d(TAG, "=== REGISTER DEVICE ===")
@@ -126,11 +128,10 @@ class AuthRepository(private val context: Context) {
                 Log.d(TAG, "Custom ROM: $isCustomROM")
                 
                 // Send to backend using HeartbeatApiService
+                val gson = com.google.gson.Gson()
                 val retrofit = retrofit2.Retrofit.Builder()
                     .baseUrl("http://82.29.168.120/")
-                    .addConverterFactory(com.google.gson.Gson().let { 
-                        retrofit2.converter.gson.GsonConverterFactory.create(it)
-                    })
+                    .addConverterFactory(GsonConverterFactory.create(gson))
                     .build()
                 
                 val heartbeatApiService = retrofit.create(HeartbeatApiService::class.java)
@@ -141,7 +142,6 @@ class AuthRepository(private val context: Context) {
                     if (apiResponse != null) {
                         Log.d(TAG, "✓ Device registration successful")
                         Log.d(TAG, "Response: success=${apiResponse.success}, device_id=${apiResponse.device_id}, message=${apiResponse.message}")
-                        Log.d(TAG, "Status: ${apiResponse.verification_status}")
                         
                         // Use device_id from response, or fallback to the one we sent
                         val responseDeviceId = apiResponse.device_id ?: deviceId
@@ -157,43 +157,12 @@ class AuthRepository(private val context: Context) {
                         registrationDataManager.saveRegistrationData(registrationPayload)
                         Log.d(TAG, "✓ Registration data saved to local database")
                         
-                        // Also save to old local database for compatibility
-                        val saved = localDataManager.saveDeviceRegistration(
-                            deviceId = responseDeviceId,
-                            loanId = loanId,
-                            imeiList = imeiList ?: emptyList(),
-                            serialNumber = serialNumber ?: "",
-                            androidId = androidId ?: "",
-                            manufacturer = manufacturer ?: "",
-                            model = model ?: "",
-                            osVersion = osVersion ?: "",
-                            sdkVersion = sdkVersion?.toString() ?: "",
-                            buildNumber = buildNumber ?: "",
-                            totalStorage = totalStorage ?: "",
-                            installedRam = installedRam ?: "",
-                            machineName = deviceFingerprint ?: "",
-                            networkOperatorName = "",
-                            simOperatorName = "",
-                            simState = "",
-                            phoneType = "",
-                            networkType = "",
-                            simSerialNumber = simSerialNumber ?: "",
-                            batteryCapacity = batteryCapacity ?: "",
-                            batteryTechnology = batteryTechnology ?: "",
-                            registrationToken = null
-                        )
-                        if (saved) {
-                            Log.d(TAG, "✓ Registration data saved to legacy database")
-                        }
-                        
                         // Return success with converted response
                         ApiResult.Success(DeviceRegistrationResponse(
                             success = true,
                             message = apiResponse.message,
                             device_id = responseDeviceId,
-                            registered_at = System.currentTimeMillis(),
-                            verification_status = apiResponse.verification_status ?: "PENDING",
-                            stored_data_hash = apiResponse.stored_data_hash
+                            timestamp = System.currentTimeMillis()
                         ))
                     } else {
                         Log.e(TAG, "✗ Response body is null")

@@ -7,7 +7,7 @@ import android.util.Log
 import com.example.deviceowner.managers.UninstallPreventionManager
 import com.example.deviceowner.managers.BootVerificationManager
 import com.example.deviceowner.managers.IdentifierAuditLog
-import com.example.deviceowner.services.HeartbeatVerificationService
+import com.example.deviceowner.services.UnifiedHeartbeatService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,6 +90,9 @@ class BootReceiver : BroadcastReceiver() {
 
                 // Start heartbeat verification service
                 startHeartbeatService(context)
+                
+                // Start command queue service (Feature 4.9)
+                startCommandQueueService(context)
 
                 Log.d(TAG, "✓ Post-boot verification completed successfully")
                 auditLog.logAction(
@@ -114,11 +117,25 @@ class BootReceiver : BroadcastReceiver() {
      */
     private fun startHeartbeatService(context: Context) {
         try {
-            val intent = Intent(context, HeartbeatVerificationService::class.java)
+            val intent = Intent(context, UnifiedHeartbeatService::class.java)
             context.startService(intent)
             Log.d(TAG, "Heartbeat verification service started")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting heartbeat service", e)
+        }
+    }
+    
+    /**
+     * Start command queue service
+     * Feature 4.9: Offline Command Queue
+     */
+    private fun startCommandQueueService(context: Context) {
+        try {
+            val intent = Intent(context, com.example.deviceowner.services.CommandQueueService::class.java)
+            context.startService(intent)
+            Log.d(TAG, "✓ CommandQueueService started after boot")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting CommandQueueService", e)
         }
     }
 }

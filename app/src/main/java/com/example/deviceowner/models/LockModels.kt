@@ -6,11 +6,20 @@ import java.io.Serializable
 /**
  * Lock type enumeration
  * Feature 4.4: Remote Lock/Unlock
+ * 
+ * SOFT: Warning overlay, device usable
+ *   - Developer options/Safe mode access attempt
+ *   - Payment reminder (2 days before due date)
+ * 
+ * HARD: Full device lock, no interaction
+ *   - System tampering detected
+ *   - Payment overdue
+ *   - Device mismatch/swap detected
+ *   - Unauthorized app removal
  */
 enum class LockType {
-    SOFT,      // Warning overlay, device usable
-    HARD,      // Full device lock, no interaction
-    PERMANENT  // Repossession lock, backend unlock only
+    SOFT,  // Warning overlay, device usable
+    HARD   // Full device lock, no interaction
 }
 
 /**
@@ -27,12 +36,20 @@ enum class LockStatus {
  * Lock reason enumeration
  */
 enum class LockReason {
-    LOAN_OVERDUE,
-    PAYMENT_DEFAULT,
-    DEVICE_MISMATCH,
-    SECURITY_BREACH,
-    ADMIN_ACTION,
-    MANUAL_LOCK,
+    // SOFT Lock Reasons (Warning overlay - device usable)
+    DEVELOPER_OPTIONS_ATTEMPT,  // User tried to access developer options
+    SAFE_MODE_ATTEMPT,          // User tried to boot into safe mode
+    PAYMENT_REMINDER,           // Payment due in 2 days
+    SUSPICIOUS_ACTIVITY,        // Suspicious activity detected (not critical)
+    COMPLIANCE_WARNING,         // Compliance requirement warning
+    USAGE_LIMIT_WARNING,        // Usage limit approaching
+    
+    // HARD Lock Reasons (Full device lock - no interaction)
+    SYSTEM_TAMPER,              // System tampering detected
+    PAYMENT_OVERDUE,            // Payment is overdue
+    DEVICE_MISMATCH,            // Device swap/clone detected
+    COMPLIANCE_VIOLATION,       // Compliance violation detected
+    ADMIN_ACTION,               // Admin/backend action
     UNKNOWN
 }
 
@@ -64,12 +81,6 @@ data class DeviceLock(
     @SerializedName("expires_at")
     val expiresAt: Long? = null,
     
-    @SerializedName("pin_required")
-    val pinRequired: Boolean = false,
-    
-    @SerializedName("pin_hash")
-    val pinHash: String? = null,
-    
     @SerializedName("unlock_attempts")
     val unlockAttempts: Int = 0,
     
@@ -78,6 +89,12 @@ data class DeviceLock(
     
     @SerializedName("backend_unlock_only")
     val backendUnlockOnly: Boolean = false,
+    
+    @SerializedName("pin_required")
+    val pinRequired: Boolean = false,
+    
+    @SerializedName("pin_hash")
+    val pinHash: String? = null,
     
     @SerializedName("metadata")
     val metadata: Map<String, String> = emptyMap()

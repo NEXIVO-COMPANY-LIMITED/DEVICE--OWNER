@@ -3,6 +3,7 @@ package com.example.deviceowner
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
@@ -11,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.example.deviceowner.managers.RegistrationDataProtectionManager
+import com.example.deviceowner.managers.protection.RegistrationDataProtectionManager
 import com.example.deviceowner.ui.screens.WelcomeScreen
 import com.example.deviceowner.ui.screens.AgentLoginScreen
 import com.example.deviceowner.ui.screens.DeviceScannerScreen

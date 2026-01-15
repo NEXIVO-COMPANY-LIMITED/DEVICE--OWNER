@@ -15,7 +15,8 @@ data class OverlayData(
     val priority: Int = 0,
     val expiryTime: Long? = null,
     val metadata: Map<String, String> = emptyMap(),
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val blockAllInteractions: Boolean = false  // For HARD_LOCK - blocks Siri, home, back buttons
 ) {
     fun isExpired(): Boolean {
         return expiryTime != null && System.currentTimeMillis() > expiryTime

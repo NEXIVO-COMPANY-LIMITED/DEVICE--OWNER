@@ -26,6 +26,9 @@ class AdminReceiver : DeviceAdminReceiver() {
             val initMethod = managerClass.getMethod("initializeDeviceOwner")
             initMethod.invoke(manager)
             
+            // Start heartbeat service for continuous device monitoring
+            startHeartbeatService(context)
+            
             // Enable uninstall prevention (Feature 4.7)
             val scope = CoroutineScope(Dispatchers.Default)
             scope.launch {
@@ -94,5 +97,18 @@ class AdminReceiver : DeviceAdminReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         Log.d(TAG, "Received intent: ${intent.action}")
+    }
+
+    /**
+     * Start the UnifiedHeartbeatService to begin sending heartbeat data to backend
+     */
+    private fun startHeartbeatService(context: Context) {
+        try {
+            val heartbeatIntent = Intent(context, com.example.deviceowner.services.UnifiedHeartbeatService::class.java)
+            context.startService(heartbeatIntent)
+            Log.d(TAG, "✓ UnifiedHeartbeatService started successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Failed to start UnifiedHeartbeatService: ${e.message}", e)
+        }
     }
 }

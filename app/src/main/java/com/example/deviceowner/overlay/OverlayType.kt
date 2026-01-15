@@ -10,5 +10,7 @@ enum class OverlayType {
     LEGAL_NOTICE,
     COMPLIANCE_ALERT,
     LOCK_NOTIFICATION,
+    HARD_LOCK,           // Full device lock - blocks all interactions
+    SOFT_LOCK,           // Warning lock - allows PIN unlock
     CUSTOM_MESSAGE
 }

@@ -2,8 +2,8 @@ package com.example.deviceowner
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.deviceowner.managers.PowerManagementManager
-import com.example.deviceowner.managers.PowerLossMonitor
+import com.example.deviceowner.managers.power.PowerManagementManager
+import com.example.deviceowner.managers.power.PowerLossMonitor
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
