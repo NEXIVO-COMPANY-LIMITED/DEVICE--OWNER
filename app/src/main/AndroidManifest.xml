@@ -68,6 +68,28 @@
             android:name=".ui.SetupActivity"
             android:exported="false" />
         
+        <!-- Provisioning Mode Activity (Android 12+) - Required for QR code provisioning -->
+        <activity
+            android:name=".ui.provisioning.ProvisioningModeActivity"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <intent-filter>
+                <action android:name="android.app.action.GET_PROVISIONING_MODE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        
+        <!-- Policy Compliance Activity (Android 12+) - Required for QR code provisioning -->
+        <activity
+            android:name=".ui.provisioning.PolicyComplianceActivity"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <intent-filter>
+                <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        
         <!-- Device Admin Receiver -->
         <receiver
             android:name=".receivers.AdminReceiver"
@@ -77,6 +99,10 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
+            </intent-filter>
+            <!-- Required for QR code provisioning -->
+            <intent-filter>
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
             </intent-filter>
             <meta-data
                 android:name="android.app.device_admin"

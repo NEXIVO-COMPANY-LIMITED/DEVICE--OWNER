@@ -1,19 +1,30 @@
 package com.example.deviceowner.overlay
 
+import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.IBinder
 import android.util.Log
 
 /**
  * OverlayManager handles lock overlay display
  */
-class OverlayManager(private val context: Context) {
+class OverlayManager : Service() {
     
     companion object {
         private const val TAG = "OverlayManager"
     }
     
-    private val overlayController = OverlayController(context)
+    private lateinit var overlayController: OverlayController
+    
+    override fun onCreate() {
+        super.onCreate()
+        overlayController = OverlayController(this)
+    }
+    
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
+    }
     
     /**
      * Show lock overlay
