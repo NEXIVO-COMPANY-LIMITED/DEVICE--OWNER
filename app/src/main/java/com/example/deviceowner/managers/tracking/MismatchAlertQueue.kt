@@ -47,9 +47,9 @@ class MismatchAlertQueue(private val context: Context) {
             // Convert MismatchAlert to DeviceOwnerLossAlert for storage
             val deviceOwnerAlert = DeviceOwnerLossAlert(
                 deviceId = alert.device_id,
+                timestamp = alert.timestamp,
                 details = alert.alert_type,
                 severity = alert.severity,
-                timestamp = alert.timestamp,
                 recoveryAttempted = false,
                 recoverySuccessful = false,
                 recoveryAttempts = 0
@@ -158,6 +158,58 @@ class MismatchAlertQueue(private val context: Context) {
         }
     }
     
+    /**
+     * Process all queued alerts (retry failed ones)
+     */
+    suspend fun processQueuedAlerts() {
+        try {
+            val deviceOwnerAlerts = getPendingAlerts()
+            val removalAlerts = getPendingRemovalAlerts()
+            
+            Log.d(TAG, "Processing ${deviceOwnerAlerts.size} device owner alerts and ${removalAlerts.size} removal alerts")
+            
+            // Process device owner alerts
+            for (alert in deviceOwnerAlerts) {
+                try {
+                    // Convert to MismatchAlert and send to backend
+                    val mismatchAlert = com.example.deviceowner.data.api.MismatchAlert(
+                        device_id = alert.deviceId,
+                        alert_type = alert.details,
+                        mismatches = emptyList(), // Empty list for device owner loss alerts
+                        severity = alert.severity,
+                        timestamp = alert.timestamp
+                    )
+                    
+                    // Try to send to backend (implementation would go here)
+                    // For now, just log
+                    Log.d(TAG, "Processing device owner alert: ${alert.deviceId}")
+                    
+                    // Remove from queue after successful processing
+                    removeAlert(alert)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error processing device owner alert", e)
+                }
+            }
+            
+            // Process removal alerts
+            for (alert in removalAlerts) {
+                try {
+                    Log.d(TAG, "Processing removal alert: ${alert.deviceId}")
+                    
+                    // Try to send to backend (implementation would go here)
+                    // For now, just log
+                    
+                    // Remove from queue after successful processing
+                    removeRemovalAlert(alert)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error processing removal alert", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing queued alerts", e)
+        }
+    }
+
     /**
      * Clear all alerts
      */

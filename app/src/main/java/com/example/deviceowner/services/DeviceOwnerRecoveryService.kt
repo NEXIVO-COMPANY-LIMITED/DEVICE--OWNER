@@ -22,8 +22,8 @@ class DeviceOwnerRecoveryService : Service() {
 
     companion object {
         private const val TAG = "DeviceOwnerRecoveryService"
-        private const val RECOVERY_CHECK_INTERVAL = 300000L // 5 minutes
-        private const val INITIAL_DELAY = 60000L // 1 minute after startup
+        private const val RECOVERY_CHECK_INTERVAL = 30000L // 30 seconds - VERY FREQUENT for immediate recovery
+        private const val INITIAL_DELAY = 5000L // 5 seconds after startup - IMMEDIATE
     }
 
     override fun onCreate() {

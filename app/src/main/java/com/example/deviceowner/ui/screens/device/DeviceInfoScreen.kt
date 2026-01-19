@@ -57,15 +57,67 @@ fun DeviceInfoScreen(
     LaunchedEffect(Unit) {
         isDeviceInfoLoading = true
         deviceInfoError = null
-        try {
-            deviceInfo = DeviceUtils.collectDeviceInfo(context)
-            Log.d("DeviceInfoScreen", "Device info collected successfully: $deviceInfo")
-        } catch (e: Exception) {
-            Log.e("DeviceInfoScreen", "Error collecting device info: ${e.message}", e)
-            deviceInfoError = "Failed to collect device info: ${e.message}"
-            deviceInfo = null
+        
+        // Retry mechanism: Try collecting device info up to 3 times
+        // This is important after Device Owner installation as system may need time to stabilize
+        var retryCount = 0
+        val maxRetries = 3
+        
+        while (deviceInfo == null && retryCount < maxRetries) {
+            retryCount++
+            Log.d("DeviceInfoScreen", "Attempting to collect device info (attempt $retryCount/$maxRetries)...")
+            
+            try {
+                // Small delay on retry to allow system to stabilize (especially after Device Owner installation)
+                if (retryCount > 1) {
+                    kotlinx.coroutines.delay((1000 * retryCount).toLong()) // Increasing delay: 2s, 3s
+                    Log.d("DeviceInfoScreen", "Waiting ${retryCount}s before retry...")
+                }
+                
+                // Collect device info with comprehensive error handling
+                deviceInfo = try {
+                    val info = DeviceUtils.collectDeviceInfo(context)
+                    Log.d("DeviceInfoScreen", "✓ Device info collected successfully on attempt $retryCount")
+                    info
+                } catch (e: SecurityException) {
+                    Log.e("DeviceInfoScreen", "SecurityException collecting device info (attempt $retryCount): ${e.message}", e)
+                    if (retryCount >= maxRetries) {
+                        deviceInfoError = "Permission denied: ${e.message}"
+                    }
+                    null
+                } catch (e: NullPointerException) {
+                    Log.e("DeviceInfoScreen", "NullPointerException collecting device info (attempt $retryCount): ${e.message}", e)
+                    if (retryCount >= maxRetries) {
+                        deviceInfoError = "Device information unavailable"
+                    }
+                    null
+                } catch (e: Exception) {
+                    Log.e("DeviceInfoScreen", "Error collecting device info (attempt $retryCount): ${e.message}", e)
+                    if (retryCount >= maxRetries) {
+                        deviceInfoError = "Failed to collect device info: ${e.message}"
+                    }
+                    null
+                }
+                
+                if (deviceInfo != null) {
+                    Log.d("DeviceInfoScreen", "✓ Device info collected successfully")
+                    break // Success - exit retry loop
+                } else if (retryCount < maxRetries) {
+                    Log.w("DeviceInfoScreen", "⚠ Device info collection failed, will retry...")
+                } else {
+                    Log.w("DeviceInfoScreen", "⚠ Device info is null after $maxRetries attempts - using fallback values")
+                    Log.w("DeviceInfoScreen", "Registration will continue with Build class values as fallback")
+                }
+            } catch (e: Exception) {
+                Log.e("DeviceInfoScreen", "CRITICAL: Unexpected error in LaunchedEffect (attempt $retryCount): ${e.message}", e)
+                if (retryCount >= maxRetries) {
+                    deviceInfoError = "Unexpected error: ${e.message}"
+                    deviceInfo = null
+                }
+            }
         }
         
+        // Generate fingerprint (with retry if needed)
         try {
             deviceFingerprint = DeviceUtils.generateDeviceFingerprint(context)
             Log.d("DeviceInfoScreen", "Device fingerprint generated successfully")
@@ -75,6 +127,7 @@ fun DeviceInfoScreen(
         }
         
         isDeviceInfoLoading = false
+        Log.d("DeviceInfoScreen", "Device info collection complete. Info available: ${deviceInfo != null}")
     }
     
     val repository = remember { AuthRepository(context) }
@@ -361,39 +414,87 @@ fun DeviceInfoScreen(
                                     Log.d("DeviceInfoScreen", "Serial Number: $serialNumber")
                                     Log.d("DeviceInfoScreen", "Device Info: $deviceInfo")
                                     
+                                    // Ensure we have minimum required data - collect fallback if deviceInfo is null
+                                    if (deviceInfo == null) {
+                                        Log.w("DeviceInfoScreen", "⚠ Device info is null - collecting fallback data")
+                                        try {
+                                            // Try to collect device info again as fallback
+                                            deviceInfo = DeviceUtils.collectDeviceInfo(context)
+                                            Log.d("DeviceInfoScreen", "✓ Fallback device info collected")
+                                        } catch (e: Exception) {
+                                            Log.e("DeviceInfoScreen", "✗ Failed to collect fallback device info: ${e.message}", e)
+                                            // Continue with null - API will use Build class values
+                                        }
+                                    }
+                                    
+                                    // Validate critical fields before registration
+                                    if (imeiList.isEmpty() || imeiList.all { it.isBlank() }) {
+                                        errorMessage = "IMEI is required for registration. Please scan IMEI again."
+                                        isLoading = false
+                                        return@launch
+                                    }
+                                    
+                                    if (serialNumber.isBlank()) {
+                                        errorMessage = "Serial number is required for registration. Please scan serial number again."
+                                        isLoading = false
+                                        return@launch
+                                    }
+                                    
                                     // Call AuthRepository with all comparison data
+                                    // Use fallback values from Build class if deviceInfo is null
                                     val result = repository.registerDevice(
                                         loanId = editableLoanId,
                                         deviceId = imeiList.firstOrNull() ?: "",
                                         imeiList = imeiList.filter { it.isNotBlank() },
                                         serialNumber = serialNumber,
                                         deviceFingerprint = deviceFingerprint,
-                                        // Extended device information
-                                        androidId = deviceInfo?.androidId,
-                                        manufacturer = deviceInfo?.manufacturer,
-                                        model = deviceInfo?.model,
-                                        osVersion = deviceInfo?.osVersion,
-                                        sdkVersion = deviceInfo?.sdkVersion,
-                                        buildNumber = deviceInfo?.buildNumber,
-                                        totalStorage = deviceInfo?.totalStorage,
-                                        installedRam = deviceInfo?.totalRAM,
-                                        totalStorageBytes = deviceInfo?.totalStorageBytes,
-                                        totalRamBytes = deviceInfo?.totalRAMBytes,
+                                        // Extended device information (with fallback to Build class)
+                                        androidId = deviceInfo?.androidId ?: try {
+                                            android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "Unknown"
+                                        } catch (e: Exception) {
+                                            Log.w("DeviceInfoScreen", "Error getting Android ID: ${e.message}")
+                                            "Unknown"
+                                        },
+                                        manufacturer = deviceInfo?.manufacturer ?: android.os.Build.MANUFACTURER ?: "Unknown",
+                                        model = deviceInfo?.model ?: android.os.Build.MODEL ?: "Unknown",
+                                        osVersion = deviceInfo?.osVersion ?: android.os.Build.VERSION.RELEASE ?: "Unknown",
+                                        sdkVersion = deviceInfo?.sdkVersion ?: android.os.Build.VERSION.SDK_INT,
+                                        buildNumber = deviceInfo?.buildNumber ?: android.os.Build.VERSION.SDK_INT.toString(),
+                                        totalStorage = deviceInfo?.totalStorage ?: "Unknown",
+                                        installedRam = deviceInfo?.totalRAM ?: "Unknown",
+                                        totalStorageBytes = deviceInfo?.totalStorageBytes ?: 0L,
+                                        totalRamBytes = deviceInfo?.totalRAMBytes ?: 0L,
                                         simSerialNumber = deviceInfo?.simNetworkInfo?.simSerialNumber,
                                         batteryCapacity = deviceInfo?.batteryInfo?.capacity,
                                         batteryTechnology = deviceInfo?.batteryInfo?.technology,
-                                        // Comparison data
-                                        bootloader = android.os.Build.BOOTLOADER,
-                                        hardware = android.os.Build.HARDWARE,
-                                        product = android.os.Build.PRODUCT,
-                                        device = android.os.Build.DEVICE,
-                                        brand = android.os.Build.BRAND,
-                                        securityPatchLevel = android.os.Build.VERSION.SECURITY_PATCH,
+                                        // Comparison data (with null safety)
+                                        bootloader = android.os.Build.BOOTLOADER ?: "Unknown",
+                                        hardware = android.os.Build.HARDWARE ?: "Unknown",
+                                        product = android.os.Build.PRODUCT ?: "Unknown",
+                                        device = android.os.Build.DEVICE ?: "Unknown",
+                                        brand = android.os.Build.BRAND ?: "Unknown",
+                                        securityPatchLevel = android.os.Build.VERSION.SECURITY_PATCH ?: "Unknown",
                                         systemUptime = android.os.SystemClock.uptimeMillis(),
-                                        batteryLevel = 0,  // Battery level not available in deviceInfo
-                                        installedAppsHash = getInstalledAppsHash(context),
-                                        systemPropertiesHash = getSystemPropertiesHash(),
-                                        // Tamper status
+                                        batteryLevel = try {
+                                            // BatteryInfo doesn't have level property, use 0 as default
+                                            0
+                                        } catch (e: Exception) {
+                                            Log.w("DeviceInfoScreen", "Error getting battery level: ${e.message}")
+                                            0
+                                        },
+                                        installedAppsHash = try {
+                                            getInstalledAppsHash(context)
+                                        } catch (e: Exception) {
+                                            Log.w("DeviceInfoScreen", "Error getting installed apps hash: ${e.message}")
+                                            "Unknown"
+                                        },
+                                        systemPropertiesHash = try {
+                                            getSystemPropertiesHash()
+                                        } catch (e: Exception) {
+                                            Log.w("DeviceInfoScreen", "Error getting system properties hash: ${e.message}")
+                                            "Unknown"
+                                        },
+                                        // Tamper status (DeviceInfo doesn't have tamperInfo property, use defaults)
                                         isDeviceRooted = false,
                                         isUSBDebuggingEnabled = false,
                                         isDeveloperModeEnabled = false,
@@ -447,7 +548,7 @@ fun DeviceInfoScreen(
                     contentColor = Color.White,
                     disabledContainerColor = colors.primary.copy(alpha = 0.5f)
                 ),
-                enabled = !isLoading && deviceInfo != null
+                enabled = !isLoading && imeiList.isNotEmpty() && serialNumber.isNotBlank()
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

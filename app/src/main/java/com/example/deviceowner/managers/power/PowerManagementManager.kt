@@ -6,6 +6,8 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import com.example.deviceowner.receivers.AdminReceiver
+import com.example.deviceowner.managers.PaymentUserLockManager
+import com.example.deviceowner.managers.DeviceOwnerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -72,8 +74,8 @@ class PowerManagementManager(private val context: Context) {
     }
 
     /**
-     * Block power menu (OEM-specific implementation)
-     * Works on supported OEMs like Samsung, Xiaomi, etc.
+     * Completely block power menu and reboot options
+     * Prevents reboot via power menu, Settings, and other methods
      */
     private fun blockPowerMenu() {
         try {
@@ -101,11 +103,17 @@ class PowerManagementManager(private val context: Context) {
 
             // Intercept power button presses
             interceptPowerButton()
+            
+            // Block reboot via Settings
+            blockRebootViaSettings()
+            
+            // Block reboot via ADB
+            blockRebootViaADB()
 
-            Log.d(TAG, "✓ Power menu blocked successfully")
+            Log.d(TAG, "✓ Power menu and reboot completely blocked")
             auditLog.logAction(
                 "POWER_MENU_BLOCKED",
-                "Power menu blocking applied"
+                "Power menu and reboot blocking applied"
             )
         } catch (e: Exception) {
             Log.w(TAG, "Warning: Could not block power menu (may not be supported on this OEM)", e)
@@ -113,6 +121,54 @@ class PowerManagementManager(private val context: Context) {
                 "POWER_MENU_BLOCK_PARTIAL",
                 "Power menu blocking partially applied: ${e.message}"
             )
+        }
+    }
+    
+    /**
+     * Block reboot via Settings
+     */
+    private fun blockRebootViaSettings() {
+        try {
+            // Block reboot option in Settings
+            android.provider.Settings.Global.putInt(
+                context.contentResolver,
+                "reboot_enabled",
+                0
+            )
+            
+            android.provider.Settings.Secure.putInt(
+                context.contentResolver,
+                "reboot_enabled",
+                0
+            )
+            
+            Log.d(TAG, "✓ Reboot via Settings blocked")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not block reboot via Settings: ${e.message}")
+        }
+    }
+    
+    /**
+     * Block reboot via ADB
+     */
+    private fun blockRebootViaADB() {
+        try {
+            // Disable ADB to prevent reboot via ADB
+            android.provider.Settings.Global.putInt(
+                context.contentResolver,
+                android.provider.Settings.Global.ADB_ENABLED,
+                0
+            )
+            
+            // Disable USB to prevent ADB access
+            if (isDeviceOwner()) {
+                val deviceOwnerManager = DeviceOwnerManager(context)
+                deviceOwnerManager.disableUSB(true)
+            }
+            
+            Log.d(TAG, "✓ Reboot via ADB blocked")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not block reboot via ADB: ${e.message}")
         }
     }
 
@@ -234,19 +290,33 @@ class PowerManagementManager(private val context: Context) {
 
     /**
      * Handle unauthorized reboot
+     * Detects reboot as tampering and applies hard lock
      */
     private fun handleUnauthorizedReboot() {
         try {
             Log.e(TAG, "Handling unauthorized reboot...")
 
-            // Auto-lock device
+            // Auto-lock device immediately
             autoLockDevice()
+
+            // Get device ID for hard lock
+            val deviceId = getDeviceId()
+            
+            // Apply hard lock via PaymentUserLockManager (treats as tampering)
+            if (deviceId.isNotEmpty()) {
+                val paymentUserLockManager = PaymentUserLockManager(context)
+                paymentUserLockManager.applyHardLockForTampering(
+                    deviceId = deviceId,
+                    tamperDetails = "Unauthorized reboot detected - device owner or app compromised"
+                )
+                Log.d(TAG, "✓ Hard lock applied for unauthorized reboot")
+            }
 
             // Log incident
             auditLog.logIncident(
                 type = "UNAUTHORIZED_REBOOT",
                 severity = "CRITICAL",
-                details = "Unauthorized reboot detected - device owner or app compromised"
+                details = "Unauthorized reboot detected - device owner or app compromised - HARD LOCK APPLIED"
             )
 
             // Alert backend
@@ -254,6 +324,19 @@ class PowerManagementManager(private val context: Context) {
 
         } catch (e: Exception) {
             Log.e(TAG, "Error handling unauthorized reboot", e)
+        }
+    }
+    
+    /**
+     * Get device ID
+     */
+    private fun getDeviceId(): String {
+        return try {
+            val prefs = context.getSharedPreferences("device_registration", Context.MODE_PRIVATE)
+            prefs.getString("device_id", "") ?: ""
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting device ID", e)
+            ""
         }
     }
 

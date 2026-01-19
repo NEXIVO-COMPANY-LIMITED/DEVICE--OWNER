@@ -35,7 +35,8 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     deviceId: String,
     loanId: String,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onViewInstallationStatus: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
@@ -284,6 +285,38 @@ fun HomeScreen(
                     FeatureRow("Security Protection", "Tampering detection enabled")
                     FeatureRow("Command Execution", "Remote management active")
                     FeatureRow("Data Verification", "Continuous verification running")
+                }
+            }
+            
+            // Installation Status & Logs Card
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(2.dp, RoundedCornerShape(12.dp)),
+                color = Color.White,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Installation & Logs",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    
+                    // View Installation Status Button
+                    OutlinedButton(
+                        onClick = onViewInstallationStatus,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Info, "Installation Status")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View Installation Status")
+                    }
                 }
             }
             

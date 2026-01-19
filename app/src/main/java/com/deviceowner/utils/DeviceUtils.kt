@@ -63,38 +63,92 @@ data class BatteryInfo(
 object DeviceUtils {
     
     fun collectDeviceInfo(context: Context): DeviceInfo {
-        val totalStorageBytes = getTotalStorageBytes()
-        val totalRAMBytes = getTotalRAMBytes(context)
-        val androidId = getAndroidId(context)
-        val appDeviceId = getOrCreateAppDeviceId(context)
-        
-        return DeviceInfo(
-            brand = Build.BRAND.replaceFirstChar { it.uppercase() },
-            model = Build.MODEL,
-            manufacturer = Build.MANUFACTURER.replaceFirstChar { it.uppercase() },
-            osVersion = Build.VERSION.RELEASE,
-            sdkVersion = Build.VERSION.SDK_INT,
-            buildNumber = Build.DISPLAY,
-            androidId = androidId,
-            totalStorage = formatBytes(totalStorageBytes),
-            totalRAM = formatBytes(totalRAMBytes),
-            totalStorageBytes = totalStorageBytes,
-            totalRAMBytes = totalRAMBytes,
-            simNetworkInfo = getSimNetworkInfo(context),
-            batteryInfo = getBatteryInfo(context),
-            // Alternative Verification Fields
-            hardwareHash = generateHardwareHash(),
-            buildFingerprint = Build.FINGERPRINT,
-            deviceName = Build.DEVICE,
-            boardName = Build.BOARD,
-            hardware = Build.HARDWARE,
-            product = Build.PRODUCT,
-            buildId = Build.ID,
-            macAddress = getMacAddress(context),
-            bluetoothMac = getBluetoothMac(),
-            deviceSerial = getDeviceSerial(),
-            appDeviceId = appDeviceId
-        )
+        return try {
+            val totalStorageBytes = getTotalStorageBytes()
+            val totalRAMBytes = getTotalRAMBytes(context)
+            val androidId = getAndroidId(context)
+            val appDeviceId = getOrCreateAppDeviceId(context)
+            
+            // Safely get brand and manufacturer with null checks
+            val brand = try {
+                (Build.BRAND ?: "Unknown").replaceFirstChar { it.uppercase() }
+            } catch (e: Exception) {
+                "Unknown"
+            }
+            
+            val manufacturer = try {
+                (Build.MANUFACTURER ?: "Unknown").replaceFirstChar { it.uppercase() }
+            } catch (e: Exception) {
+                "Unknown"
+            }
+            
+            DeviceInfo(
+                brand = brand,
+                model = Build.MODEL ?: "Unknown",
+                manufacturer = manufacturer,
+                osVersion = Build.VERSION.RELEASE ?: "Unknown",
+                sdkVersion = Build.VERSION.SDK_INT,
+                buildNumber = Build.DISPLAY ?: "Unknown",
+                androidId = androidId,
+                totalStorage = formatBytes(totalStorageBytes),
+                totalRAM = formatBytes(totalRAMBytes),
+                totalStorageBytes = totalStorageBytes,
+                totalRAMBytes = totalRAMBytes,
+                simNetworkInfo = getSimNetworkInfo(context),
+                batteryInfo = getBatteryInfo(context),
+                // Alternative Verification Fields
+                hardwareHash = generateHardwareHash(),
+                buildFingerprint = Build.FINGERPRINT ?: "Unknown",
+                deviceName = Build.DEVICE ?: "Unknown",
+                boardName = Build.BOARD ?: "Unknown",
+                hardware = Build.HARDWARE ?: "Unknown",
+                product = Build.PRODUCT ?: "Unknown",
+                buildId = Build.ID ?: "Unknown",
+                macAddress = getMacAddress(context),
+                bluetoothMac = getBluetoothMac(),
+                deviceSerial = getDeviceSerial(),
+                appDeviceId = appDeviceId
+            )
+        } catch (e: Exception) {
+            Log.e("DeviceUtils", "CRITICAL ERROR in collectDeviceInfo: ${e.message}", e)
+            // Return a safe default DeviceInfo to prevent crash
+            DeviceInfo(
+                brand = "Unknown",
+                model = "Unknown",
+                manufacturer = "Unknown",
+                osVersion = Build.VERSION.RELEASE ?: "Unknown",
+                sdkVersion = Build.VERSION.SDK_INT,
+                buildNumber = "Unknown",
+                androidId = "Unknown",
+                totalStorage = "Unknown",
+                totalRAM = "Unknown",
+                totalStorageBytes = 0L,
+                totalRAMBytes = 0L,
+                simNetworkInfo = SimNetworkInfo(
+                    networkOperatorName = "Unknown",
+                    simOperatorName = "Unknown",
+                    simState = "Unknown",
+                    phoneType = "Unknown",
+                    networkType = "Unknown",
+                    simSerialNumber = "Unknown"
+                ),
+                batteryInfo = BatteryInfo(
+                    capacity = "Unknown",
+                    technology = "Unknown"
+                ),
+                hardwareHash = "unknown_hash",
+                buildFingerprint = "Unknown",
+                deviceName = "Unknown",
+                boardName = "Unknown",
+                hardware = "Unknown",
+                product = "Unknown",
+                buildId = "Unknown",
+                macAddress = null,
+                bluetoothMac = null,
+                deviceSerial = null,
+                appDeviceId = UUID.randomUUID().toString()
+            )
+        }
     }
     
     private fun getAndroidId(context: Context): String {
@@ -353,11 +407,22 @@ object DeviceUtils {
     fun generateDeviceFingerprint(context: Context): String {
         return try {
             val deviceInfo = collectDeviceInfo(context)
-            val fingerprint = "${deviceInfo.androidId}${deviceInfo.brand}${deviceInfo.model}${Build.SERIAL}"
+            val serial = try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    Build.getSerial()
+                } else {
+                    @Suppress("DEPRECATION")
+                    Build.SERIAL
+                }
+            } catch (e: Exception) {
+                "unknown"
+            }
+            val fingerprint = "${deviceInfo.androidId}${deviceInfo.brand}${deviceInfo.model}$serial"
             val md = MessageDigest.getInstance("SHA-256")
             val digest = md.digest(fingerprint.toByteArray())
             digest.joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
+            Log.e("DeviceUtils", "Error generating device fingerprint: ${e.message}", e)
             "unknown_fingerprint"
         }
     }

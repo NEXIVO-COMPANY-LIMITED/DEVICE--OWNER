@@ -7,42 +7,28 @@
     
     <!-- Device information permissions -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_DEVICE_CONFIG" />
-    
-    <!-- Device owner permissions -->
-    <uses-permission android:name="android.permission.MANAGE_DEVICE_ADMINS" />
-    <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN" />
-    <uses-permission android:name="android.permission.MANAGE_USERS" />
-    <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
-    <uses-permission android:name="android.permission.REBOOT" />
-    <uses-permission android:name="android.permission.CHANGE_CONFIGURATION" />
-    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
-    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
-    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
-    <uses-permission android:name="android.permission.INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.DELETE_PACKAGES" />
-    <uses-permission android:name="android.permission.CHANGE_DEVICE_ADMIN" />
     
     <!-- Camera permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     
-    <!-- Battery permission -->
-    <uses-permission android:name="android.permission.BATTERY_STATS" />
-    
     <!-- Location permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     
-    <!-- Package management permissions -->
-    <uses-permission android:name="android.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS" />
+    <!-- Boot receiver permission -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
-    <!-- Overlay permissions (Feature 4.6) -->
+    <!-- Overlay permissions -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.SYSTEM_OVERLAY_WINDOW" />
+    
+    <!-- Wake lock permission -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Foreground service permission (Android 9+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -53,7 +39,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.DEVICEOWNER"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:targetApi="31"
+        tools:ignore="AllowBackup,GoogleAppIndexingWarning">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -65,25 +53,37 @@
         </activity>
         
         <activity
-            android:name=".ui.SetupActivity"
+            android:name=".ui.activities.setup.SetupActivity"
             android:exported="false" />
         
-        <!-- Provisioning Mode Activity (Android 12+) - Required for QR code provisioning -->
+        <!-- Device Owner Installation Status Activity -->
+        <!-- Automatically shown after Device Owner initialization completes -->
+        <activity
+            android:name=".ui.activities.DeviceOwnerInstallationStatusActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:excludeFromRecents="false" />
+        
+        <!-- Provisioning Mode Activity -->
+        <!-- Required for Android 12+ QR code provisioning -->
         <activity
             android:name=".ui.provisioning.ProvisioningModeActivity"
             android:exported="true"
-            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            android:theme="@style/Theme.DEVICEOWNER">
             <intent-filter>
                 <action android:name="android.app.action.GET_PROVISIONING_MODE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
         
-        <!-- Policy Compliance Activity (Android 12+) - Required for QR code provisioning -->
+        <!-- Policy Compliance Activity -->
+        <!-- Required for Android 12+ QR code provisioning -->
         <activity
             android:name=".ui.provisioning.PolicyComplianceActivity"
             android:exported="true"
-            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            android:theme="@style/Theme.DEVICEOWNER">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -91,6 +91,7 @@
         </activity>
         
         <!-- Device Admin Receiver -->
+        <!-- Required for device owner provisioning via QR code, NFC, or ADB -->
         <receiver
             android:name=".receivers.AdminReceiver"
             android:exported="true"
@@ -99,32 +100,57 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
-            </intent-filter>
-            <!-- Required for QR code provisioning -->
-            <intent-filter>
+                <!-- Required for QR code and NFC provisioning -->
                 <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
             </intent-filter>
             <meta-data
                 android:name="android.app.device_admin"
                 android:resource="@xml/device_admin_receiver" />
         </receiver>
         
-        <!-- Heartbeat Verification Service -->
+        <!-- Services -->
+        <service
+            android:name=".services.UnifiedHeartbeatService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        
         <service
             android:name=".services.HeartbeatVerificationService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         
-        <!-- Command Queue Service (Feature 4.9) -->
         <service
             android:name=".services.CommandQueueService"
             android:exported="false" />
         
-        <!-- Mismatch Alert Retry Service (Feature 4.2) -->
+        <service
+            android:name=".services.TamperDetectionService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        
+        <service
+            android:name=".services.FlashingDetectionService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        
+        <service
+            android:name=".services.ComprehensiveSecurityService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        
+        <service
+            android:name=".services.DeviceOwnerRecoveryService"
+            android:exported="false" />
+        
         <service
             android:name=".services.MismatchAlertRetryService"
             android:exported="false" />
         
-        <!-- Boot Receiver -->
+        <service
+            android:name=".overlay.OverlayManager"
+            android:exported="false" />
+        <!-- Receivers -->
         <receiver
             android:name=".receivers.BootReceiver"
             android:exported="true">
@@ -133,20 +159,16 @@
             </intent-filter>
         </receiver>
         
-        <!-- Package Removal Receiver -->
         <receiver
             android:name=".receivers.PackageRemovalReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />
                 <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
-                <action android:name="android.intent.action.PACKAGE_CHANGED" />
-                <action android:name="android.intent.action.PACKAGE_NEEDS_VERIFICATION" />
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
         
-        <!-- Reboot Detection Receiver (Feature 4.5) -->
         <receiver
             android:name=".receivers.RebootDetectionReceiver"
             android:exported="true">
@@ -154,11 +176,7 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-        
-        <!-- Overlay Manager Service (Feature 4.6) -->
-        <service
-            android:name=".overlay.OverlayManager"
-            android:exported="false" />
+
     </application>
 
 </manifest>

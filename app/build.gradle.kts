@@ -39,17 +39,42 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // API Configuration - Using HTTP for now
+        buildConfigField("String", "BASE_URL", "\"http://82.29.168.120/\"")
+        buildConfigField("Boolean", "ENABLE_LOGGING", "true")
+        buildConfigField("String", "API_VERSION", "\"v1\"")
     }
 
     buildTypes {
+        debug {
+            // Development configuration
+            buildConfigField("String", "BASE_URL", "\"http://82.29.168.120/\"")
+            buildConfigField("Boolean", "ENABLE_LOGGING", "true")
+            buildConfigField("String", "API_VERSION", "\"v1\"")
+            isDebuggable = true
+        }
+        
         release {
-            isMinifyEnabled = false
+            // Production configuration
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            
+            // Production API settings - Using HTTP for now
+            buildConfigField("String", "BASE_URL", "\"http://82.29.168.120/\"")
+            buildConfigField("Boolean", "ENABLE_LOGGING", "false")
+            buildConfigField("String", "API_VERSION", "\"v1\"")
         }
+    }
+    
+    buildFeatures {
+        compose = true
+        buildConfig = true  // Enable BuildConfig generation
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

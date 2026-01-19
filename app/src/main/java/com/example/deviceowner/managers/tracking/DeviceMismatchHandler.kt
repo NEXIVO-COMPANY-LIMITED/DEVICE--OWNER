@@ -161,111 +161,32 @@ class DeviceMismatchHandler(private val context: Context) {
 
     /**
      * Alert backend about mismatch
-     * Sends alert via API with retry queue for offline scenarios
+     * 
+     * NOTE: Backend will detect mismatch from heartbeat data automatically.
+     * No need to send separate API call. Just log locally and lock device.
+     * Backend compares heartbeat data with baseline and responds with lock_status.
      */
     private suspend fun alertBackend(details: MismatchDetails) {
         withContext(Dispatchers.IO) {
             try {
-                Log.w(TAG, "Alerting backend about mismatch: ${details.type}")
+                Log.w(TAG, "Mismatch detected locally: ${details.type}")
+                Log.w(TAG, "Backend will detect this from heartbeat data")
+                Log.w(TAG, "Device locked locally. Backend will confirm via heartbeat response.")
                 
-                // Get device ID
-                val prefs = context.getSharedPreferences("identifier_prefs", Context.MODE_PRIVATE)
-                val deviceId = prefs.getString("device_id", "") ?: ""
-                val loanNumber = prefs.getString("loan_number", "") ?: ""
-                
-                if (deviceId.isEmpty()) {
-                    Log.e(TAG, "Device ID not found, cannot alert backend")
-                    return@withContext
-                }
-                
-                // Create alert
-                val mismatchList = listOf(
-                    com.example.deviceowner.data.api.HeartbeatMismatchResponse(
-                        field = details.type.name,
-                        expected_value = details.storedValue,
-                        actual_value = details.currentValue,
-                        severity = details.severity,
-                        field_type = "DEVICE_IDENTIFIER"
-                    )
+                // Log locally - backend will detect from heartbeat
+                auditLog.logAction(
+                    "MISMATCH_DETECTED_LOCALLY", 
+                    "Type: ${details.type}, Backend will detect from heartbeat"
                 )
                 
-                val mismatchAlert = com.example.deviceowner.data.api.MismatchAlert(
-                    device_id = deviceId,
-                    alert_type = details.type.name,
-                    mismatches = mismatchList,
-                    severity = details.severity,
-                    timestamp = details.timestamp
-                )
+                // Device is already locked by handleMismatch()
+                // Backend will detect mismatch from next heartbeat and respond with lock_status
+                // No need for separate API call
                 
-                // Send to backend
-                val success = sendMismatchAlert(deviceId, mismatchAlert)
-                
-                if (success) {
-                    Log.d(TAG, "✓ Backend alerted successfully")
-                    auditLog.logAction("BACKEND_ALERT_SENT", "Mismatch reported: ${details.type}")
-                } else {
-                    Log.e(TAG, "✗ Failed to alert backend, queuing for retry")
-                    // Queue for retry
-                    queueMismatchAlert(mismatchAlert)
-                }
             } catch (e: Exception) {
-                Log.e(TAG, "Error alerting backend", e)
+                Log.e(TAG, "Error logging mismatch", e)
             }
         }
-    }
-    
-    /**
-     * Send mismatch alert to backend via API
-     */
-    private suspend fun sendMismatchAlert(
-        deviceId: String,
-        alert: com.example.deviceowner.data.api.MismatchAlert
-    ): Boolean {
-        return try {
-            val retrofit = retrofit2.Retrofit.Builder()
-                .baseUrl("http://82.29.168.120/")
-                .addConverterFactory(com.google.gson.Gson().let { 
-                    retrofit2.converter.gson.GsonConverterFactory.create(it)
-                })
-                .client(createOkHttpClient())
-                .build()
-            
-            val apiService = retrofit.create(com.example.deviceowner.data.api.HeartbeatApiService::class.java)
-            val response = apiService.reportMismatch(deviceId, alert)
-            
-            if (response.isSuccessful) {
-                val body = response.body()
-                Log.d(TAG, "✓ Mismatch alert sent: ${body?.message}")
-                
-                // Process any action from backend
-                body?.action?.let { action ->
-                    Log.w(TAG, "Backend action: $action")
-                }
-                
-                true
-            } else {
-                Log.e(TAG, "✗ Failed to send alert: ${response.code()} - ${response.message()}")
-                false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending mismatch alert", e)
-            false
-        }
-    }
-    
-    /**
-     * Create OkHttpClient with proper configuration
-     */
-    private fun createOkHttpClient(): okhttp3.OkHttpClient {
-        return okhttp3.OkHttpClient.Builder()
-            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .addInterceptor(okhttp3.logging.HttpLoggingInterceptor().apply {
-                level = okhttp3.logging.HttpLoggingInterceptor.Level.BODY
-            })
-            .build()
     }
     
     /**
@@ -293,19 +214,8 @@ class DeviceMismatchHandler(private val context: Context) {
         }
     }
     
-    /**
-     * Queue mismatch alert for retry when offline
-     */
-    private fun queueMismatchAlert(alert: com.example.deviceowner.data.api.MismatchAlert) {
-        try {
-            val alertQueue = MismatchAlertQueue(context)
-            alertQueue.queueAlert(alert)
-            Log.d(TAG, "Mismatch alert queued for retry")
-            auditLog.logAction("ALERT_QUEUED", "Mismatch alert queued for retry")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error queuing mismatch alert", e)
-        }
-    }
+    // Removed queueMismatchAlert() - not needed
+    // Backend detects mismatch from heartbeat data automatically
 
     /**
      * Disable critical features

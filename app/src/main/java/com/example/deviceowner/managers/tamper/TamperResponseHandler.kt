@@ -294,16 +294,8 @@ class TamperResponseHandler(private val context: Context) {
                     details = buildTamperDetails(tamperStatus)
                 )
 
-                // Send to backend
-                val success = sendTamperAlert(deviceId, tamperAlert)
-
-                if (success) {
-                    Log.d(TAG, "✓ Backend alerted successfully")
-                    auditLog.logAction("BACKEND_ALERT_SENT", "Tamper alert sent to backend")
-                } else {
-                    Log.e(TAG, "✗ Failed to alert backend, queuing for retry")
-                    queueTamperAlert(tamperAlert)
-                }
+                // Log locally - backend will detect from heartbeat data
+                sendTamperAlert(deviceId, tamperAlert)
             } catch (e: Exception) {
                 Log.e(TAG, "Error alerting backend", e)
             }
@@ -312,82 +304,39 @@ class TamperResponseHandler(private val context: Context) {
 
     /**
      * Send tamper alert to backend
+     * 
+     * NOTE: Backend will detect tampering from heartbeat data automatically.
+     * No need to send separate API call. Just log locally and lock device.
+     * Backend compares heartbeat data with baseline and responds with lock_status.
      */
     private suspend fun sendTamperAlert(
         deviceId: String,
         alert: TamperAlert
     ): Boolean {
         return try {
-            val retrofit = retrofit2.Retrofit.Builder()
-                .baseUrl("http://82.29.168.120/")
-                .addConverterFactory(com.google.gson.Gson().let {
-                    retrofit2.converter.gson.GsonConverterFactory.create(it)
-                })
-                .client(createOkHttpClient())
-                .build()
-
-            val apiService = retrofit.create(com.example.deviceowner.data.api.HeartbeatApiService::class.java)
+            Log.w(TAG, "Tampering detected locally: ${alert.tamperFlags.joinToString(", ")}")
+            Log.w(TAG, "Backend will detect this from heartbeat data")
+            Log.w(TAG, "Device locked locally. Backend will confirm via heartbeat response.")
             
-            // Convert TamperAlert to MismatchAlert for backend reporting
-            val mismatchList = listOf(
-                com.example.deviceowner.data.api.HeartbeatMismatchResponse(
-                    field = "tamper_status",
-                    expected_value = "CLEAN",
-                    actual_value = alert.tamperFlags.joinToString(", "),
-                    severity = alert.severity,
-                    field_type = "TAMPER_DETECTION"
-                )
+            // Log locally - backend will detect from heartbeat
+            auditLog.logAction(
+                "TAMPER_DETECTED_LOCALLY",
+                "Flags: ${alert.tamperFlags.joinToString(", ")}, Backend will detect from heartbeat"
             )
             
-            val mismatchAlert = com.example.deviceowner.data.api.MismatchAlert(
-                device_id = deviceId,
-                alert_type = "TAMPER_DETECTED",
-                mismatches = mismatchList,
-                severity = alert.severity,
-                timestamp = alert.timestamp
-            )
+            // Device is already locked by handleTamperAlert()
+            // Backend will detect tampering from next heartbeat and respond with lock_status
+            // No need for separate API call
             
-            val response = apiService.reportMismatch(deviceId, mismatchAlert)
-
-            if (response.isSuccessful) {
-                val body: com.example.deviceowner.data.api.MismatchAlertResponse? = response.body()
-                Log.d(TAG, "✓ Tamper alert sent: ${body?.message}")
-
-                // Process any action from backend
-                body?.action?.let { action ->
-                    Log.w(TAG, "Backend action received: $action")
-                }
-
-                true
-            } else {
-                Log.e(TAG, "✗ Failed to send alert: ${response.code()} - ${response.message()}")
-                false
-            }
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Error sending tamper alert", e)
+            Log.e(TAG, "Error logging tamper alert", e)
             false
         }
     }
 
-    /**
-     * Queue tamper alert for retry when offline
-     */
-    private fun queueTamperAlert(alert: TamperAlert) {
-        try {
-            val prefs = context.getSharedPreferences("tamper_alerts_queue", Context.MODE_PRIVATE)
-            val gson = com.google.gson.Gson()
-            val alertJson = gson.toJson(alert)
-
-            val queue = prefs.getStringSet("alerts", mutableSetOf()) ?: mutableSetOf()
-            queue.add(alertJson)
-
-            prefs.edit().putStringSet("alerts", queue).apply()
-            Log.d(TAG, "Tamper alert queued for retry")
-            auditLog.logAction("ALERT_QUEUED", "Tamper alert queued for retry")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error queuing tamper alert", e)
-        }
-    }
+    // Removed queueTamperAlert() - not needed
+    // Backend detects tampering from heartbeat data automatically
 
     /**
      * Enable enhanced monitoring

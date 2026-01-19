@@ -93,6 +93,9 @@ class BootReceiver : BroadcastReceiver() {
                 
                 // Start command queue service (Feature 4.9)
                 startCommandQueueService(context)
+                
+                // Start comprehensive security service
+                startComprehensiveSecurityService(context)
 
                 Log.d(TAG, "✓ Post-boot verification completed successfully")
                 auditLog.logAction(
@@ -136,6 +139,20 @@ class BootReceiver : BroadcastReceiver() {
             Log.d(TAG, "✓ CommandQueueService started after boot")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting CommandQueueService", e)
+        }
+    }
+    
+    /**
+     * Start comprehensive security service
+     * Continuous security monitoring and enforcement
+     */
+    private fun startComprehensiveSecurityService(context: Context) {
+        try {
+            val intent = Intent(context, com.example.deviceowner.services.ComprehensiveSecurityService::class.java)
+            context.startService(intent)
+            Log.d(TAG, "✓ ComprehensiveSecurityService started after boot")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting ComprehensiveSecurityService", e)
         }
     }
 }

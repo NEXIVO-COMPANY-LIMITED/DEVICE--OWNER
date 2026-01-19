@@ -244,7 +244,7 @@ class HeartbeatValidator(private val context: Context) {
                 
                 // Create API service
                 val retrofit = Retrofit.Builder()
-                    .baseUrl("http://82.29.168.120/")
+                    .baseUrl(com.example.deviceowner.config.ApiConfig.getBaseUrl(context))
                     .addConverterFactory(GsonConverterFactory.create())
                     .client(createOkHttpClient())
                     .build()

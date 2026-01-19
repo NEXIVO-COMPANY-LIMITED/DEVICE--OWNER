@@ -68,9 +68,9 @@ class UnifiedHeartbeatService : Service() {
         remoteLockManager = RemoteLockManager(this)
         auditLog = IdentifierAuditLog(this)
         
-        // Initialize Retrofit API service
+        // Initialize Retrofit API service with configurable base URL
         val retrofit = Retrofit.Builder()
-            .baseUrl("http://82.29.168.120/")
+            .baseUrl(com.example.deviceowner.config.ApiConfig.getBaseUrl(this))
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         
@@ -493,7 +493,7 @@ class UnifiedHeartbeatService : Service() {
         return withContext(Dispatchers.IO) {
             try {
                 val retrofit = Retrofit.Builder()
-                    .baseUrl("http://82.29.168.120/")
+                    .baseUrl(com.example.deviceowner.config.ApiConfig.getBaseUrl(this@UnifiedHeartbeatService))
                     .addConverterFactory(GsonConverterFactory.create())
                     .client(createOkHttpClient())
                     .build()

@@ -19,6 +19,7 @@ import com.example.deviceowner.ui.screens.DeviceScannerScreen
 import com.example.deviceowner.ui.screens.DeviceInfoScreen
 import com.example.deviceowner.ui.screens.SuccessScreen
 import com.example.deviceowner.ui.screens.HomeScreen
+import com.example.deviceowner.ui.screens.DeviceOwnerInstallationStatusScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -143,6 +144,16 @@ fun AppNavigation(activity: MainActivity) {
                 loanId = loanId,
                 onLogout = {
                     currentScreen = "welcome"
+                },
+                onViewInstallationStatus = {
+                    currentScreen = "installationStatus"
+                }
+            )
+        }
+        "installationStatus" -> {
+            DeviceOwnerInstallationStatusScreen(
+                onBack = {
+                    currentScreen = "home"
                 }
             )
         }

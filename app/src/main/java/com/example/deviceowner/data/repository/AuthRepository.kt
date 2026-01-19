@@ -130,7 +130,7 @@ class AuthRepository(private val context: Context) {
                 // Send to backend using HeartbeatApiService
                 val gson = com.google.gson.Gson()
                 val retrofit = retrofit2.Retrofit.Builder()
-                    .baseUrl("http://82.29.168.120/")
+                    .baseUrl(com.example.deviceowner.config.ApiConfig.getBaseUrl(context))
                     .addConverterFactory(GsonConverterFactory.create(gson))
                     .build()
                 

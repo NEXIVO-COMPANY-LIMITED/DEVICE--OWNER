@@ -27,8 +27,21 @@ class CertificatePinning(private val context: Context) {
     companion object {
         private const val TAG = "CertificatePinning"
         
-        // Backend server configuration
-        private const val BACKEND_HOST = "82.29.168.120"
+        /**
+         * Get backend host from URL
+         * Extracts host from base URL for certificate pinning
+         */
+        private fun getBackendHost(context: Context): String {
+            val baseUrl = com.example.deviceowner.config.ApiConfig.getBaseUrl(context)
+            return try {
+                val url = java.net.URL(baseUrl)
+                url.host
+            } catch (e: Exception) {
+                Log.w(TAG, "Error extracting host from URL: $baseUrl", e)
+                "api.yourdomain.com" // Fallback
+            }
+        }
+        
         private const val BACKEND_PORT = 8443
         
         // Certificate pins (SHA-256 hashes of public keys)
@@ -49,9 +62,13 @@ class CertificatePinning(private val context: Context) {
         return try {
             Log.d(TAG, "Creating secure OkHttpClient with certificate pinning")
             
+            // Get backend host from configuration
+            val backendHost = getBackendHost(context)
+            Log.d(TAG, "Using backend host for certificate pinning: $backendHost")
+            
             // Create certificate pinner
             val certificatePinner = CertificatePinner.Builder()
-                .add(BACKEND_HOST, *CERTIFICATE_PINS)
+                .add(backendHost, *CERTIFICATE_PINS)
                 .build()
             
             // Create SSL context with TLS 1.2+
@@ -195,9 +212,10 @@ class CertificatePinning(private val context: Context) {
     fun updateCertificatePins(newPins: Array<String>): CertificatePinner {
         return try {
             Log.d(TAG, "Updating certificate pins")
+            val backendHost = getBackendHost(context)
             
             CertificatePinner.Builder()
-                .add(BACKEND_HOST, *newPins)
+                .add(backendHost, *newPins)
                 .build()
         } catch (e: Exception) {
             Log.e(TAG, "Error updating certificate pins", e)

@@ -33,14 +33,36 @@ class ProvisioningModeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "========================================")
         Log.d(TAG, "ProvisioningModeActivity created")
+        Log.d(TAG, "Android version: ${Build.VERSION.SDK_INT} (S = ${Build.VERSION_CODES.S})")
+        Log.d(TAG, "========================================")
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            handleGetProvisioningMode()
-        } else {
-            // For Android < 12, just finish with RESULT_OK
-            Log.d(TAG, "Android version < 12, finishing with RESULT_OK")
-            setResult(Activity.RESULT_OK)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                handleGetProvisioningMode()
+            } else {
+                // For Android < 12, provisioning mode selection is not required
+                // But we should still return a result to allow provisioning to continue
+                Log.d(TAG, "Android version < 12, returning fully managed device mode")
+                val resultIntent = Intent().apply {
+                    putExtra(EXTRA_PROVISIONING_MODE, PROVISIONING_MODE_FULLY_MANAGED_DEVICE)
+                }
+                setResult(Activity.RESULT_OK, resultIntent)
+                finish()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "CRITICAL ERROR in ProvisioningModeActivity", e)
+            // Always return fully managed device mode as fallback
+            try {
+                val resultIntent = Intent().apply {
+                    putExtra(EXTRA_PROVISIONING_MODE, PROVISIONING_MODE_FULLY_MANAGED_DEVICE)
+                }
+                setResult(Activity.RESULT_OK, resultIntent)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Error creating result intent", e2)
+                setResult(Activity.RESULT_OK)
+            }
             finish()
         }
     }
@@ -48,9 +70,10 @@ class ProvisioningModeActivity : Activity() {
     private fun handleGetProvisioningMode() {
         val action = intent.action
         Log.d(TAG, "Handling intent action: $action")
+        Log.d(TAG, "Intent extras: ${intent.extras?.keySet()}")
         
-        if (ACTION_GET_PROVISIONING_MODE == action) {
-            try {
+        try {
+            if (ACTION_GET_PROVISIONING_MODE == action) {
                 // Get allowed provisioning modes from intent
                 val allowedModes = intent.getIntegerArrayListExtra(EXTRA_PROVISIONING_ALLOWED_PROVISIONING_MODES)
                 Log.d(TAG, "Allowed provisioning modes: $allowedModes")
@@ -58,29 +81,49 @@ class ProvisioningModeActivity : Activity() {
                 // Return fully managed device mode if allowed, otherwise use first available mode
                 val provisioningMode = if (allowedModes != null && allowedModes.isNotEmpty()) {
                     if (allowedModes.contains(PROVISIONING_MODE_FULLY_MANAGED_DEVICE)) {
+                        Log.d(TAG, "✓ Fully managed device mode is allowed - using it")
                         PROVISIONING_MODE_FULLY_MANAGED_DEVICE
                     } else {
+                        Log.w(TAG, "⚠ Fully managed device mode NOT allowed. Allowed modes: $allowedModes")
+                        Log.w(TAG, "Using first allowed mode: ${allowedModes[0]}")
                         allowedModes[0] // Use first allowed mode
                     }
                 } else {
                     // Default to fully managed device mode
+                    Log.d(TAG, "No allowed modes specified - defaulting to fully managed device mode")
                     PROVISIONING_MODE_FULLY_MANAGED_DEVICE
                 }
                 
+                Log.d(TAG, "========================================")
                 Log.d(TAG, "Returning provisioning mode: $provisioningMode")
+                Log.d(TAG, "Mode: ${if (provisioningMode == PROVISIONING_MODE_FULLY_MANAGED_DEVICE) "Fully Managed Device" else "Managed Profile"}")
+                Log.d(TAG, "========================================")
                 
                 // Set result with provisioning mode
                 val resultIntent = Intent().apply {
                     putExtra(EXTRA_PROVISIONING_MODE, provisioningMode)
                 }
                 setResult(Activity.RESULT_OK, resultIntent)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error handling GET_PROVISIONING_MODE", e)
-                setResult(Activity.RESULT_CANCELED)
+            } else {
+                Log.w(TAG, "Unexpected intent action: $action")
+                // Return fully managed device mode as fallback
+                val resultIntent = Intent().apply {
+                    putExtra(EXTRA_PROVISIONING_MODE, PROVISIONING_MODE_FULLY_MANAGED_DEVICE)
+                }
+                setResult(Activity.RESULT_OK, resultIntent)
             }
-        } else {
-            Log.w(TAG, "Unexpected intent action: $action")
-            setResult(Activity.RESULT_CANCELED)
+        } catch (e: Exception) {
+            Log.e(TAG, "CRITICAL ERROR handling GET_PROVISIONING_MODE", e)
+            // Always return fully managed device mode as fallback
+            try {
+                val resultIntent = Intent().apply {
+                    putExtra(EXTRA_PROVISIONING_MODE, PROVISIONING_MODE_FULLY_MANAGED_DEVICE)
+                }
+                setResult(Activity.RESULT_OK, resultIntent)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Error creating fallback result intent", e2)
+                setResult(Activity.RESULT_OK)
+            }
         }
         
         finish()

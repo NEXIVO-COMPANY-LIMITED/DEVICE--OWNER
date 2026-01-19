@@ -36,7 +36,7 @@ class TamperDetectionService : Service() {
     
     companion object {
         private const val TAG = "TamperDetectionService"
-        private const val HEARTBEAT_INTERVAL = 60000L // 1 minute
+        private const val HEARTBEAT_INTERVAL = 5000L // 5 seconds - REAL-TIME detection
     }
     
     override fun onCreate() {
@@ -49,7 +49,7 @@ class TamperDetectionService : Service() {
         
         // Initialize Retrofit API service
         val retrofit = Retrofit.Builder()
-            .baseUrl("http://82.29.168.120/")
+            .baseUrl(com.example.deviceowner.config.ApiConfig.getBaseUrl(this))
             .addConverterFactory(GsonConverterFactory.create())
             .client(createOkHttpClient())
             .build()
@@ -316,7 +316,7 @@ class TamperDetectionService : Service() {
         return withContext(Dispatchers.IO) {
             try {
                 val retrofit = Retrofit.Builder()
-                    .baseUrl("http://82.29.168.120/")
+                    .baseUrl(com.example.deviceowner.config.ApiConfig.getBaseUrl(this@TamperDetectionService))
                     .addConverterFactory(GsonConverterFactory.create())
                     .client(createOkHttpClient())
                     .build()

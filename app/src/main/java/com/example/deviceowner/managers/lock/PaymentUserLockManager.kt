@@ -72,13 +72,13 @@ class PaymentUserLockManager(private val context: Context) {
                 "ACTIVE" -> {
                     val daysUntilDue = loanManager.getDaysUntilDue(loan.loanId)
                     
-                    // Apply soft lock if payment due in 2 days
+                    // Apply soft lock if payment due in 2 days (warning only)
                     if (daysUntilDue <= PAYMENT_REMINDER_DAYS && daysUntilDue > 0) {
                         if (existingLock?.lockType != LockType.SOFT) {
                             applySoftLockForPaymentReminder(deviceId, loan, payment, daysUntilDue)
                         }
                     } else if (daysUntilDue <= 0) {
-                        // Payment is overdue, apply hard lock
+                        // Payment is overdue, apply HARD LOCK (not soft lock)
                         applyHardLockForPaymentOverdue(deviceId, loan, payment)
                     } else {
                         // Remove any existing lock
@@ -87,7 +87,7 @@ class PaymentUserLockManager(private val context: Context) {
                 }
 
                 "OVERDUE" -> {
-                    // Apply hard lock for overdue payment
+                    // Apply HARD LOCK for overdue payment (ensures hard lock)
                     if (existingLock?.lockType != LockType.HARD) {
                         applyHardLockForPaymentOverdue(deviceId, loan, payment)
                     }

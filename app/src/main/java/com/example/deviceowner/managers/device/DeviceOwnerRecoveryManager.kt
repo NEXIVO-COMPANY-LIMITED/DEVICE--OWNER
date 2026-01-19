@@ -35,8 +35,8 @@ class DeviceOwnerRecoveryManager(private val context: Context) {
         private const val KEY_RECOVERY_ATTEMPTS = "recovery_attempts"
         private const val KEY_LAST_RECOVERY_TIME = "last_recovery_time"
         private const val KEY_RECOVERY_STATE = "recovery_state"
-        private const val MAX_RECOVERY_ATTEMPTS = 5
-        private const val RECOVERY_COOLDOWN_MS = 30000L // 30 seconds between attempts
+        private const val MAX_RECOVERY_ATTEMPTS = 10 // Increased for more recovery attempts
+        private const val RECOVERY_COOLDOWN_MS = 10000L // 10 seconds between attempts - FASTER RECOVERY
     }
     
     /**
