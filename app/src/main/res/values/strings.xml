@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">DEVICE OWNER</string>
+    <string name="app_name">PAYO</string>
+    <string name="app_name_admin">DEVICE OWNER</string>
+    <string name="app_name_stealth">PAYO</string>
 </resources>

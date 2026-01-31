@@ -3,15 +3,13 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-    kotlin("kapt")
+    id("com.google.devtools.ksp") version "1.9.25-1.0.20"
+    id("org.jetbrains.kotlin.plugin.parcelize") version "1.9.25"
 }
 
 android {
     namespace = "com.example.deviceowner"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     // Load keystore properties
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -25,7 +23,7 @@ android {
             if (keystorePropertiesFile.exists()) {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
@@ -40,23 +38,34 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
-        // API Configuration - Using HTTP for now
-        buildConfigField("String", "BASE_URL", "\"http://82.29.168.120/\"")
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+        
+        // API Configuration - Using HTTPS for production server (Device Owner compatible)
+        buildConfigField("String", "BASE_URL", "\"https://payoplan.com/\"")
         buildConfigField("Boolean", "ENABLE_LOGGING", "true")
         buildConfigField("String", "API_VERSION", "\"v1\"")
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    
     buildTypes {
         debug {
-            // Development configuration
-            buildConfigField("String", "BASE_URL", "\"http://82.29.168.120/\"")
+            // Development configuration - Using HTTPS for Device Owner compatibility
+            buildConfigField("String", "BASE_URL", "\"https://payoplan.com/\"")
             buildConfigField("Boolean", "ENABLE_LOGGING", "true")
             buildConfigField("String", "API_VERSION", "\"v1\"")
             isDebuggable = true
         }
         
         release {
-            // Production configuration
+            // Production configuration - Using HTTPS for Device Owner compatibility
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -65,9 +74,9 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
             
-            // Production API settings - Using HTTP for now
-            buildConfigField("String", "BASE_URL", "\"http://82.29.168.120/\"")
-            buildConfigField("Boolean", "ENABLE_LOGGING", "false")
+            // Production API settings - Using HTTPS for Device Owner compatibility
+            buildConfigField("String", "BASE_URL", "\"https://payoplan.com/\"")
+            buildConfigField("Boolean", "ENABLE_LOGGING", "true") // Keep logging enabled for crash debugging
             buildConfigField("String", "API_VERSION", "\"v1\"")
         }
     }
@@ -76,18 +85,18 @@ android {
         compose = true
         buildConfig = true  // Enable BuildConfig generation
     }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.15"
+    }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    
     kotlinOptions {
         jvmTarget = "11"
-    }
-    buildFeatures {
-        compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.10"
     }
 }
 
@@ -115,23 +124,14 @@ dependencies {
     implementation(libs.compose.activity)
     implementation(libs.compose.icons)
     
-    // CameraX
-    implementation(libs.camera.core)
-    implementation(libs.camera.camera2)
-    implementation(libs.camera.lifecycle)
-    implementation(libs.camera.view)
-    
-    // ML Kit (vision-common must come before barcode-scanning)
-    implementation(libs.mlkit.vision)
-    implementation(libs.mlkit.barcode)
-    
-    // Accompanist Permissions
-    implementation(libs.accompanist.permissions)
+    // Compose ViewModel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     
     // Room Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    kapt(libs.room.compiler)
+    ksp(libs.room.compiler)
+    ksp(libs.room.compiler)
     
     // WorkManager for background tasks
     implementation(libs.workmanager)
@@ -139,6 +139,10 @@ dependencies {
     // Coroutines
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
+    
+    // Lifecycle
+    implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.lifecycle.livedata.ktx)
     
     // Google Play Services Location
     implementation(libs.playservices.location)

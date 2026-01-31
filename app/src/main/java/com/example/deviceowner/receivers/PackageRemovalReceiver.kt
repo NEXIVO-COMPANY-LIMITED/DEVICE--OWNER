@@ -4,15 +4,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.managers.RemovalAttemptTracker
-import com.example.deviceowner.managers.IdentifierAuditLog
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.example.deviceowner.device.DeviceOwnerManager
 
 /**
- * Real-time package removal receiver
- * Detects unauthorized app removal attempts immediately
- * Provides instant response to removal threats
+ * Package Removal Receiver
+ * Detects attempts to uninstall, clear data, or deactivate the device owner app
+ * Triggers immediate security response when detected
  */
 class PackageRemovalReceiver : BroadcastReceiver() {
     
@@ -21,62 +19,78 @@ class PackageRemovalReceiver : BroadcastReceiver() {
     }
     
     override fun onReceive(context: Context, intent: Intent) {
-        try {
-            // Check if this is a package removal action
-            if (intent.action != Intent.ACTION_PACKAGE_REMOVED) {
-                Log.d(TAG, "Ignoring non-removal action: ${intent.action}")
-                return
-            }
-            
-            // Get the package name from the intent
-            val packageName = intent.data?.schemeSpecificPart
-            
-            if (packageName == null) {
-                Log.w(TAG, "Package name not found in intent")
-                return
-            }
-            
-            // Check if it's our app being removed
-            if (packageName == context.packageName) {
-                Log.e(TAG, "CRITICAL: Real-time package removal detected for our app!")
+        when (intent.action) {
+            Intent.ACTION_PACKAGE_REMOVED -> {
+                val packageName = intent.data?.schemeSpecificPart
+                val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
                 
-                // Log the incident immediately
-                val auditLog = IdentifierAuditLog(context)
-                auditLog.logIncident(
-                    type = "REAL_TIME_REMOVAL_DETECTED",
-                    severity = "CRITICAL",
-                    details = "Package removal broadcast received for: $packageName"
-                )
-                
-                // Handle removal attempt asynchronously
-                handleRemovalAttempt(context)
-            } else {
-                Log.d(TAG, "Package removal detected for different app: $packageName")
+                // Only trigger if not replacing (actual uninstall, not update)
+                if (!isReplacing && packageName == context.packageName) {
+                    Log.e(TAG, "⚠️ DEVICE OWNER APP UNINSTALL ATTEMPT DETECTED!")
+                    handleSecurityThreat(context, "Attempted to uninstall device owner app")
+                }
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in PackageRemovalReceiver", e)
+            
+            Intent.ACTION_PACKAGE_REPLACED -> {
+                val packageName = intent.data?.schemeSpecificPart
+                if (packageName == context.packageName) {
+                    Log.w(TAG, "Device owner app was replaced - re-applying security restrictions...")
+                    // Re-apply all restrictions after app update
+                    reapplySecurityRestrictions(context)
+                }
+            }
+            
+            Intent.ACTION_PACKAGE_FULLY_REMOVED -> {
+                val packageName = intent.data?.schemeSpecificPart
+                if (packageName == context.packageName) {
+                    Log.e(TAG, "⚠️ DEVICE OWNER APP FULLY REMOVED!")
+                    handleSecurityThreat(context, "Device owner app was removed")
+                }
+            }
+            
+            Intent.ACTION_PACKAGE_DATA_CLEARED -> {
+                val packageName = intent.data?.schemeSpecificPart
+                if (packageName == context.packageName) {
+                    Log.e(TAG, "⚠️ DEVICE OWNER APP DATA CLEAR ATTEMPT DETECTED!")
+                    handleSecurityThreat(context, "Attempted to clear device owner app data")
+                }
+            }
         }
     }
     
-    /**
-     * Handle removal attempt asynchronously
-     */
-    private fun handleRemovalAttempt(context: Context) {
-        GlobalScope.launch {
-            try {
-                Log.e(TAG, "Handling unauthorized removal attempt...")
-                
-                val removalTracker = RemovalAttemptTracker(context)
-                val attemptNumber = removalTracker.recordRemovalAttempt()
-                
-                if (attemptNumber > 0) {
-                    Log.e(TAG, "✓ Removal attempt #$attemptNumber recorded and queued for backend")
-                } else {
-                    Log.e(TAG, "✗ Failed to record removal attempt")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error handling removal attempt", e)
+    private fun handleSecurityThreat(context: Context, reason: String) {
+        try {
+            val deviceOwnerManager = DeviceOwnerManager(context)
+            
+            // Re-apply ALL restrictions immediately
+            if (deviceOwnerManager.isDeviceOwner()) {
+                Log.d(TAG, "Re-applying ALL security restrictions after threat detection...")
+                deviceOwnerManager.applyRestrictions()
+                deviceOwnerManager.applyAllCriticalRestrictions()
+                deviceOwnerManager.applySilentCompanyRestrictions()
             }
+            
+            // Apply soft lock
+            val controlManager = RemoteDeviceControlManager(context)
+            controlManager.applySoftLock("SOFT LOCK: $reason")
+            Log.e(TAG, "Soft lock applied due to: $reason")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle security threat", e)
+        }
+    }
+    
+    private fun reapplySecurityRestrictions(context: Context) {
+        try {
+            val deviceOwnerManager = DeviceOwnerManager(context)
+            if (deviceOwnerManager.isDeviceOwner()) {
+                Log.d(TAG, "Re-applying security restrictions after app update...")
+                deviceOwnerManager.applyRestrictions()
+                deviceOwnerManager.applyAllCriticalRestrictions()
+                deviceOwnerManager.applySilentCompanyRestrictions()
+                Log.d(TAG, "✅ Security restrictions re-applied after update")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to reapply security restrictions", e)
         }
     }
 }

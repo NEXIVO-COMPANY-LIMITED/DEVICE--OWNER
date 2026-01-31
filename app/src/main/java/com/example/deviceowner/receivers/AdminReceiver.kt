@@ -1,17 +1,17 @@
 package com.example.deviceowner.receivers
 
 import android.app.admin.DeviceAdminReceiver
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.UserManager
 import android.util.Log
-import com.example.deviceowner.managers.UninstallPreventionManager
-import com.example.deviceowner.managers.device.ProvisioningManager
-import com.example.deviceowner.utils.logging.FileLogger
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.example.deviceowner.device.DeviceOwnerManager
+import com.example.deviceowner.work.RestrictionEnforcementWorker
 
 class AdminReceiver : DeviceAdminReceiver() {
 
@@ -20,407 +20,221 @@ class AdminReceiver : DeviceAdminReceiver() {
     }
 
     override fun onEnabled(context: Context, intent: Intent) {
-        // Initialize file logger
-        val fileLogger = FileLogger.getInstance(context)
-        fileLogger.logInstallationStep("Device Admin Enabled", "Starting Device Owner installation process")
-        fileLogger.i(TAG, "========================================")
-        fileLogger.i(TAG, "Device Admin Enabled")
-        fileLogger.i(TAG, "Intent action: ${intent.action}")
-        fileLogger.i(TAG, "========================================")
-        
-        try {
-            super.onEnabled(context, intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in super.onEnabled: ${e.message}", e)
-            fileLogger.e(TAG, "Error in super.onEnabled: ${e.message}", e)
-            // Continue anyway
-        }
-        
-        Log.d(TAG, "========================================")
-        Log.d(TAG, "Device Admin Enabled")
-        Log.d(TAG, "Intent action: ${intent.action}")
-        Log.d(TAG, "========================================")
-        
-        // Check if this is during provisioning
-        val isProvisioning = try {
-            intent.action == "android.app.action.PROVISION_MANAGED_DEVICE" ||
-            intent.action == "android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE"
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking provisioning status: ${e.message}", e)
-            fileLogger.e(TAG, "Error checking provisioning status: ${e.message}", e)
-            true // Assume provisioning to be safe
-        }
-        Log.d(TAG, "Is provisioning: $isProvisioning")
-        fileLogger.logInstallationStep("Provisioning Check", "Is provisioning: $isProvisioning")
-        
-        // CRITICAL: Immediately enforce factory reset and developer options blocking
-        // This must happen BEFORE any other initialization to prevent user access
-        try {
-            fileLogger.logInstallationStep("Immediate Policy Enforcement", "Enforcing factory reset and developer options blocking")
-            enforceCriticalPoliciesImmediately(context, fileLogger)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error enforcing critical policies immediately: ${e.message}", e)
-            fileLogger.e(TAG, "Error enforcing critical policies immediately: ${e.message}", e)
-            // Continue anyway - ProvisioningManager will retry
-        }
-        
-        try {
-            // Use the new comprehensive ProvisioningManager
-            val provisioningManager = ProvisioningManager(context)
-            provisioningManager.initializeProvisioning(isProvisioning)
-            
-            Log.d(TAG, "✓ ProvisioningManager initialized - comprehensive provisioning started")
-        } catch (e: OutOfMemoryError) {
-            Log.e(TAG, "CRITICAL: Out of memory initializing ProvisioningManager", e)
-            // Fallback to minimal initialization
-            try {
-                minimalInitialization(context, isProvisioning)
-            } catch (e2: Exception) {
-                Log.e(TAG, "CRITICAL: Minimal initialization also failed!", e2)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "CRITICAL ERROR: Failed to initialize ProvisioningManager", e)
-            
-            // Fallback to legacy initialization if ProvisioningManager fails
-            Log.w(TAG, "Falling back to legacy initialization...")
-            try {
-                legacyInitialization(context, isProvisioning)
-            } catch (fallbackError: Exception) {
-                Log.e(TAG, "CRITICAL: Legacy initialization also failed!", fallbackError)
-                
-                // Last resort: minimal initialization
-                try {
-                    minimalInitialization(context, isProvisioning)
-                } catch (e2: Exception) {
-                    Log.e(TAG, "CRITICAL: Even minimal initialization failed!", e2)
-                    // At this point, we've tried everything - log and continue
-                }
-            }
-        }
-    }
-    
-    /**
-     * Minimal initialization - only critical operations
-     * Used as last resort if everything else fails
-     */
-    private fun minimalInitialization(context: Context, isProvisioning: Boolean) {
-        Log.d(TAG, "=== MINIMAL INITIALIZATION (Last Resort) ===")
-        try {
-            // Only try to verify device owner - nothing else
-            try {
-                val managerClass = Class.forName("com.example.deviceowner.managers.DeviceOwnerManager")
-                val constructor = managerClass.getConstructor(Context::class.java)
-                val manager = constructor.newInstance(context)
-                val isDeviceOwnerMethod = managerClass.getMethod("isDeviceOwner")
-                val isDeviceOwner = isDeviceOwnerMethod.invoke(manager) as Boolean
-                Log.d(TAG, "Minimal check - Device Owner: $isDeviceOwner")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error in minimal initialization: ${e.message}", e)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "CRITICAL: Minimal initialization error: ${e.message}", e)
-            // Don't throw - we've exhausted all options
-        }
-    }
-    
-    /**
-     * Legacy initialization method (fallback)
-     * Kept for compatibility if ProvisioningManager fails
-     */
-    private fun legacyInitialization(context: Context, isProvisioning: Boolean) {
-        try {
-            val managerClass = Class.forName("com.example.deviceowner.managers.DeviceOwnerManager")
-            val constructor = managerClass.getConstructor(Context::class.java)
-            val manager = constructor.newInstance(context)
-            
-            val isDeviceOwnerMethod = managerClass.getMethod("isDeviceOwner")
-            val isDeviceOwner = isDeviceOwnerMethod.invoke(manager) as Boolean
-            Log.d(TAG, "Device Owner Status: $isDeviceOwner")
-            
-            if (!isDeviceOwner) {
-                Log.e(TAG, "WARNING: Device admin enabled but NOT device owner!")
-            } else {
-                Log.d(TAG, "✓ Device Owner confirmed")
-                
-                // Immediately enforce critical restrictions
-                try {
-                    val disableDevOptionsMethod = managerClass.getMethod("disableDeveloperOptions", Boolean::class.javaPrimitiveType)
-                    disableDevOptionsMethod.invoke(manager, true)
-                    Log.d(TAG, "✓ Developer options disabled")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error disabling developer options: ${e.message}", e)
-                }
-                
-                try {
-                    val preventFactoryResetMethod = managerClass.getMethod("preventFactoryReset")
-                    preventFactoryResetMethod.invoke(manager)
-                    Log.d(TAG, "✓ Factory reset prevented")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error preventing factory reset: ${e.message}", e)
-                }
-            }
-            
-            val initMethod = managerClass.getMethod("initializeDeviceOwner")
-            initMethod.invoke(manager)
-            
-            // Start services
-            val scope = CoroutineScope(Dispatchers.Default)
-            scope.launch {
-                if (isProvisioning) {
-                    delay(2000)
-                }
-                startAllCriticalServices(context)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in legacy initialization", e)
-        }
+        super.onEnabled(context, intent)
+        Log.d(TAG, "Device admin enabled")
     }
 
     override fun onDisabled(context: Context, intent: Intent) {
         super.onDisabled(context, intent)
-        Log.d(TAG, "Device admin disabled")
-        // Handle device owner removal
+        Log.e(TAG, "⚠️ DEVICE ADMIN DISABLED - TRIGGERING SOFT LOCK")
+        
+        // Immediately trigger soft lock when admin is disabled
         try {
-            val managerClass = Class.forName("com.example.deviceowner.managers.DeviceOwnerManager")
-            val constructor = managerClass.getConstructor(Context::class.java)
-            val manager = constructor.newInstance(context)
-            val onRemoveMethod = managerClass.getMethod("onDeviceOwnerRemoved")
-            onRemoveMethod.invoke(manager)
+            val controlManager = com.example.deviceowner.control.RemoteDeviceControlManager(context)
+            controlManager.applySoftLock("SOFT LOCK: Device admin was disabled")
+            Log.e(TAG, "Soft lock applied due to admin disable")
         } catch (e: Exception) {
-            Log.e(TAG, "Error handling device owner removal", e)
+            Log.e(TAG, "Failed to apply soft lock on admin disable", e)
         }
-    }
-
-    override fun onLockTaskModeEntering(context: Context, intent: Intent, pkg: String) {
-        super.onLockTaskModeEntering(context, intent, pkg)
-        Log.d(TAG, "Lock task mode entering: $pkg")
-    }
-
-    override fun onLockTaskModeExiting(context: Context, intent: Intent) {
-        super.onLockTaskModeExiting(context, intent)
-        Log.d(TAG, "Lock task mode exiting")
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         Log.d(TAG, "Received intent: ${intent.action}")
-        
-        // Handle PROVISION_MANAGED_DEVICE intent explicitly
-        if (intent.action == "android.app.action.PROVISION_MANAGED_DEVICE") {
-            Log.d(TAG, "PROVISION_MANAGED_DEVICE intent received - provisioning in progress")
-            // The system will automatically call onEnabled() after provisioning
-        }
     }
 
     /**
-     * Start all critical services required for Device Owner functionality
-     * This ensures all services are running after provisioning completes
-     * 
-     * Services started in order:
-     * 1. UnifiedHeartbeatService - Core device monitoring and backend communication
-     * 2. CommandQueueService - Offline command processing
-     * 3. DeviceOwnerRecoveryService - Device owner status monitoring and recovery
-     * 4. TamperDetectionService - Continuous tamper detection and security monitoring
-     * 5. FlashingDetectionService - Real-time flashing detection and blocking
+     * Aggressive Provisioning Handler
+     * Executes the final lockdown and connectivity configuration.
+     * CRITICAL: This runs IMMEDIATELY when device owner is set - BEFORE user can access anything
      */
-    private fun startAllCriticalServices(context: Context) {
-        Log.d(TAG, "Starting all critical services...")
+    override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
+        Log.d(TAG, "🔒🔒🔒 DEVICE OWNER PROVISIONING COMPLETE - APPLYING IMMEDIATE SECURITY 🔒🔒🔒")
         
-        // 1. UnifiedHeartbeatService - Core service for device monitoring and backend communication
-        startHeartbeatService(context)
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val admin = ComponentName(context, AdminReceiver::class.java)
+
+        // STEP 1: IMMEDIATE CRITICAL SECURITY (BEFORE USER CAN DO ANYTHING)
+        Log.d(TAG, "STEP 1: APPLYING IMMEDIATE CRITICAL SECURITY...")
         
-        // 2. CommandQueueService - Processes offline commands (Feature 4.9)
-        startCommandQueueService(context)
+        try {
+            // CRITICAL: Apply 100% Perfect Security IMMEDIATELY using DeviceOwnerManager
+            Log.d(TAG, "Applying immediate perfect security via DeviceOwnerManager...")
+            applyFallbackSecurityImmediately(dpm, admin, context)
+            
+            // Also apply via DeviceOwnerManager for comprehensive coverage
+            Handler(Looper.getMainLooper()).postDelayed({
+                Thread {
+                    try {
+                        val deviceOwnerManager = com.example.deviceowner.device.DeviceOwnerManager(context.applicationContext)
+                        if (deviceOwnerManager.isDeviceOwner()) {
+                            deviceOwnerManager.applyAllCriticalRestrictions()
+                            deviceOwnerManager.applyRestrictions()
+                            Log.d(TAG, "✅✅✅ 100% PERFECT SECURITY APPLIED IMMEDIATELY ✅✅✅")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error applying DeviceOwnerManager security", e)
+                    }
+                }.start()
+            }, 100)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error applying perfect security - using fallback", e)
+            applyFallbackSecurityImmediately(dpm, admin, context)
+        }
+
+        // STEP 2: ADDITIONAL IMMEDIATE RESTRICTIONS
+        Log.d(TAG, "STEP 2: APPLYING ADDITIONAL IMMEDIATE RESTRICTIONS...")
         
-        // 3. DeviceOwnerRecoveryService - Monitors and recovers device owner status
-        startDeviceOwnerRecoveryService(context)
+        // 1. IMMUTABILITY LAYER (App Protection)
+        dpm.setUninstallBlocked(admin, context.packageName, true)
+        dpm.addUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
+        Log.d(TAG, "✓ App uninstall blocked immediately")
+
+        // 2. USB Data (MTP) allowed – picha, nyimbo; Tethering allowed
+        dpm.clearUserRestriction(admin, UserManager.DISALLOW_USB_FILE_TRANSFER)
+        dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_TETHERING)
+        Log.d(TAG, "✓ USB data transfer allowed (MTP)")
         
-        // 4. TamperDetectionService - Continuous tamper detection and security monitoring
-        startTamperDetectionService(context)
+        // 3. OPERATIONAL AUTOMATION
+        dpm.setPermissionPolicy(admin, DevicePolicyManager.PERMISSION_POLICY_AUTO_GRANT)
+        Log.d(TAG, "✓ Permission policy set to auto-grant")
         
-        // 5. FlashingDetectionService - Real-time flashing detection and blocking
-        startFlashingDetectionService(context)
+        // 4. BRANDING & UI
+        dpm.setProfileName(admin, "SECURE CORPORATE DEVICE")
+        Log.d(TAG, "✓ Device profile name set")
         
-        // 6. ComprehensiveSecurityService - Continuous security monitoring and enforcement
-        startComprehensiveSecurityService(context)
+        Log.d(TAG, "✅ IMMEDIATE SECURITY APPLIED - USER CANNOT ACCESS DEVELOPER OPTIONS OR FACTORY RESET")
         
-        Log.d(TAG, "✓ All critical services started")
+        // STEP 3: DELAYED COMPREHENSIVE SETUP (After immediate security is active)
+        Handler(Looper.getMainLooper()).postDelayed({
+            Thread {
+                try {
+                    Log.d(TAG, "STEP 3: APPLYING COMPREHENSIVE SECURITY SETUP...")
+                    
+                    val dm = DeviceOwnerManager(context.applicationContext)
+                    if (dm.isDeviceOwner()) {
+                        // Grant permissions for IMEI/Serial collection
+                        dm.grantRequiredPermissions()
+                        
+                        // Apply comprehensive restrictions
+                        dm.applyAllCriticalRestrictions()
+                        dm.applySilentCompanyRestrictions()
+                        
+                        // Verify all restrictions are active
+                        val allActive = dm.verifyAllCriticalRestrictionsActive()
+                        if (allActive) {
+                            Log.d(TAG, "🎯 ALL COMPREHENSIVE RESTRICTIONS VERIFIED ACTIVE")
+                        } else {
+                            Log.w(TAG, "⚠️ Some comprehensive restrictions need attention - re-applying...")
+                            dm.applyRestrictions()
+                        }
+                        
+                        // Schedule periodic enforcement
+                        RestrictionEnforcementWorker.schedule(context.applicationContext)
+                        
+                        // Start security monitoring
+                        com.example.deviceowner.monitoring.SecurityMonitorService.startService(context.applicationContext)
+                        
+                        // Initialize enhanced security features
+                        initializeEnhancedSecurityFeatures(context.applicationContext)
+                        
+                        Log.d(TAG, "═══════════════════════════════════════════════════════")
+                        Log.d(TAG, "✅✅✅ DEVICE OWNER SETUP COMPLETE ✅✅✅")
+                        Log.d(TAG, "   🔒 Developer Options: IMPOSSIBLE TO ENABLE")
+                        Log.d(TAG, "   🔒 Factory Reset: IMPOSSIBLE TO ACCESS")
+                        Log.d(TAG, "   🔒 All security: ACTIVE AND VERIFIED")
+                        Log.d(TAG, "═══════════════════════════════════════════════════════")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in comprehensive setup", e)
+                }
+            }.start()
+        }, 500) // Reduced delay - apply comprehensive setup quickly
     }
     
     /**
-     * Helper method to start a service properly
-     * FIXED: Uses startForegroundService() for Android 8.0+ and application context
-     * This ensures services actually start during the quick UI transitions
+     * Apply fallback security immediately if perfect security fails
      */
-    private fun startServiceSafely(context: Context, serviceClass: Class<*>, serviceName: String) {
+    private fun applyFallbackSecurityImmediately(dpm: DevicePolicyManager, admin: ComponentName, context: Context) {
+        Log.d(TAG, "🔒 APPLYING FALLBACK SECURITY IMMEDIATELY...")
+        
         try {
-            val appContext = context.applicationContext
-            val intent = Intent(appContext, serviceClass)
+            // CRITICAL: Factory Reset - BLOCK IMMEDIATELY
+            dpm.addUserRestriction(admin, UserManager.DISALLOW_FACTORY_RESET)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                dpm.addUserRestriction(admin, UserManager.DISALLOW_SAFE_BOOT)
+            }
             
-            // Use startForegroundService() for Android 8.0+ (API 26+)
-            // This is CRITICAL - regular startService() fails silently on Android 8.0+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                appContext.startForegroundService(intent)
-                Log.d(TAG, "✓ Started $serviceName as foreground service (Android 8.0+)")
-            } else {
-                appContext.startService(intent)
-                Log.d(TAG, "✓ Started $serviceName (Android < 8.0)")
-            }
-        } catch (e: IllegalStateException) {
-            Log.e(TAG, "IllegalStateException starting service $serviceName: ${e.message}", e)
-            // Try fallback for older Android versions
+            // Try setMasterClearDisabled
             try {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                    val appContext = context.applicationContext
-                    val intent = Intent(appContext, serviceClass)
-                    appContext.startService(intent)
-                    Log.d(TAG, "✓ Started $serviceName (fallback)")
-                }
-            } catch (e2: Exception) {
-                Log.e(TAG, "✗ Fallback startService also failed for $serviceName: ${e2.message}", e2)
+                val method = dpm.javaClass.getMethod(
+                    "setMasterClearDisabled",
+                    ComponentName::class.java,
+                    Boolean::class.javaPrimitiveType
+                )
+                method.invoke(dpm, admin, true)
+                Log.d(TAG, "✓ Factory reset blocked via setMasterClearDisabled")
+            } catch (e: Exception) {
+                Log.w(TAG, "setMasterClearDisabled not available: ${e.message}")
             }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Security exception starting service $serviceName: ${e.message}", e)
+            
+            // CRITICAL: Developer Options - BLOCK IMMEDIATELY
+            // dpm.addUserRestriction(admin, UserManager.DISALLOW_DEBUGGING_FEATURES) <-- DISABLED FOR DEBUGGING
+            
+            // Force disable developer options at system level
+            // android.provider.Settings.Global.putInt(
+            //     context.contentResolver,
+            //     android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED,
+            //     0
+            // ) <-- DISABLED FOR DEBUGGING
+            
+            // Force disable ADB
+            // android.provider.Settings.Global.putInt(
+            //    context.contentResolver,
+            //    android.provider.Settings.Global.ADB_ENABLED,
+            //    0
+            // ) <-- DISABLED FOR DEBUGGING
+            
+            Log.d(TAG, "✅ FALLBACK SECURITY APPLIED IMMEDIATELY")
+             Log.d(TAG, "   🚫 Developer Options: ENABLED FOR DEBUGGING")
+            Log.d(TAG, "   🚫 Factory Reset: BLOCKED")
+            
         } catch (e: Exception) {
-            Log.e(TAG, "✗ Failed to start $serviceName: ${e.message}", e)
+            Log.e(TAG, "❌ CRITICAL: Fallback security failed", e)
         }
     }
     
     /**
-     * Start the UnifiedHeartbeatService to begin sending heartbeat data to backend
+     * Initialize enhanced security features after provisioning
      */
-    private fun startHeartbeatService(context: Context) {
-        startServiceSafely(context, com.example.deviceowner.services.UnifiedHeartbeatService::class.java, "UnifiedHeartbeatService")
-    }
-    
-    /**
-     * Start CommandQueueService for offline command processing
-     * Feature 4.9: Offline Command Queue
-     */
-    private fun startCommandQueueService(context: Context) {
-        startServiceSafely(context, com.example.deviceowner.services.CommandQueueService::class.java, "CommandQueueService")
-    }
-    
-    /**
-     * Start DeviceOwnerRecoveryService for continuous device owner monitoring
-     * Monitors device owner status and automatically recovers if lost
-     */
-    private fun startDeviceOwnerRecoveryService(context: Context) {
-        startServiceSafely(context, com.example.deviceowner.services.DeviceOwnerRecoveryService::class.java, "DeviceOwnerRecoveryService")
-    }
-    
-    /**
-     * Start TamperDetectionService for continuous tamper detection
-     * Monitors device for tampering (root, bootloader unlock, custom ROM, etc.)
-     * and triggers security responses based on severity
-     */
-    private fun startTamperDetectionService(context: Context) {
-        startServiceSafely(context, com.example.deviceowner.services.TamperDetectionService::class.java, "TamperDetectionService")
-    }
-    
-    /**
-     * Start FlashingDetectionService for real-time flashing detection
-     * Monitors for device flashing attempts and blocks immediately
-     */
-    private fun startFlashingDetectionService(context: Context) {
-        startServiceSafely(context, com.example.deviceowner.services.FlashingDetectionService::class.java, "FlashingDetectionService")
-    }
-    
-    /**
-     * Start ComprehensiveSecurityService for continuous security monitoring
-     * Monitors and enforces all security measures:
-     * - Uninstall prevention
-     * - Flashing prevention
-     * - USB debugging blocking
-     * - Safe mode prevention
-     * - Reboot prevention
-     */
-    private fun startComprehensiveSecurityService(context: Context) {
-        startServiceSafely(context, com.example.deviceowner.services.ComprehensiveSecurityService::class.java, "ComprehensiveSecurityService")
-    }
-    
-    /**
-     * IMMEDIATELY enforce critical policies (factory reset and developer options)
-     * This is called RIGHT AFTER Device Owner is enabled, before any other initialization
-     * This prevents users from accessing factory reset or developer options during the brief window
-     * between Device Owner installation and full provisioning completion
-     */
-    private fun enforceCriticalPoliciesImmediately(context: Context, fileLogger: FileLogger) {
-        Log.d(TAG, "=== IMMEDIATELY ENFORCING CRITICAL POLICIES ===")
-        fileLogger.logInstallationStep("Immediate Policy Enforcement", "Starting immediate enforcement of critical policies")
-        
-        try {
-            val managerClass = Class.forName("com.example.deviceowner.managers.DeviceOwnerManager")
-            val constructor = managerClass.getConstructor(Context::class.java)
-            val manager = constructor.newInstance(context)
-            
-            // Check if device owner is active
-            val isDeviceOwnerMethod = managerClass.getMethod("isDeviceOwner")
-            val isDeviceOwner = isDeviceOwnerMethod.invoke(manager) as Boolean
-            
-            if (!isDeviceOwner) {
-                Log.w(TAG, "⚠ Cannot enforce policies - not device owner yet")
-                return
-            }
-            
-            Log.d(TAG, "✓ Device Owner confirmed - enforcing policies IMMEDIATELY")
-            
-            // 1. IMMEDIATELY disable developer options
+    private fun initializeEnhancedSecurityFeatures(context: Context) {
+        Thread {
             try {
-                fileLogger.logPolicyEnforcement("Developer Options", "Attempting to disable")
-                val disableDevOptionsMethod = managerClass.getMethod("disableDeveloperOptions", Boolean::class.javaPrimitiveType)
-                val devOptionsResult = disableDevOptionsMethod.invoke(manager, true) as Boolean
-                if (devOptionsResult) {
-                    Log.d(TAG, "✓✓✓ Developer options IMMEDIATELY disabled ✓✓✓")
-                    fileLogger.logPolicyEnforcement("Developer Options", "SUCCESS - Disabled")
-                } else {
-                    Log.e(TAG, "✗ Failed to disable developer options immediately - will retry")
-                    fileLogger.logPolicyEnforcement("Developer Options", "FAILED - Will retry")
-                }
+                // 1. Device Owner Removal Detection
+                val removalDetector = com.example.deviceowner.security.monitoring.DeviceOwnerRemovalDetector(context)
+                removalDetector.startMonitoring()
+                
+                // 2. ADB Backup Prevention
+                val adbBackupPrevention = com.example.deviceowner.security.prevention.AdbBackupPrevention(context)
+                adbBackupPrevention.preventAdbBackup()
+                
+                // 3. System Update Control
+                val systemUpdateController = com.example.deviceowner.security.prevention.SystemUpdateController(context)
+                systemUpdateController.requireUpdateApproval()
+                
+                // 4. Advanced Security Monitoring
+                val advancedMonitor = com.example.deviceowner.security.monitoring.AdvancedSecurityMonitor(context)
+                advancedMonitor.startMonitoring()
+                
+                // 5. Screen Pinning
+                val screenPinningManager = com.example.deviceowner.security.enforcement.ScreenPinningManager(context)
+                screenPinningManager.enableScreenPinning()
+                
+                Log.d(TAG, "✅ Enhanced security features initialized")
             } catch (e: Exception) {
-                Log.e(TAG, "Exception disabling developer options immediately: ${e.message}", e)
-                fileLogger.e(TAG, "Exception disabling developer options immediately: ${e.message}", e)
+                Log.e(TAG, "Error initializing enhanced security features", e)
             }
-            
-            // 2. IMMEDIATELY prevent factory reset
-            try {
-                fileLogger.logPolicyEnforcement("Factory Reset", "Attempting to prevent")
-                val preventFactoryResetMethod = managerClass.getMethod("preventFactoryReset")
-                val factoryResetResult = preventFactoryResetMethod.invoke(manager) as Boolean
-                if (factoryResetResult) {
-                    Log.d(TAG, "✓✓✓ Factory reset IMMEDIATELY prevented ✓✓✓")
-                    fileLogger.logPolicyEnforcement("Factory Reset", "SUCCESS - Prevented")
-                } else {
-                    Log.e(TAG, "✗ Failed to prevent factory reset immediately - will retry")
-                    fileLogger.logPolicyEnforcement("Factory Reset", "FAILED - Will retry")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception preventing factory reset immediately: ${e.message}", e)
-                fileLogger.e(TAG, "Exception preventing factory reset immediately: ${e.message}", e)
-            }
-            
-            // 3. Verify restrictions are enforced
-            try {
-                fileLogger.logInstallationStep("Policy Verification", "Verifying all restrictions")
-                val verifyMethod = managerClass.getMethod("verifyAndEnforceCriticalRestrictions")
-                val verified = verifyMethod.invoke(manager) as Boolean
-                if (verified) {
-                    Log.d(TAG, "✓✓✓ All critical restrictions IMMEDIATELY verified ✓✓✓")
-                    fileLogger.logPolicyEnforcement("All Restrictions", "SUCCESS - Verified")
-                } else {
-                    Log.w(TAG, "⚠ Some restrictions not verified - will retry in ProvisioningManager")
-                    fileLogger.logPolicyEnforcement("All Restrictions", "PARTIAL - Will retry")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Exception verifying restrictions: ${e.message}", e)
-                fileLogger.e(TAG, "Exception verifying restrictions: ${e.message}", e)
-            }
-            
-            Log.d(TAG, "=== IMMEDIATE POLICY ENFORCEMENT COMPLETE ===")
-            fileLogger.logInstallationStep("Immediate Policy Enforcement", "COMPLETE")
-        } catch (e: Exception) {
-            Log.e(TAG, "CRITICAL ERROR enforcing policies immediately: ${e.message}", e)
-            // Don't throw - ProvisioningManager will handle retry
-        }
+        }.start()
     }
 }

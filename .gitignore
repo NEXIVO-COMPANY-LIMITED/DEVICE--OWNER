@@ -23,6 +23,8 @@
 # Local configuration
 local.properties
 gradle.properties
+keystore.properties
+*.jks
 
 # OS specific
 .DS_Store
@@ -50,3 +52,27 @@ Thumbs.db
 # App specific
 app/build/
 app/.gradle/
+
+# Build outputs
+/out/
+*.img
+*.zip
+*.so
+
+# Firmware build artifacts
+firmware/**/*.o
+firmware/**/*.ko
+firmware/**/*.elf
+
+# AOSP integration
+aosp_integration/.patched
+aosp_integration/.integrated
+
+# Native build artifacts
+native/**/*.o
+native/**/*.a
+native/**/*.so
+
+# Test outputs
+tests/**/test-results/
+tests/**/reports/

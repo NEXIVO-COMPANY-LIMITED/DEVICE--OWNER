@@ -4,9 +4,15 @@
 
     <!-- Internet permission for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
     <!-- Device information permissions -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE" tools:ignore="ProtectedPermissions" />
+    
+    <!-- Storage permissions for device data collection -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     
     <!-- Camera permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -16,21 +22,37 @@
     <!-- Location permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     
     <!-- Boot receiver permission -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
-    <!-- Overlay permissions -->
+    <!-- Overlay permissions for soft lock -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    
+    <!-- Device Owner specific permissions for complete control -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <uses-permission android:name="android.permission.STATUS_BAR" />
+    <uses-permission android:name="android.permission.SYSTEM_UI" />
+    <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW" />
     
     <!-- Wake lock permission -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Power management permissions -->
+    <uses-permission android:name="android.permission.DEVICE_POWER" />
+    <uses-permission android:name="android.permission.REBOOT" />
     
     <!-- Foreground service permission (Android 9+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
+        android:name=".DeviceOwnerApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -42,48 +64,100 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning">
+        <!-- Registration Status Activity - Determines launch flow -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".ui.activities.RegistrationStatusActivity"
+            android:exported="true"
+            android:theme="@style/Theme.DEVICEOWNER">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        
+
+        <!-- Main Activity - Shows device status and information -->
         <activity
-            android:name=".ui.activities.setup.SetupActivity"
-            android:exported="false" />
-        
-        <!-- Device Owner Installation Status Activity -->
-        <!-- Automatically shown after Device Owner initialization completes -->
+            android:name=".presentation.activities.MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Registration Error Viewer - Lists and opens HTML error files (DeviceOwner/RegistrationErrors) -->
         <activity
-            android:name=".ui.activities.DeviceOwnerInstallationStatusActivity"
+            android:name=".presentation.activities.RegistrationErrorViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Loan ID Input Activity - First screen (Launcher) for device registration -->
+        <activity
+            android:name=".ui.activities.provisioning.LoanIdInputActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Device Info Activity - Shows device information and handles registration -->
+        <activity
+            android:name=".ui.activities.provisioning.DeviceInfoActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Welcome Activity - Shows welcome screen after successful registration -->
+        <activity
+            android:name=".ui.activities.WelcomeActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:excludeFromRecents="false" />
-        
-        <!-- Provisioning Mode Activity -->
-        <!-- Required for Android 12+ QR code provisioning -->
+            android:launchMode="singleTop" />
+
+        <!-- Registration Debug Activity - Debug tool for registration issues -->
         <activity
-            android:name=".ui.provisioning.ProvisioningModeActivity"
+            android:name=".ui.activities.RegistrationDebugActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Device Data Inspector Activity - Shows what data the phone collects -->
+        <activity
+            android:name=".ui.activities.DeviceDataInspectorActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Enhanced Soft Lock Activity - Kotlin Compose implementation -->
+        <activity
+            android:name=".ui.activities.lock.EnhancedSoftLockActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.DEVICEOWNER"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden|navigation" />
+
+        <!-- Hard Lock Activity - Kiosk mode screen when device is hard locked -->
+        <activity
+            android:name=".ui.activities.lock.HardLockActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="false"
+            android:finishOnTaskLaunch="false"
+            android:clearTaskOnLaunch="false"
+            android:theme="@style/Theme.DEVICEOWNER"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden|navigation" />
+
+        <!-- Android 12+ GET_PROVISIONING_MODE handler -->
+        <activity
+            android:name=".ui.activities.provisioning.ProvisioningModeActivity"
             android:exported="true"
-            android:theme="@style/Theme.DEVICEOWNER">
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.app.action.GET_PROVISIONING_MODE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        
-        <!-- Policy Compliance Activity -->
-        <!-- Required for Android 12+ QR code provisioning -->
+
+        <!-- Android 12+ ADMIN_POLICY_COMPLIANCE handler -->
         <activity
-            android:name=".ui.provisioning.PolicyComplianceActivity"
-            android:exported="true"
-            android:theme="@style/Theme.DEVICEOWNER">
+            android:name=".ui.activities.provisioning.PolicyComplianceActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -91,7 +165,6 @@
         </activity>
         
         <!-- Device Admin Receiver -->
-        <!-- Required for device owner provisioning via QR code, NFC, or ADB -->
         <receiver
             android:name=".receivers.AdminReceiver"
             android:exported="true"
@@ -100,7 +173,6 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
-                <!-- Required for QR code and NFC provisioning -->
                 <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
                 <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
             </intent-filter>
@@ -109,73 +181,155 @@
                 android:resource="@xml/device_admin_receiver" />
         </receiver>
         
-        <!-- Services -->
-        <service
-            android:name=".services.UnifiedHeartbeatService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-        
-        <service
-            android:name=".services.HeartbeatVerificationService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-        
-        <service
-            android:name=".services.CommandQueueService"
-            android:exported="false" />
-        
-        <service
-            android:name=".services.TamperDetectionService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-        
-        <service
-            android:name=".services.FlashingDetectionService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-        
-        <service
-            android:name=".services.ComprehensiveSecurityService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-        
-        <service
-            android:name=".services.DeviceOwnerRecoveryService"
-            android:exported="false" />
-        
-        <service
-            android:name=".services.MismatchAlertRetryService"
-            android:exported="false" />
-        
-        <service
-            android:name=".overlay.OverlayManager"
-            android:exported="false" />
-        <!-- Receivers -->
+        <!-- QR Code Provisioning Receiver -->
         <receiver
-            android:name=".receivers.BootReceiver"
+            android:name=".receivers.QRProvisioningReceiver"
             android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            <intent-filter android:priority="1000">
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
+                <action android:name="android.app.action.PROVISIONING_SUCCESSFUL" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
-        
+
+        <!-- Boot Receiver -->
+        <receiver
+            android:name=".receivers.BootReceiver"
+            android:exported="false"
+            android:enabled="true"
+            android:directBootAware="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Package Removal Receiver -->
         <receiver
             android:name=".receivers.PackageRemovalReceiver"
-            android:exported="true">
-            <intent-filter>
+            android:exported="false"
+            android:enabled="true">
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_DATA_CLEARED" />
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
-        
-        <receiver
-            android:name=".receivers.RebootDetectionReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
+
+        <!-- Log Viewer Activity - For viewing application logs -->
+        <activity
+            android:name=".ui.activities.LogViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- API Diagnostic Activity - For troubleshooting API connection issues -->
+        <activity
+            android:name=".ui.activities.ApiDiagnosticActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- JSON Data Viewer Activity - For viewing API request data in JSON format -->
+        <activity
+            android:name=".ui.activities.JsonDataViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Certificate Extractor Test Activity - For getting SSL certificate pins -->
+        <activity
+            android:name=".ui.activities.CertificateExtractorTestActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- SSL Certificate Setup Activity - For configuring perfect SSL security -->
+        <activity
+            android:name=".ui.activities.SSLCertificateSetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Network Diagnostic Activity - For troubleshooting connection issues -->
+        <activity
+            android:name=".ui.activities.NetworkDiagnosticActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Device Registration Activity - For entering loan number -->
+        <activity
+            android:name=".ui.activities.DeviceRegistrationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Device Data Collection Activity - For collecting and sending device data -->
+        <activity
+            android:name=".presentation.activities.DeviceDataCollectionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Soft Lock Test Activity - For testing different violation types -->
+        <activity
+            android:name=".ui.activities.SoftLockTestActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Services -->
+        <!-- Critical services marked as directBootAware for zero-second persistence -->
+        <service
+            android:name=".services.HeartbeatService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:directBootAware="true" />
+
+        <service
+            android:name=".monitoring.SecurityMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:directBootAware="true" />
+
+        <service
+            android:name=".services.RemoteManagementService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:directBootAware="true" />
+
+        <!-- Enhanced Soft Lock Services -->
+        <service
+            android:name=".services.SoftLockOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".services.SoftLockMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".services.FirmwareSecurityMonitorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Local JSON Data Server Service - Serves device data via HTTP -->
+        <service
+            android:name=".services.LocalDataServerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:directBootAware="true" />
+
+        <!-- File Provider for sharing log files -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

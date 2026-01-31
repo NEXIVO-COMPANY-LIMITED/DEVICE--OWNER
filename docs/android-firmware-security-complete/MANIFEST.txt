@@ -1,0 +1,55 @@
+Android Firmware Security - Complete Package
+===========================================
+
+CONTENTS:
+---------
+
+1. Source Code:
+   - bootloader-modifications/FastbootSecurity.cpp
+   - kernel-driver/input_security_filter.c
+   - device-owner-integration/cpp/firmware_security_jni.cpp
+   - device-owner-integration/kotlin/FirmwareSecurity.kt
+   - device-owner-integration/kotlin/IntegrationExample.kt
+
+2. Build Configuration:
+   - device-owner-integration/config/CMakeLists.txt
+   - device-owner-integration/config/build.gradle.kts
+
+3. Scripts:
+   - install.sh (master installation script)
+   - testing-suite/test_security.sh (comprehensive tests)
+   - build-scripts/ (build automation)
+
+4. Documentation:
+   - README.md (main documentation)
+   - documentation/QUICKSTART.md (5-minute setup guide)
+   - documentation/INTEGRATION.md (app integration guide)
+   - MANIFEST.txt (this file)
+
+QUICK START:
+-----------
+1. Connect Android device
+2. Run: ./install.sh
+3. Follow on-screen instructions
+
+INTEGRATION:
+-----------
+1. Copy device-owner-integration/ to your app
+2. Update build.gradle.kts
+3. Add CMakeLists.txt
+4. Call FirmwareSecurity.activateSecurityMode()
+
+For detailed instructions, see README.md
+
+TARGET DEVICES:
+--------------
+✓ Real Android phones (Pixel, Samsung, OnePlus, Xiaomi, etc.)
+✓ Android 8.0+ (API 26+)
+✓ ARM/ARM64 processors
+✗ No emulator support (use real devices!)
+
+SUPPORT:
+--------
+- Documentation: See documentation/ folder
+- Issues: Check existing documentation first
+- Testing: Use testing-suite/test_security.sh

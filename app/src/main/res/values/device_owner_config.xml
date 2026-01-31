@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Device Owner Configuration -->
+    
+    <!-- Security Configuration -->
+    <bool name="enable_usb_blocking">false</bool>
+    <bool name="enable_usb_debugging_block">true</bool>
+    <bool name="enable_usb_file_transfer_block">false</bool>
+    
+    <!-- Allowed services for device owner -->
+    <string-array name="allowed_services_for_device_owner">
+        <item>com.example.deviceowner.services.TamperDetectionService</item>
+        <item>com.example.deviceowner.services.InstallmentMonitoringService</item>
+        <item>com.example.deviceowner.services.HeartbeatService</item>
+        <!-- DeviceOwnerInitializationService removed - part of old initialization logic -->
+    </string-array>
+    
+</resources>

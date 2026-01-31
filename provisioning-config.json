@@ -1,7 +1,7 @@
-{
+﻿{
   "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.example.deviceowner/com.example.deviceowner.receivers.AdminReceiver",
-  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": "https://github.com/NEXIVO-COMPANY-LIMITED/DEVICE--OWNER/releases/download/v1.0.0/app-release.apk",
-  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "aXbp-BlYVNrdniBRviRg48K8elAW67CQzn--wEhWGO8",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": "https://github.com/NEXIVO-COMPANY-LIMITED/DEVICE--OWNER/releases/download/V1.1/app-release.apk",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "UdO7THG1FX_ZEmWuAY72YTg3nEGWOwfNXJ1X0RwH4mc",
   "android.app.extra.PROVISIONING_WIFI_SSID": "NEXIVO 4G",
   "android.app.extra.PROVISIONING_WIFI_PASSWORD": "Nexivo.io",
   "android.app.extra.PROVISIONING_WIFI_SECURITY_TYPE": "WPA",
@@ -9,5 +9,8 @@
   "android.app.extra.PROVISIONING_SKIP_ENCRYPTION": false,
   "android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED": true,
   "android.app.extra.PROVISIONING_TIME_ZONE": "Africa/Dar_es_Salaam",
-  "android.app.extra.PROVISIONING_LOCALE": "en_US"
+  "android.app.extra.PROVISIONING_LOCALE": "en_US",
+  "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
+    "com.example.deviceowner.PROVISIONING_MODE": "DEVICE_OWNER"
+  }
 }
