@@ -10,7 +10,6 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.deviceowner.BuildConfig
 import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.data.remote.ApiEndpoints
 import com.example.deviceowner.control.RemoteDeviceControlManager

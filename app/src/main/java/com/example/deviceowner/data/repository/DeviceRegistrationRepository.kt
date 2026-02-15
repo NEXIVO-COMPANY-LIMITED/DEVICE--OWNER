@@ -3,19 +3,50 @@ package com.example.deviceowner.data.repository
 import android.content.Context
 import android.util.Log
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.dao.BasicLoanInfo
 import com.example.deviceowner.data.local.database.entities.CompleteDeviceRegistrationEntity
 import com.example.deviceowner.data.models.DeviceRegistrationRequest
+import com.example.deviceowner.data.remote.ApiClient
+import com.example.deviceowner.data.remote.ApiService
+import com.example.deviceowner.utils.logging.LogManager
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import com.example.deviceowner.AppConfig
+import com.example.deviceowner.data.remote.api.ApiHeadersInterceptor
+
 
 class DeviceRegistrationRepository(private val context: Context) {
     
     private val database = DeviceOwnerDatabase.getDatabase(context)
     private val dao = database.completeDeviceRegistrationDao()
-    private val gson = Gson()
-    private val registrationBackup = com.example.deviceowner.data.backup.RegistrationDataBackup(context)
+    private val gson = GsonBuilder().setLenient().create()
+    private val registrationBackup = com.example.deviceowner.data.local.RegistrationDataBackup(context)
+    
+    // Public API client for logging errors
+    val apiClient = ApiClient()
+    
+    private val apiService: ApiService by lazy {
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (AppConfig.ENABLE_LOGGING) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+        }
+        
+        val client = OkHttpClient.Builder()
+            .addInterceptor(ApiHeadersInterceptor())
+            .addInterceptor(logging)
+            .build()
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(AppConfig.BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+        retrofit.create(ApiService::class.java)
+    }
     
     companion object {
         private const val TAG = "DeviceRegistrationRepo"
@@ -67,9 +98,9 @@ class DeviceRegistrationRepository(private val context: Context) {
             )
             
             dao.insertRegistration(entity)
-            Log.d(TAG, "Loan number saved for future registration: $loanNumber")
+            LogManager.logInfo(LogManager.LogCategory.DEVICE_REGISTRATION, "Loan number saved for future registration: $loanNumber")
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving loan number: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error saving loan number: ${e.message}", throwable = e)
         }
     }
     
@@ -101,6 +132,13 @@ class DeviceRegistrationRepository(private val context: Context) {
             val systemIntegrity = deviceRegistrationRequest.systemIntegrity ?: emptyMap()
             val appInfo = deviceRegistrationRequest.appInfo ?: emptyMap()
             
+            // Parse version_sdk_int: Gson may return Int or Double from JSON number
+            val sdkVersionValue = androidInfo["version_sdk_int"]
+            val sdkVersion = when (sdkVersionValue) {
+                is Number -> sdkVersionValue.toInt()
+                is String -> sdkVersionValue.toIntOrNull()
+                else -> null
+            }
             val entity = CompleteDeviceRegistrationEntity(
                 deviceId = finalDeviceId,
                 loanNumber = deviceRegistrationRequest.loanNumber ?: "UNKNOWN",
@@ -110,7 +148,7 @@ class DeviceRegistrationRepository(private val context: Context) {
                 androidId = deviceInfo["android_id"] as? String,
                 deviceImeis = (imeiInfo["device_imeis"] as? List<*>)?.joinToString(","),
                 osVersion = androidInfo["version_release"] as? String,
-                sdkVersion = (androidInfo["version_sdk_int"] as? String)?.toIntOrNull(),
+                sdkVersion = sdkVersion,
                 buildNumber = (androidInfo["version_incremental"] as? String)?.toIntOrNull(),
                 securityPatchLevel = androidInfo["security_patch"] as? String,
                 bootloader = deviceInfo["bootloader"] as? String,
@@ -143,21 +181,21 @@ class DeviceRegistrationRepository(private val context: Context) {
             )
             
             dao.insertRegistration(entity)
-            Log.d(TAG, "Complete registration data saved to local database (status: $status, deviceId: $finalDeviceId)")
+            LogManager.logInfo(LogManager.LogCategory.DEVICE_REGISTRATION, "Complete registration data saved to local database (status: $status, deviceId: $finalDeviceId)")
             
             // Backup data if registration is successful
             if (status == "SUCCESS") {
                 val backupSuccess = registrationBackup.backupRegistrationData()
-                Log.d(TAG, "Registration data backup: ${if (backupSuccess) "SUCCESS" else "FAILED"}")
+                 LogManager.logInfo(LogManager.LogCategory.DEVICE_REGISTRATION, "Registration data backup: ${if (backupSuccess) "SUCCESS" else "FAILED"}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving registration data: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error saving registration data: ${e.message}", throwable = e)
             throw e
         }
     }
     
     /**
-     * Update registration status after server response
+     * Update registration status after server response (by device_id).
      */
     suspend fun updateRegistrationStatus(
         deviceId: String,
@@ -171,9 +209,28 @@ class DeviceRegistrationRepository(private val context: Context) {
                 response = serverResponse,
                 syncTime = System.currentTimeMillis()
             )
-            Log.d(TAG, "Registration status updated to: $status")
+            LogManager.logInfo(LogManager.LogCategory.DEVICE_REGISTRATION, "Registration status updated to: $status")
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating registration status: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error updating registration status: ${e.message}", throwable = e)
+        }
+    }
+
+    /**
+     * Update registration after successful API register: set server-assigned device_id and SUCCESS by loan number.
+     * (Local row was inserted with Android ID; this updates it so DB and heartbeat stay in sync.)
+     */
+    suspend fun updateRegistrationSuccessByLoan(
+        loanNumber: String,
+        serverDeviceId: String,
+        status: String = "SUCCESS",
+        serverResponse: String? = null,
+        syncTime: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
+        try {
+            dao.updateRegistrationSuccessByLoan(loanNumber, serverDeviceId, status, serverResponse, syncTime)
+            LogManager.logInfo(LogManager.LogCategory.DEVICE_REGISTRATION, "Registration success by loan: deviceId=$serverDeviceId")
+        } catch (e: Exception) {
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error updating registration by loan: ${e.message}", throwable = e)
         }
     }
     
@@ -192,7 +249,21 @@ class DeviceRegistrationRepository(private val context: Context) {
             val anyRegistration = dao.getAnyRegistration()
             return@withContext anyRegistration?.loanNumber
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting stored loan number: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error getting stored loan number: ${e.message}", throwable = e)
+            null
+        }
+    }
+
+    /**
+     * Get loan number from most recent in-progress registration (for resuming after app close).
+     * Returns null if device is fully registered or no in-progress registration exists.
+     */
+    suspend fun getInProgressLoanNumber(): String? = withContext(Dispatchers.IO) {
+        try {
+            if (dao.hasSuccessfulRegistration() > 0) return@withContext null
+            dao.getMostRecentInProgressRegistration()?.loanNumber
+        } catch (e: Exception) {
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error getting in-progress loan number: ${e.message}", throwable = e)
             null
         }
     }
@@ -205,22 +276,65 @@ class DeviceRegistrationRepository(private val context: Context) {
             val count = dao.hasSuccessfulRegistration()
             count > 0
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking registration status: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error checking registration status: ${e.message}", throwable = e)
             false
         }
     }
     
     /**
-     * Get basic loan information for main screen (limited data)
+     * Save device registration (simplified version for RegistrationResponseHandler)
      */
-    suspend fun getBasicLoanInfo(): BasicLoanInfo? = withContext(Dispatchers.IO) {
+    suspend fun saveDeviceRegistration(
+        deviceId: String,
+        model: String,
+        manufacturer: String,
+        deviceType: String,
+        serialNumber: String,
+        loanNumber: String,
+        registeredAt: Long
+    ) = withContext(Dispatchers.IO) {
         try {
-            dao.getBasicLoanInfo()
+            val entity = CompleteDeviceRegistrationEntity(
+                deviceId = deviceId,
+                loanNumber = loanNumber,
+                manufacturer = manufacturer,
+                model = model,
+                serialNumber = serialNumber,
+                androidId = null,
+                deviceImeis = null,
+                osVersion = null,
+                sdkVersion = null,
+                buildNumber = null,
+                securityPatchLevel = null,
+                bootloader = null,
+                installedRam = null,
+                totalStorage = null,
+                language = null,
+                deviceFingerprint = null,
+                systemUptime = null,
+                installedAppsHash = null,
+                systemPropertiesHash = null,
+                isDeviceRooted = null,
+                isUsbDebuggingEnabled = null,
+                isDeveloperModeEnabled = null,
+                isBootloaderUnlocked = null,
+                isCustomRom = null,
+                tamperSeverity = null,
+                tamperFlags = null,
+                latitude = null,
+                longitude = null,
+                registrationStatus = "SUCCESS",
+                registeredAt = registeredAt
+            )
+            
+            dao.insertRegistration(entity)
+            LogManager.logInfo(LogManager.LogCategory.DEVICE_REGISTRATION, "Device registration saved: $deviceId")
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting basic loan info: ${e.message}", e)
-            null
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error saving device registration: ${e.message}", throwable = e)
         }
     }
+    
+
     
     /**
      * Get complete registration data (for admin/debug purposes only)
@@ -229,26 +343,8 @@ class DeviceRegistrationRepository(private val context: Context) {
         try {
             dao.getSuccessfulRegistration()
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting complete registration data: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error getting complete registration data: ${e.message}", throwable = e)
             null
-        }
-    }
-    
-    /**
-     * Update loan information from server
-     */
-    suspend fun updateLoanInfo(
-        deviceId: String,
-        nextPaymentDate: String?,
-        totalAmount: Double?,
-        paidAmount: Double?,
-        remainingAmount: Double?
-    ) = withContext(Dispatchers.IO) {
-        try {
-            dao.updateLoanInfo(deviceId, nextPaymentDate, totalAmount, paidAmount, remainingAmount)
-            Log.d(TAG, "Loan information updated")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating loan info: ${e.message}", e)
         }
     }
     
@@ -258,9 +354,9 @@ class DeviceRegistrationRepository(private val context: Context) {
     suspend fun clearAllRegistrations() = withContext(Dispatchers.IO) {
         try {
             dao.clearAllRegistrations()
-            Log.d(TAG, "All registration data cleared")
+            LogManager.logInfo(LogManager.LogCategory.DEVICE_REGISTRATION, "All registration data cleared")
         } catch (e: Exception) {
-            Log.e(TAG, "Error clearing registration data: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error clearing registration data: ${e.message}", throwable = e)
         }
     }
     
@@ -335,13 +431,21 @@ class DeviceRegistrationRepository(private val context: Context) {
                     "longitude" to entity.longitude,
                     "registration_status" to entity.registrationStatus,
                     "registered_at" to entity.registeredAt,
-                    "last_sync_at" to entity.lastSyncAt,
-                    "server_response" to entity.serverResponse
+                    "last_sync_at" to entity.lastSyncAt
                 )
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting all registration data: ${e.message}", e)
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "Error getting all registration data: ${e.message}", throwable = e)
             emptyList()
+        }
+    }
+
+    suspend fun registerDevice(request: DeviceRegistrationRequest) = withContext(Dispatchers.IO) {
+        try {
+            apiService.registerDevice(request)
+        } catch (e: Exception) {
+            LogManager.logError(LogManager.LogCategory.DEVICE_REGISTRATION, "API Error: ${e.message}", throwable = e)
+            throw e
         }
     }
 }

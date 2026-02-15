@@ -43,11 +43,5 @@ data class CompleteDeviceRegistrationEntity(
     val registrationStatus: String, // "PENDING", "SUCCESS", "FAILED"
     val registeredAt: Long,
     val lastSyncAt: Long? = null,
-    val serverResponse: String? = null, // JSON response from server
-    
-    // Loan information (basic info for main screen)
-    val nextPaymentDate: String? = null,
-    val totalAmount: Double? = null,
-    val paidAmount: Double? = null,
-    val remainingAmount: Double? = null
+    val serverResponse: String? = null // JSON response from server
 )

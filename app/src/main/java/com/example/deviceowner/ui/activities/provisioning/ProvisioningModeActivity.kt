@@ -33,10 +33,30 @@ class ProvisioningModeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "========================================")
+        Log.d(TAG, "=========================================")
         Log.d(TAG, "ProvisioningModeActivity created")
         Log.d(TAG, "Android version: ${Build.VERSION.SDK_INT} (S = ${Build.VERSION_CODES.S})")
-        Log.d(TAG, "========================================")
+        Log.d(TAG, "=========================================")
+        
+        // CRITICAL: Check device compatibility BEFORE provisioning
+        Log.d(TAG, "🔍 Checking device compatibility...")
+        val validator = com.example.deviceowner.provisioning.ProvisioningValidator(this)
+        val isCompatible = validator.validateBeforeProvisioning()
+        
+        if (!isCompatible) {
+            Log.e(TAG, "❌ Device is NOT compatible - blocking provisioning")
+            val issues = validator.getCompatibilityIssues()
+            Log.e(TAG, "Compatibility issues: $issues")
+            
+            // Launch compatibility check activity to show error
+            val intent = Intent(this, DeviceCompatibilityCheckActivity::class.java)
+            startActivity(intent)
+            setResult(Activity.RESULT_CANCELED)
+            finish()
+            return
+        }
+        
+        Log.i(TAG, "✅ Device is compatible - proceeding with provisioning")
         
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -94,10 +114,10 @@ class ProvisioningModeActivity : Activity() {
                     PROVISIONING_MODE_FULLY_MANAGED_DEVICE
                 }
                 
-                Log.d(TAG, "========================================")
+                Log.d(TAG, "=========================================")
                 Log.d(TAG, "Returning provisioning mode: $provisioningMode")
                 Log.d(TAG, "Mode: ${if (provisioningMode == PROVISIONING_MODE_FULLY_MANAGED_DEVICE) "Fully Managed Device" else "Managed Profile"}")
-                Log.d(TAG, "========================================")
+                Log.d(TAG, "=========================================")
                 
                 // Set result with provisioning mode
                 val resultIntent = Intent().apply {

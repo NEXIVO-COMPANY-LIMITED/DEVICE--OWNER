@@ -23,9 +23,21 @@ class FirmwareSecurityMonitorService : Service() {
     companion object {
         private const val TAG = "FirmwareSecurityMonitor"
         private const val MAX_VIOLATIONS_BEFORE_LOCK = 10
+
+        fun startService(context: Context) {
+            val intent = Intent(context, FirmwareSecurityMonitorService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
         private const val NOTIFICATION_ID = 1002
+        private const val CRITICAL_ALERT_NOTIFICATION_ID = 1003
         private const val CHANNEL_ID = "firmware_security_monitor_channel"
         private const val CHANNEL_NAME = "Firmware Security"
+        private const val CRITICAL_CHANNEL_ID = "firmware_security_critical_channel"
+        private const val CRITICAL_CHANNEL_NAME = "Security Alerts"
     }
 
     override fun onCreate() {
@@ -49,6 +61,7 @@ class FirmwareSecurityMonitorService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
@@ -57,8 +70,17 @@ class FirmwareSecurityMonitorService : Service() {
                 description = "Firmware security monitoring (bootloader, violations)"
                 setShowBadge(false)
             }
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(channel)
+            nm.createNotificationChannel(channel)
+            val criticalChannel = NotificationChannel(
+                CRITICAL_CHANNEL_ID,
+                CRITICAL_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Critical security violation alerts"
+                setShowBadge(true)
+                enableVibration(true)
+            }
+            nm.createNotificationChannel(criticalChannel)
         }
     }
 
@@ -94,94 +116,10 @@ class FirmwareSecurityMonitorService : Service() {
 
     private fun handleViolation(v: FirmwareSecurity.Violation) {
         Log.w(TAG, "Violation: ${v.type} severity=${v.severity} details=${v.details}")
-        scope.launch {
-            try {
-                reportViolationToServer(v)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to report violation", e)
-            }
-        }
         val status = FirmwareSecurity.checkSecurityStatus()
         val total = status?.violations?.total ?: 0
         if (total > MAX_VIOLATIONS_BEFORE_LOCK) handleExcessiveViolations(total)
         if (v.severity == "CRITICAL") handleCriticalViolation(v)
-    }
-
-    private suspend fun reportViolationToServer(v: FirmwareSecurity.Violation) {
-        withContext(Dispatchers.IO) {
-            try {
-                val apiClient = com.example.deviceowner.data.remote.ApiClient()
-                val deviceId = getCurrentDeviceId()
-                
-                // Create violation report payload
-                val violationData = mapOf(
-                    "device_id" to deviceId,
-                    "timestamp" to v.timestamp,
-                    "violation_type" to v.type,
-                    "severity" to v.severity,
-                    "details" to v.details,
-                    "security_status" to (FirmwareSecurity.checkSecurityStatus()?.let { status ->
-                        mapOf(
-                            "bootloaderLocked" to status.bootloaderLocked,
-                            "securityEnabled" to status.securityEnabled,
-                            "buttonBlocking" to status.buttonBlocking,
-                            "violations" to mapOf(
-                                "total" to status.violations.total,
-                                "recovery" to status.violations.recovery,
-                                "fastboot" to status.violations.fastboot
-                            ),
-                            "lastViolation" to status.lastViolation,
-                            "timestamp" to status.timestamp
-                        )
-                    } ?: emptyMap())
-                )
-                
-                // Send to server using existing endpoint
-                val response = apiClient.reportSecurityViolation(deviceId, violationData)
-                
-                if (response.isSuccessful) {
-                    Log.i(TAG, "Violation reported successfully: ${v.type}")
-                } else {
-                    Log.e(TAG, "Failed to report violation: ${response.code()}")
-                }
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error reporting violation to server", e)
-                // Store for retry later
-                storeViolationForRetry(v)
-            }
-        }
-    }
-    
-    private fun getCurrentDeviceId(): String {
-        return try {
-            val prefsManager = com.example.deviceowner.utils.SharedPreferencesManager(this)
-            prefsManager.getDeviceId() ?: android.provider.Settings.Secure.getString(
-                contentResolver,
-                android.provider.Settings.Secure.ANDROID_ID
-            ) ?: "unknown_device"
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get device ID", e)
-            "unknown_device"
-        }
-    }
-    
-    private fun storeViolationForRetry(v: FirmwareSecurity.Violation) {
-        // Store in local database for retry when network is available
-        scope.launch {
-            try {
-                // You can implement this using your existing Room database
-                // For now, just log the violation for manual review
-                Log.w(TAG, "Storing violation for retry: ${v.type} - ${v.details} at ${v.timestamp}")
-                
-                // TODO: Implement proper database storage
-                // val database = AppDatabase.getDatabase(this@FirmwareSecurityMonitorService)
-                // database.violationDao().insertViolation(v.toEntity())
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to store violation for retry", e)
-            }
-        }
     }
 
     private fun handleExcessiveViolations(count: Long) {
@@ -189,24 +127,11 @@ class FirmwareSecurityMonitorService : Service() {
         
         scope.launch {
             try {
-                // 1. Notify server of excessive violations
-                val violationData = mapOf(
-                    "device_id" to getCurrentDeviceId(),
-                    "violation_type" to "EXCESSIVE_VIOLATIONS",
-                    "severity" to "CRITICAL",
-                    "details" to "Total violations exceeded threshold: $count",
-                    "timestamp" to System.currentTimeMillis(),
-                    "action_required" to true
-                )
-                
-                val apiClient = com.example.deviceowner.data.remote.ApiClient()
-                apiClient.reportSecurityViolation(getCurrentDeviceId(), violationData)
-                
-                // 2. Trigger enhanced security measures
+                // Trigger enhanced security measures
                 val enhancedSecurity = com.example.deviceowner.security.enforcement.EnhancedSecurityManager(this@FirmwareSecurityMonitorService)
                 enhancedSecurity.apply100PercentPerfectSecurity()
                 
-                // 3. Trigger hard lock as last resort
+                // Trigger hard lock as last resort
                 triggerHardLock()
                 
                 Log.i(TAG, "Enhanced security measures applied due to excessive violations")
@@ -219,29 +144,10 @@ class FirmwareSecurityMonitorService : Service() {
 
     private fun handleCriticalViolation(v: FirmwareSecurity.Violation) {
         Log.e(TAG, "CRITICAL SECURITY VIOLATION: ${v.type} - ${v.details}")
-        
+        showCriticalViolationAlert(v)
         scope.launch {
             try {
-                // 1. Immediate server notification
-                val violationData = mapOf(
-                    "device_id" to getCurrentDeviceId(),
-                    "violation_type" to "CRITICAL_SECURITY_BREACH",
-                    "severity" to "CRITICAL",
-                    "details" to "Critical violation: ${v.type} - ${v.details}",
-                    "timestamp" to v.timestamp,
-                    "immediate_action_required" to true,
-                    "original_violation" to mapOf(
-                        "type" to v.type,
-                        "severity" to v.severity,
-                        "details" to v.details,
-                        "timestamp" to v.timestamp
-                    )
-                )
-                
-                val apiClient = com.example.deviceowner.data.remote.ApiClient()
-                apiClient.reportSecurityViolation(getCurrentDeviceId(), violationData)
-                
-                // 2. Trigger immediate security response based on violation type
+                // Trigger immediate security response based on violation type
                 when (v.type) {
                     "BOOTLOADER_UNLOCKED", "FASTBOOT_UNLOCKED" -> {
                         Log.e(TAG, "DEVICE COMPROMISED - bootloader/fastboot unlocked")
@@ -269,6 +175,21 @@ class FirmwareSecurityMonitorService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle critical violation", e)
             }
+        }
+    }
+
+    private fun showCriticalViolationAlert(v: FirmwareSecurity.Violation) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notification = NotificationCompat.Builder(this, CRITICAL_CHANNEL_ID)
+                .setContentTitle("Critical security violation")
+                .setContentText("${v.type}: ${v.details}")
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(true)
+                .build()
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(CRITICAL_ALERT_NOTIFICATION_ID, notification)
         }
     }
 

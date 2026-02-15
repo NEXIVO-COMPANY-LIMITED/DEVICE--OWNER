@@ -1,0 +1,109 @@
+# Device Installation (Provisioning)
+
+This document describes how the Device Owner app is **installed and provisioned** as Device Owner on the device.
+
+---
+
+## Overview
+
+Installation is the process of:
+
+1. **Deploying the app** (e.g. via MDM, adb, or side-loading).
+2. **Provisioning as Device Owner** via Android's managed provisioning (e.g. QR code, `PROVISION_MANAGED_DEVICE`).
+3. **Running the in-app setup flow**: compatibility check, consent, progress, then registration (loan number and device data).
+
+The app does **not** set itself as Device Owner; that is done by the system during provisioning. The app only responds to provisioning intents and then runs its own setup and registration flows.
+
+---
+
+## Provisioning Entry Points
+
+### 1. QR Code / Managed Provisioning
+
+- **Receiver**: `QRProvisioningReceiver`  
+  - Actions: `PROVISION_MANAGED_DEVICE`, `PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE`, `PROVISIONING_SUCCESSFUL`.
+- The device user scans a QR code (or uses another method) that triggers Android to provision the app as Device Owner. After provisioning, the system launches the app; the app then runs **RegistrationStatusActivity** or the appropriate provisioning activity.
+
+### 2. Device Admin Receiver
+
+- **Receiver**: `AdminReceiver`  
+  - Actions: `DEVICE_ADMIN_ENABLED`, `DEVICE_ADMIN_DISABLED`, `PROVISION_MANAGED_DEVICE`, `PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE`, password events, etc.
+- Handles device admin lifecycle and provisioning-related intents. Meta-data: `@xml/device_admin_receiver`.
+
+### 3. Provisioning Mode (Android 12+)
+
+- **Activity**: `ProvisioningModeActivity`  
+  - Intent filter: `GET_PROVISIONING_MODE`.  
+- Used by the system to query the app's provisioning mode when starting managed provisioning.
+
+---
+
+## In-App Installation Flow (Post-Provisioning)
+
+After the app is installed and set as Device Owner, the **in-app** "installation" flow is the sequence of screens and checks that prepare the device for registration and normal operation.
+
+### 1. Launch and status
+
+- **RegistrationStatusActivity** is the **launcher** (MAIN / LAUNCHER). It decides whether the user has already completed registration or must go through setup.
+
+### 2. Data privacy consent
+
+- **DataPrivacyConsentActivity** — Shown early (e.g. before loan number input) to collect user consent for data use.
+
+### 3. Device compatibility check
+
+- **DeviceCompatibilityCheckActivity** — Validates that the device meets requirements (e.g. API level, no conflicting profiles).
+- **DeviceOwnerCompatibilityChecker** (in code) performs the actual checks. See [Compatibility](03-compatibility.md).
+
+### 4. Provisioning progress
+
+- **ProvisioningProgressActivity**  
+  - Shows "Connecting to system services…", "Checking device compatibility…".  
+  - Uses **DeviceOwnerCompatibilityChecker** to run `checkCompatibility()`.  
+  - On success → **CompatibilitySuccessActivity** or **DeviceCompatibilitySuccessActivity**.  
+  - On failure → **CompatibilityFailureActivity** with failure details.
+
+### 5. Policy compliance
+
+- **PolicyComplianceActivity**  
+  - Intent filter: `ADMIN_POLICY_COMPLIANCE`.  
+  - Shown when the system needs admin policy compliance from the user.
+
+### 6. Post–compatibility success
+
+- From the success screen, the user is typically guided to **Device Registration** (loan number and device data collection), then to **RegistrationSuccessActivity** when registration with the backend succeeds.
+
+---
+
+## Installation Status API
+
+Once the device has a `device_id` (after registration), the app can report **installation status** to the backend:
+
+- **Endpoint**: `POST api/devices/mobile/{deviceId}/installation-status/`  
+- **Models**: `InstallationStatusModels` (e.g. status: completed / failed).  
+- Used to inform the server that device setup (from the app's perspective) has completed or failed.
+
+---
+
+## Boot and post-install behavior
+
+- **BootReceiver** (BOOT_COMPLETED, LOCKED_BOOT_COMPLETED, QUICKBOOT_POWERON) runs early (priority 999). It re-applies persistent hard lock if needed and runs **TamperBootChecker** so that on every boot, tamper is checked and hard lock applied if required.
+- **UpdateReceiver** handles install-complete callbacks for in-app updates (e.g. GitHub-based updates).
+
+---
+
+## Summary
+
+| Step | Component | Description |
+|------|-----------|-------------|
+| 1 | System / MDM | App installed; provisioning (e.g. QR) sets app as Device Owner |
+| 2 | QRProvisioningReceiver / AdminReceiver | Handle provisioning intents |
+| 3 | RegistrationStatusActivity | Launcher; routes to setup or main flow |
+| 4 | DataPrivacyConsentActivity | Data privacy consent |
+| 5 | DeviceCompatibilityCheckActivity | Entry to compatibility check |
+| 6 | ProvisioningProgressActivity | Progress + DeviceOwnerCompatibilityChecker |
+| 7 | CompatibilitySuccessActivity / DeviceCompatibilitySuccessActivity | Success path |
+| 8 | Device Registration | Loan number + device data → backend |
+| 9 | Installation status API | Report installation completed/failed to backend |
+
+For **registration** (loan number, device ID, API calls), see [Device Registration](05-device-registration.md).

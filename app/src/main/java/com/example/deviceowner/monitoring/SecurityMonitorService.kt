@@ -14,23 +14,26 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.example.deviceowner.core.device.DeviceDataCollector
+import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.security.response.EnhancedAntiTamperResponse
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
+import com.example.deviceowner.services.HeartbeatService
 import kotlinx.coroutines.*
 
 /**
- * Security Monitor Service
- * Continuously monitors for:
- * - Developer Options access attempts
- * - Factory Reset attempts
- * - Settings modifications
- * Triggers soft lock when violations detected
+ * Security Monitor Service – FOREGROUND SERVICE (notification shown).
+ * Heartbeat must run in a foreground service so it continues when app is closed and keeps 30s interval.
+ * Background service would be killed or throttled → heartbeat stops or big gaps between server receipts.
+ * Continuously monitors for: Developer Options, Factory Reset, Settings; triggers soft lock on violation.
  */
 class SecurityMonitorService : Service() {
     
     companion object {
         private const val TAG = "SecurityMonitor"
         private const val MONITOR_INTERVAL = 2000L // Check every 2 seconds
+        /** Heartbeat every 30 seconds so Django receives data at this interval. */
+        private const val HEARTBEAT_INTERVAL_MS = 30_000L
         private const val NOTIFICATION_ID = 1002
         private const val CHANNEL_ID = "security_monitor_channel"
         
@@ -53,12 +56,13 @@ class SecurityMonitorService : Service() {
     private val tamperResponse by lazy { EnhancedAntiTamperResponse(this) }
     private val database by lazy { DeviceOwnerDatabase.getDatabase(this) }
     private var monitoringJob: Job? = null
+    private var heartbeatService: HeartbeatService? = null
     private val handler = Handler(Looper.getMainLooper())
     
     private var lastDeveloperOptionsState = false
     private var lastUsbDebuggingState = false
     private var lastTamperCheckTime = 0L
-    private val TAMPER_CHECK_INTERVAL = 15 * 60 * 1000L // Check every 15 minutes
+    private val TAMPER_CHECK_INTERVAL = 2000L // Check every 2 seconds (bootloader, etc.) - detect & block hapo hapo
     private var lastSettingsCheckTime = 0L
     private val SETTINGS_CHECK_INTERVAL = 500L // Check every 500ms for Settings app
     private var lastForegroundPackage = ""
@@ -73,9 +77,51 @@ class SecurityMonitorService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
         startMonitoring()
+        startHeartbeatLoop()
         
         // Start Real-Time Security Mesh
         startSecurityMesh()
+    }
+    
+    /**
+     * Run heartbeat every 30 seconds so Django receives data at that interval.
+     * Uses HeartbeatService in-process (Handler + 30s) so interval is exact. WorkManager
+     * cannot run more often than 15 min, so we do NOT enqueue workers here – HeartbeatWorker
+     * remains a backup when this service is not running (e.g. after reboot before app open).
+     */
+    private fun startHeartbeatLoop() {
+        try {
+            val deviceId = resolveDeviceIdForHeartbeat()
+            if (deviceId.isNullOrBlank()) {
+                Log.w(TAG, "⚠️ device_id_for_heartbeat missing – heartbeat will start when device is registered")
+                Log.w(TAG, "   Check: device_data, device_registration, device_owner_prefs")
+                return
+            }
+            Log.i(TAG, "Heartbeat using device_id: ${deviceId.take(8)}...")
+            val apiClient = ApiClient()
+            val deviceDataCollector = DeviceDataCollector(this)
+            heartbeatService = HeartbeatService(this, apiClient, deviceDataCollector)
+            heartbeatService!!.schedulePeriodicHeartbeat(deviceId)
+            Log.i(TAG, "✅ Heartbeat loop started – every ${HEARTBEAT_INTERVAL_MS / 1000}s (in-process, exact interval)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Heartbeat start error: ${e.message}", e)
+        }
+    }
+    
+    /** Resolve device_id from multiple sources (device_data, device_registration, device_owner_prefs) */
+    private fun resolveDeviceIdForHeartbeat(): String? {
+        val deviceDataPrefs = getSharedPreferences("device_data", Context.MODE_PRIVATE)
+        val fromDeviceData = deviceDataPrefs.getString("device_id_for_heartbeat", null)
+        if (!fromDeviceData.isNullOrBlank()) return fromDeviceData
+        
+        val deviceReg = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
+            .getString("device_id", null)
+        if (!deviceReg.isNullOrBlank()) {
+            deviceDataPrefs.edit().putString("device_id_for_heartbeat", deviceReg).apply()
+            return deviceReg
+        }
+        
+        return com.example.deviceowner.utils.SharedPreferencesManager(this).getDeviceIdForHeartbeat()
     }
     
     /**
@@ -163,33 +209,61 @@ class SecurityMonitorService : Service() {
     }
     
     /**
-     * Check for security violations
+     * Check for security violations.
+     * When Developer Options or USB Debugging are ON → automatically block user and apply hard lock (kiosk).
+     * Bootloader unlocked = CRITICAL → hard lock. Other tamper = periodic check.
      */
     private suspend fun checkSecurityViolations() {
-        // Check Developer Options
-        val currentDeveloperOptions = isDeveloperOptionsEnabled()
-        if (currentDeveloperOptions && !lastDeveloperOptionsState) {
-            Log.e(TAG, "⚠️ DEVELOPER OPTIONS ENABLED - TRIGGERING SOFT LOCK")
-            triggerSoftLock("User enabled Developer Options")
-            // Log as tamper event
-            logTamperEvent("DEVELOPER_OPTIONS_ENABLED", "User enabled Developer Options")
+        val devOptEnabled = isDeveloperOptionsEnabled()
+        val usbEnabled = isUsbDebuggingEnabled()
+
+        // When developer options or USB debugging are detected ON → block user TOTALLY (hard lock).
+        // Kwa muda inacheki tamper; ikigundua kuna tatizo inablock totally device again with hard lock.
+        if (devOptEnabled || usbEnabled) {
+            val reason = buildString {
+                if (devOptEnabled) append("Developer options enabled")
+                if (usbEnabled) {
+                    if (devOptEnabled) append("; ")
+                    append("USB debugging enabled")
+                }
+            }
+            val tamperType = when {
+                devOptEnabled && usbEnabled -> "DEVELOPER_MODE"
+                devOptEnabled -> "DEVELOPER_MODE"
+                else -> "USB_DEBUG"
+            }
+            Log.e(TAG, "🚨 SECURITY VIOLATION: $reason – inablock totally (hard lock)")
+            handler.post {
+                try {
+                    controlManager.applyHardLock(
+                        reason = "Security violation: $reason",
+                        forceRestart = false,
+                        forceFromServerOrMismatch = true,
+                        tamperType = tamperType
+                    )
+                    // Send tamper event to server (same as other tamper sources – logs, offline queue if no network)
+                    tamperResponse.sendTamperToBackendOnly(
+                        tamperType = tamperType,
+                        severity = "CRITICAL",
+                        description = "Security violation: $reason",
+                        extraData = mapOf(
+                            "lock_applied_on_device" to "hard",
+                            "lock_type" to "hard",
+                            "tamper_source" to "security_monitor_service"
+                        )
+                    )
+                    Log.i(TAG, "Tamper event sent to server: $tamperType")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to apply hard lock for developer/USB violation", e)
+                }
+            }
+            disableDeveloperOptionsImmediately()
         }
-        lastDeveloperOptionsState = currentDeveloperOptions
-        
-        // Check USB Debugging
-        val currentUsbDebugging = isUsbDebuggingEnabled()
-        if (currentUsbDebugging && !lastUsbDebuggingState) {
-            Log.e(TAG, "⚠️ USB DEBUGGING ENABLED - TRIGGERING SOFT LOCK")
-            triggerSoftLock("User enabled USB Debugging")
-            // Log as tamper event
-            logTamperEvent("USB_DEBUGGING_ENABLED", "User enabled USB Debugging")
-        }
-        lastUsbDebuggingState = currentUsbDebugging
-        
-        // Check Factory Reset protection
-        checkFactoryResetProtection()
-        
-        // Perform comprehensive tamper check periodically
+
+        lastDeveloperOptionsState = devOptEnabled
+        lastUsbDebuggingState = usbEnabled
+
+        // Periodic tamper check: bootloader unlocked, etc.
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastTamperCheckTime > TAMPER_CHECK_INTERVAL) {
             performTamperCheck()
@@ -347,22 +421,27 @@ class SecurityMonitorService : Service() {
     }
     
     /**
-     * Perform comprehensive tamper detection check
+     * Perform tamper detection - block IMMEDIATELY on device, no server wait.
+     * Runs even when device not yet registered (blocks locally; server notified when possible).
      */
     private suspend fun performTamperCheck() {
         try {
-            val sharedPrefs = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
-            val deviceId = sharedPrefs.getString("device_token", null) ?: return
-            
-            // Perform basic tamper checks
             val tamperDetected = checkForTamperIndicators()
             if (tamperDetected.isNotEmpty()) {
-                Log.e(TAG, "🚨 TAMPER DETECTED: ${tamperDetected.joinToString(", ")}")
-                
-                // Log tamper event and trigger response
+                Log.e(TAG, "🚨 TAMPER DETECTED: ${tamperDetected.joinToString(", ")} - blocking user immediately")
                 for (tamperType in tamperDetected) {
                     logTamperEvent(tamperType, "Tamper detected: $tamperType")
-                    tamperResponse.respondToTamper(tamperType, "HIGH", "Tamper detected: $tamperType")
+                    val severity = if (tamperType == "BOOTLOADER_UNLOCKED") "CRITICAL" else "HIGH"
+                    tamperResponse.respondToTamper(
+                        tamperType = tamperType,
+                        severity = severity,
+                        description = "Tamper detected: $tamperType",
+                        extraData = mapOf(
+                            "lock_applied_on_device" to "hard",
+                            "lock_type" to "hard",
+                            "tamper_source" to "security_monitor_periodic_check"
+                        )
+                    )
                 }
             }
         } catch (e: Exception) {
@@ -371,24 +450,18 @@ class SecurityMonitorService : Service() {
     }
     
     /**
-     * Check for various tamper indicators
+     * Check for various tamper indicators (bootloader unlocked, etc.).
+     * Developer options / USB debugging are handled in checkSecurityViolations with CRITICAL → hard lock.
      */
     private fun checkForTamperIndicators(): List<String> {
         val indicators = mutableListOf<String>()
         
         try {
-            // Check if developer options is enabled
-            if (isDeveloperOptionsEnabled()) {
-                indicators.add("DEVELOPER_OPTIONS_ENABLED")
+            // Bootloader unlocked (e.g. after fastboot unlock) = CRITICAL
+            val bootloaderEnforcer = com.example.deviceowner.security.enforcement.BootloaderLockEnforcer(this)
+            if (bootloaderEnforcer.isBootloaderUnlocked()) {
+                indicators.add("BOOTLOADER_UNLOCKED")
             }
-            
-            // Check if USB debugging is enabled
-            if (isUsbDebuggingEnabled()) {
-                indicators.add("USB_DEBUGGING_ENABLED")
-            }
-            
-            // Add other tamper checks as needed
-            
         } catch (e: Exception) {
             Log.w(TAG, "Error checking tamper indicators", e)
         }
@@ -397,22 +470,25 @@ class SecurityMonitorService : Service() {
     }
     
     /**
-     * Log a tamper event directly
+     * Log tamper event locally. Uses device_id if registered, else "UNREGISTERED" for audit.
      */
     private fun logTamperEvent(tamperType: String, description: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val sharedPrefs = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
-                val deviceId = sharedPrefs.getString("device_token", null) ?: return@launch
-                
-                val tamperDetection = com.example.deviceowner.data.local.database.entities.TamperDetectionEntity(
+                val deviceId = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
+                    .getString("device_id", null)
+                    ?: getSharedPreferences("device_data", Context.MODE_PRIVATE)
+                        .getString("device_id_for_heartbeat", null)
+                    ?: android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+                    ?: "UNREGISTERED"
+                val entity = com.example.deviceowner.data.local.database.entities.TamperDetectionEntity(
                     deviceId = deviceId,
                     tamperType = tamperType,
-                    severity = "HIGH",
+                    severity = "CRITICAL",
                     detectedAt = System.currentTimeMillis(),
                     details = description
                 )
-                database.tamperDetectionDao().insertTamperDetection(tamperDetection)
+                database.tamperDetectionDao().insertTamperDetection(entity)
             } catch (e: Exception) {
                 Log.e(TAG, "Error logging tamper event", e)
             }
@@ -450,44 +526,6 @@ class SecurityMonitorService : Service() {
     }
     
     /**
-     * Check Factory Reset protection
-     */
-    private fun checkFactoryResetProtection() {
-        try {
-            // Check if user is trying to access factory reset
-            // This is monitored through settings access patterns
-            // If factory reset option becomes accessible, trigger lock
-            val factoryResetAccessible = isFactoryResetAccessible()
-            if (factoryResetAccessible) {
-                Log.e(TAG, "⚠️ FACTORY RESET ACCESSIBLE - TRIGGERING SOFT LOCK")
-                triggerSoftLock("User attempted to access Factory Reset")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error checking factory reset", e)
-        }
-    }
-    
-    /**
-     * Check if Factory Reset is accessible
-     */
-    private fun isFactoryResetAccessible(): Boolean {
-        // Check if factory reset protection is still active
-        // If it's not, user might have found a way to access it
-        return try {
-            // This is a heuristic check - if restrictions are not properly applied
-            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
-            val admin = android.content.ComponentName(this, com.example.deviceowner.receivers.AdminReceiver::class.java)
-            
-            // Check if factory reset restriction is still active
-            val userManager = getSystemService(Context.USER_SERVICE) as android.os.UserManager
-            val restrictions = userManager.getUserRestrictions()
-            !restrictions.getBoolean(android.os.UserManager.DISALLOW_FACTORY_RESET, false)
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    /**
      * Trigger soft lock
      */
     private fun triggerSoftLock(reason: String) {
@@ -503,8 +541,9 @@ class SecurityMonitorService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
-        // Stop monitoring job
         monitoringJob?.cancel()
+        heartbeatService?.cancelPeriodicHeartbeat()
+        heartbeatService = null
         
         // Stop security mesh components
         try {

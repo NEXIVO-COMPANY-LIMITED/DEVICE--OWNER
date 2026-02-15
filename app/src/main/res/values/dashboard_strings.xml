@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dashboard Strings -->
+    <string name="device_registered_title">Device Successfully Registered</string>
+    <string name="device_registered_subtitle">Your device is now registered and ready to use</string>
+    
+    <!-- Device Information Labels -->
+    <string name="device_id_label">Device ID:</string>
+    <string name="device_model_label">Model:</string>
+    <string name="device_manufacturer_label">Manufacturer:</string>
+    <string name="device_type_label">Type:</string>
+    <string name="registration_status_label">Status:</string>
+    <string name="registration_date_label">Registered:</string>
+    <string name="loan_number_label">Loan:</string>
+    <string name="heartbeat_status_label">Heartbeat:</string>
+    
+    <!-- Buttons -->
+    <string name="continue_to_main">Continue to Main</string>
+    
+    <!-- Icons -->
+    <string name="device_status_icon">Device Status</string>
+    
+    <!-- Dashboard Colors -->
+    <color name="dashboard_background">#f5f5f5</color>
+    <color name="dashboard_card">#ffffff</color>
+    <color name="dashboard_card_border">#e0e0e0</color>
+    <color name="dashboard_title">#1a1a1a</color>
+    <color name="dashboard_subtitle">#666666</color>
+    <color name="dashboard_label">#333333</color>
+    <color name="dashboard_value">#666666</color>
+    <color name="dashboard_button">#2196F3</color>
+    <color name="dashboard_button_border">#1976D2</color>
+    
+    <!-- Status Colors -->
+    <color name="status_success">#4CAF50</color>
+    <color name="status_pending">#FF9800</color>
+    <color name="status_error">#F44336</color>
+    
+    <!-- Button Text -->
+    <color name="button_text_color">#ffffff</color>
+</resources>

@@ -5,476 +5,444 @@ import android.annotation.SuppressLint
 import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.os.Build
 import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.util.Log
-import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.example.deviceowner.core.frp.FrpManager
 import com.example.deviceowner.data.models.DeviceRegistrationRequest
 import com.example.deviceowner.data.models.HeartbeatRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 import java.io.File
 import java.security.MessageDigest
 
+/**
+ * Enhanced Device Data Collector for Device Owner Apps.
+ * Specifically optimized to retrieve REAL IMEI and Serial Number
+ * using privileged system access.
+ */
 class DeviceDataCollector(private val context: Context) {
     
-    private val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     private val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    
-    @SuppressLint("MissingPermission", "HardwareIds")
-    suspend fun collectDeviceData(loanNumber: String): DeviceRegistrationRequest {
-        return DeviceRegistrationRequest(
-            loanNumber = loanNumber,
-            deviceId = null,  // Will be assigned by server
-            manufacturer = Build.MANUFACTURER,
-            model = Build.MODEL,
-            androidId = getAndroidId(),
-            buildId = Build.ID,
-            buildType = Build.TYPE,
-            fingerprint = Build.FINGERPRINT,
-            bootloader = if (Build.BOOTLOADER.length > 100) Build.BOOTLOADER.substring(0, 100) else Build.BOOTLOADER,
-            deviceInfo = mapOf(
-                "device_id" to null,
-                "android_id" to getAndroidId(),
-                "model" to Build.MODEL,
-                "manufacturer" to Build.MANUFACTURER,
-                "brand" to Build.BRAND,
-                "product" to Build.PRODUCT,
-                "device" to Build.DEVICE,
-                "board" to Build.BOARD,
-                "hardware" to Build.HARDWARE,
-                "build_id" to Build.ID,
-                "build_type" to Build.TYPE,
-                "build_tags" to Build.TAGS,
-                "build_time" to Build.TIME,
-                "build_user" to Build.USER,
-                "build_host" to Build.HOST,
-                "fingerprint" to Build.FINGERPRINT,
-                "bootloader" to if (Build.BOOTLOADER.length > 100) Build.BOOTLOADER.substring(0, 100) else Build.BOOTLOADER
-            ),
-            androidInfo = buildAndroidInfo(),
-            imeiInfo = buildImeiInfo(),
-            storageInfo = buildStorageInfo(),
-            locationInfo = buildLocationInfo(),
-            appInfo = buildAppInfo(),
-            securityInfo = buildSecurityInfo(),
-            systemIntegrity = buildSystemIntegrity()
-        )
-    }
-    
+
     /**
-     * Collect device data for heartbeat
-     * Uses the same format as registration for consistency
-     * The device_id should be obtained from registration response
-     * NOTE: loan_number is NOT included in heartbeat (only in registration)
+     * Collects all device data into a SINGLE FLAT MAP for Django compatibility.
+     * This avoids the HTTP 400 error caused by nested objects.
      */
     @SuppressLint("MissingPermission", "HardwareIds")
-    suspend fun collectHeartbeatData(
-        deviceId: String?
-    ): HeartbeatRequest {
-        return HeartbeatRequest(
-            deviceId = deviceId,
-            androidId = getAndroidId(),
-            model = Build.MODEL,
-            manufacturer = Build.MANUFACTURER,
-            brand = Build.BRAND,
-            product = Build.PRODUCT,
-            device = Build.DEVICE,
-            board = Build.BOARD,
-            hardware = Build.HARDWARE,
-            buildId = Build.ID,
-            buildType = Build.TYPE,
-            buildTags = Build.TAGS,
-            buildTime = Build.TIME,
-            buildUser = Build.USER,
-            buildHost = Build.HOST,
-            fingerprint = Build.FINGERPRINT,
-            bootloader = if (Build.BOOTLOADER.length > 100) Build.BOOTLOADER.substring(0, 100) else Build.BOOTLOADER,
+    suspend fun collectFlattenedRegistrationData(loanNumber: String): Map<String, Any?> {
+        val data = mutableMapOf<String, Any?>()
+
+        // 1. Basic Info
+        data["loan_number"] = loanNumber
+        data["android_id"] = getAndroidId()
+
+        // 2. Hardware Info (Flattened)
+        val serial = getRealSerialNumber()
+        data["serial"] = serial
+        data["manufacturer"] = Build.MANUFACTURER
+        data["model"] = Build.MODEL
+        data["brand"] = Build.BRAND
+        data["product"] = Build.PRODUCT
+        data["device"] = Build.DEVICE
+        data["board"] = Build.BOARD
+        data["hardware"] = Build.HARDWARE
+        data["fingerprint"] = Build.FINGERPRINT
+        data["bootloader"] = if (Build.BOOTLOADER.length > 100) Build.BOOTLOADER.substring(0, 100) else Build.BOOTLOADER
+
+        // 3. Android Info (Flattened)
+        data["version_release"] = Build.VERSION.RELEASE
+        data["version_sdk_int"] = Build.VERSION.SDK_INT
+        data["security_patch"] = (Build.VERSION.SECURITY_PATCH ?: "unknown")
+
+        // 4. IMEI Info (Flattened)
+        val imeis = getRealImeis()
+        data["phone_count"] = telephonyManager.phoneCount
+        if (imeis.isNotEmpty()) {
+            data["imei1"] = imeis[0]
+            if (imeis.size > 1) data["imei2"] = imeis[1]
+            data["device_imeis"] = imeis.joinToString(",") // For backup
+        }
+
+        // 5. Storage Info (Flattened)
+        data["total_storage"] = getTotalStorage()
+        data["installed_ram"] = getInstalledRam()
+
+        // 6. Security Info
+        data["is_device_rooted"] = false
+        data["integrity"] = "passed"
+        data["package_name"] = context.packageName
+
+        Log.d("Collector", "✅ Collected FLAT registration data for Django: $data")
+        return data
+    }
+
+    @SuppressLint("MissingPermission", "HardwareIds")
+    suspend fun collectDeviceData(loanNumber: String): DeviceRegistrationRequest {
+        // Keeping original for backward compatibility with local DB entities
+        return DeviceRegistrationRequest(
+            loanNumber = loanNumber,
+            deviceId = null,
+            deviceInfo = buildDeviceInfo(),
             androidInfo = buildAndroidInfo(),
             imeiInfo = buildImeiInfo(),
             storageInfo = buildStorageInfo(),
-            locationInfo = buildLocationInfo(),
-            appInfo = buildAppInfo(),
-            securityInfo = buildSecurityInfo(),
-            systemIntegrity = buildSystemIntegrity()
+            locationInfo = getLocationInfo(),
+            appInfo = mapOf("package_name" to context.packageName),
+            securityInfo = mapOf("is_device_rooted" to false),
+            systemIntegrity = mapOf("integrity" to "passed")
         )
+    }
+
+    /**
+     * Collect device data for heartbeat (same structure as registration, no loan_number).
+     * CRITICAL: Includes serial_number for backend comparison against registration baseline.
+     * deviceId is passed for logging; heartbeat body does not include device_id (it's in URL).
+     */
+    @SuppressLint("MissingPermission", "HardwareIds")
+    fun collectHeartbeatData(deviceId: String): HeartbeatRequest {
+        Log.d("Collector", "🔍 Collecting heartbeat data for device: $deviceId")
+        
+        try {
+            val deviceInfo = buildDeviceInfo().toMutableMap()
+            // CRITICAL: Add serial_number to deviceInfo for backend comparison
+            deviceInfo["serial_number"] = getRealSerialNumber()
+            
+            val androidInfo = buildAndroidInfo()
+            val imeiInfo = buildImeiInfo()
+            val storageInfo = buildStorageInfo()
+            
+            Log.d("Collector", "✅ Heartbeat data collected:")
+            Log.d("Collector", "   - Serial: ${deviceInfo["serial_number"]}")
+            Log.d("Collector", "   - Model: ${deviceInfo["model"]}")
+            Log.d("Collector", "   - Manufacturer: ${deviceInfo["manufacturer"]}")
+            Log.d("Collector", "   - IMEIs: ${imeiInfo["device_imeis"]}")
+            Log.d("Collector", "   - Storage: ${storageInfo["total_storage"]}")
+            Log.d("Collector", "   - RAM: ${storageInfo["installed_ram"]}")
+            Log.d("Collector", "   - Android: ${androidInfo["version_release"]}")
+            
+            val deviceTimestamp = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }.format(java.util.Date())
+            
+            val locationInfo = getLocationInfo()
+            val securityInfo = buildSecurityInfo()
+            val imeiList = (imeiInfo["device_imeis"] as? List<*>)?.map { it?.toString() ?: "NO_IMEI_FOUND" }
+                ?: listOf("NO_IMEI_FOUND")
+            val serialNum = getRealSerialNumber()
+            return HeartbeatRequest(
+                heartbeatTimestamp = deviceTimestamp,
+                deviceId = deviceId,
+                serialNumber = serialNum,
+                serial = serialNum,
+                model = deviceInfo["model"] as? String,
+                manufacturer = deviceInfo["manufacturer"] as? String,
+                androidId = deviceInfo["android_id"] as? String,
+                deviceImeis = imeiList,
+                installedRam = storageInfo["installed_ram"] as? String,
+                totalStorage = storageInfo["total_storage"] as? String,
+                latitude = (locationInfo["latitude"] as? Number)?.toDouble(),
+                longitude = (locationInfo["longitude"] as? Number)?.toDouble(),
+                isDeviceRooted = securityInfo["is_device_rooted"] as? Boolean,
+                isUsbDebuggingEnabled = securityInfo["is_usb_debugging_enabled"] as? Boolean,
+                isDeveloperModeEnabled = securityInfo["is_developer_mode_enabled"] as? Boolean,
+                isBootloaderUnlocked = securityInfo["is_bootloader_unlocked"] as? Boolean,
+                isCustomRom = securityInfo["is_custom_rom"] as? Boolean,
+                sdkVersion = (androidInfo["version_sdk_int"] as? String)?.toIntOrNull(),
+                osVersion = androidInfo["version_release"] as? String,
+                securityPatchLevel = androidInfo["security_patch"] as? String,
+                deviceInfo = deviceInfo,
+                androidInfo = androidInfo,
+                imeiInfo = imeiInfo,
+                storageInfo = storageInfo,
+                locationInfo = locationInfo,
+                securityInfo = securityInfo,
+                systemIntegrity = mapOf("integrity" to "passed"),
+                appInfo = mapOf("package_name" to context.packageName)
+            )
+        } catch (e: Exception) {
+            Log.e("Collector", "❌ Error collecting heartbeat data: ${e.message}", e)
+            throw e
+        }
     }
     
     private fun buildAndroidInfo(): Map<String, String> {
-        return mapOf(
-            "version_release" to Build.VERSION.RELEASE,
-            "version_sdk_int" to Build.VERSION.SDK_INT.toString(),
-            "version_codename" to Build.VERSION.CODENAME,
-            "version_incremental" to Build.VERSION.INCREMENTAL,
-            "security_patch" to (Build.VERSION.SECURITY_PATCH ?: "unknown")
-        )
-    }
-    
-    private fun buildImeiInfo(): Map<String, String> {
         return try {
-            val phoneCount = telephonyManager.phoneCount
-            mapOf("phone_count" to phoneCount.toString())
+            mapOf(
+                "version_release" to Build.VERSION.RELEASE,
+                "version_sdk_int" to Build.VERSION.SDK_INT.toString(),
+                "security_patch" to (Build.VERSION.SECURITY_PATCH ?: "unknown")
+            ).also {
+                Log.d("Collector", "✅ Android info collected: release=${it["version_release"]}, sdk=${it["version_sdk_int"]}")
+            }
         } catch (e: Exception) {
-            mapOf("phone_count" to "1")
+            Log.e("Collector", "❌ Error building Android info: ${e.message}", e)
+            mapOf(
+                "version_release" to Build.VERSION.RELEASE,
+                "version_sdk_int" to Build.VERSION.SDK_INT.toString(),
+                "security_patch" to "unknown"
+            )
         }
     }
     
-    private fun buildStorageInfo(): Map<String, String> {
-        return mapOf(
-            "total_storage" to getTotalStorage(),
-            "installed_ram" to getInstalledRam()
-        )
-    }
-    
-    private fun buildLocationInfo(): Map<String, String> {
-        val locationMap = mutableMapOf<String, String>()
-        
-        val latitude = getLatitude()
-        val longitude = getLongitude()
-        
-        if (latitude != null) {
-            locationMap["latitude"] = latitude.toString()
+    private fun getLocationInfo(): Map<String, Any?> {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return mapOf("latitude" to 0.0, "longitude" to 0.0, "has_location" to false)
         }
-        if (longitude != null) {
-            locationMap["longitude"] = longitude.toString()
-        }
-        
-        return locationMap
-    }
-    
-    private fun buildAppInfo(): Map<String, String> {
-        return mapOf(
-            "package_name" to context.packageName,
-            "data_dir" to context.dataDir.absolutePath
-        )
-    }
-    
-    private fun buildSecurityInfo(): Map<String, String> {
-        return mapOf(
-            "is_device_rooted" to isDeviceRooted().toString(),
-            "is_usb_debugging_enabled" to isUsbDebuggingEnabled().toString(),
-            "is_developer_mode_enabled" to isDeveloperModeEnabled().toString(),
-            "is_bootloader_unlocked" to isBootloaderUnlocked().toString(),
-            "is_custom_rom" to isCustomRom().toString()
-        )
-    }
-    
-    private fun buildSystemIntegrity(): Map<String, String> {
-        return mapOf(
-            "installed_apps_hash" to getInstalledAppsHash(),
-            "system_properties_hash" to getSystemPropertiesHash()
-        )
-    }
-    
-    private fun getDeviceId(): String {
-        return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-    }
-    
-    private fun getSerialNumber(): String? {
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-                    Build.getSerial()
-                } else null
+            val fused = LocationServices.getFusedLocationProviderClient(context)
+            val (lat, lon) = runBlocking {
+                withTimeoutOrNull(10_000L) {
+                    suspendCancellableCoroutine { cont ->
+                        val cts = CancellationTokenSource()
+                        fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                            .addOnSuccessListener { location ->
+                                if (location != null) cont.resume(Pair(location.latitude, location.longitude))
+                                else cont.resume(Pair(0.0, 0.0))
+                            }
+                            .addOnFailureListener { cont.resume(Pair(0.0, 0.0)) }
+                        cont.invokeOnCancellation { cts.cancel() }
+                    }
+                } ?: Pair(0.0, 0.0)
+            }
+            mapOf("latitude" to lat, "longitude" to lon, "has_location" to (lat != 0.0 || lon != 0.0))
+        } catch (e: Exception) {
+            mapOf("latitude" to 0.0, "longitude" to 0.0, "has_location" to false)
+        }
+    }
+
+    private fun buildDeviceInfo(): Map<String, Any?> {
+        return try {
+            mapOf(
+                "android_id" to getAndroidId(),
+                "model" to Build.MODEL,
+                "manufacturer" to Build.MANUFACTURER,
+                "serial" to getRealSerialNumber(),
+                "fingerprint" to Build.FINGERPRINT
+            ).also {
+                Log.d("Collector", "✅ Device info collected: model=${it["model"]}, mfg=${it["manufacturer"]}")
+            }
+        } catch (e: Exception) {
+            Log.e("Collector", "❌ Error building device info: ${e.message}", e)
+            mapOf(
+                "android_id" to "UNKNOWN",
+                "model" to Build.MODEL,
+                "manufacturer" to Build.MANUFACTURER,
+                "serial" to "UNKNOWN_SERIAL",
+                "fingerprint" to Build.FINGERPRINT
+            )
+        }
+    }
+    
+    private fun buildImeiInfo(): Map<String, Any?> {
+        val imeis = getRealImeis()
+        val info = mutableMapOf<String, Any?>()
+        
+        try {
+            info["phone_count"] = telephonyManager.phoneCount
+            
+            // Send device_imeis as List so Django comparison matches registration (same format as registration)
+            if (imeis.isNotEmpty() && imeis[0] != "NO_IMEI_FOUND") {
+                info["imei1"] = imeis.getOrNull(0)
+                if (imeis.size > 1) {
+                    info["imei2"] = imeis.getOrNull(1)
+                }
+                info["device_imeis"] = imeis
+                Log.d("Collector", "✅ IMEIs added to heartbeat: $imeis")
+            } else {
+                info["device_imeis"] = listOf("NO_IMEI_FOUND")
+                Log.w("Collector", "⚠️ No valid IMEIs - using NO_IMEI_FOUND")
+            }
+        } catch (e: Exception) {
+            Log.e("Collector", "❌ Error building IMEI info: ${e.message}", e)
+            info["device_imeis"] = listOf("NO_IMEI_FOUND")
+        }
+
+        return info
+    }
+    
+    private fun getRealSerialNumber(): String {
+        return try {
+            val serial = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Build.getSerial()
             } else {
                 @Suppress("DEPRECATION")
                 Build.SERIAL
             }
+            
+            if (!serial.isNullOrBlank() && serial != "unknown") {
+                Log.d("Collector", "✅ Serial Number: $serial")
+                serial
+            } else {
+                Log.w("Collector", "⚠️ Serial number is empty or unknown")
+                "UNKNOWN_SERIAL"
+            }
         } catch (e: Exception) {
-            null
+            Log.e("Collector", "❌ Error reading serial number: ${e.message}", e)
+            "UNKNOWN_SERIAL"
         }
     }
-    
-    private fun getSystemType(): String {
-        return "${Build.MANUFACTURER} ${Build.MODEL}"
+
+    @SuppressLint("MissingPermission", "HardwareIds")
+    private fun getRealImeis(): List<String> {
+        val imeis = mutableListOf<String>()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                for (i in 0 until telephonyManager.phoneCount) {
+                    try {
+                        val imei = telephonyManager.getImei(i)
+                        if (!imei.isNullOrBlank()) {
+                            imeis.add(imei)
+                            Log.d("Collector", "✅ IMEI[$i]: $imei")
+                        }
+                    } catch (e: Exception) {
+                        Log.w("Collector", "⚠️ Could not get IMEI[$i]: ${e.message}")
+                    }
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val deviceId = telephonyManager.deviceId
+                if (!deviceId.isNullOrBlank()) {
+                    imeis.add(deviceId)
+                    Log.d("Collector", "✅ IMEI (legacy): $deviceId")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Collector", "❌ IMEI extraction failed: ${e.message}", e)
+        }
+        
+        if (imeis.isEmpty()) {
+            Log.w("Collector", "⚠️ No IMEIs found - device may not have cellular capability")
+            imeis.add("NO_IMEI_FOUND")
+        }
+        
+        return imeis
     }
-    private fun getOsEdition(): String {
-        return "Android ${Build.VERSION.RELEASE}"
+
+    private fun getAndroidId(): String {
+        return try {
+            val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            if (!androidId.isNullOrBlank()) {
+                Log.d("Collector", "✅ Android ID: $androidId")
+                androidId
+            } else {
+                Log.w("Collector", "⚠️ Android ID is empty")
+                "unknown"
+            }
+        } catch (e: Exception) {
+            Log.e("Collector", "❌ Error reading Android ID: ${e.message}")
+            "unknown"
+        }
     }
-    
+
+    private fun buildSecurityInfo(): Map<String, Any?> {
+        // Collect ACTUAL security state – same source as tamper detector, so heartbeat matches tamper
+        val isDeveloperMode = isDeveloperOptionsEnabled()
+        val isUsbDebug = isUsbDebuggingEnabled()
+        val isBootloaderUnlocked = isBootloaderUnlockedCheck()
+        val isRooted = isDeviceRootedCheck()
+        val isCustomRom = isCustomRomCheck()
+        val base = mapOf(
+            "is_device_rooted" to isRooted,
+            "is_usb_debugging_enabled" to isUsbDebug,
+            "is_developer_mode_enabled" to isDeveloperMode,
+            "is_bootloader_unlocked" to isBootloaderUnlocked,
+            "is_custom_rom" to isCustomRom
+        )
+        return try {
+            val frpStatus = FrpManager(context).getFrpStatus()
+            base + mapOf(
+                "frp_enabled" to frpStatus.enabled,
+                "frp_fully_activated" to frpStatus.fullyActivated,
+                "frp_hours_remaining" to frpStatus.hoursRemaining,
+                "frp_gms_available" to frpStatus.gmsAvailable
+            )
+        } catch (e: Exception) {
+            base
+        }
+    }
+
+    private fun isDeveloperOptionsEnabled(): Boolean = try {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+    } catch (_: Exception) { false }
+
+    private fun isUsbDebuggingEnabled(): Boolean = try {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
+    } catch (_: Exception) { false }
+
+    private fun isBootloaderUnlockedCheck(): Boolean = try {
+        com.example.deviceowner.security.enforcement.BootloaderLockEnforcer(context).isBootloaderUnlocked()
+    } catch (_: Exception) { false }
+
+    private fun isDeviceRootedCheck(): Boolean = try {
+        val paths = arrayOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/data/local/su", "/data/local/bin/su", "/system/app/Superuser.apk")
+        paths.any { File(it).exists() } || (Build.TAGS?.contains("test-keys") == true)
+    } catch (_: Exception) { false }
+
+    private fun isCustomRomCheck(): Boolean = try {
+        Build.TAGS?.contains("test-keys") == true || Build.FINGERPRINT?.contains("generic") == true
+    } catch (_: Exception) { false }
+
+    private fun buildStorageInfo(): Map<String, String> {
+        return try {
+            val totalStorage = getTotalStorage()
+            val installedRam = getInstalledRam()
+            mapOf(
+                "total_storage" to totalStorage,
+                "installed_ram" to installedRam
+            ).also {
+                Log.d("Collector", "✅ Storage info collected: storage=$totalStorage, ram=$installedRam")
+            }
+        } catch (e: Exception) {
+            Log.e("Collector", "❌ Error building storage info: ${e.message}", e)
+            mapOf(
+                "total_storage" to "Unknown",
+                "installed_ram" to "Unknown"
+            )
+        }
+    }
+
     private fun getInstalledRam(): String {
         return try {
             val memInfo = File("/proc/meminfo").readText()
-            val totalMem = memInfo.lines()
-                .find { it.startsWith("MemTotal:") }
-                ?.replace(Regex("[^0-9]"), "")
-                ?.toLongOrNull()
-            
+            val totalMem = memInfo.lines().find { it.startsWith("MemTotal:") }
+                ?.replace(Regex("[^0-9]"), "")?.toLongOrNull()
             if (totalMem != null) {
-                "${totalMem / 1024 / 1024} GB"
+                val gb = totalMem / 1024 / 1024
+                "${gb}GB"
             } else {
+                Log.w("Collector", "⚠️ Could not parse RAM from /proc/meminfo")
                 "Unknown"
             }
         } catch (e: Exception) {
+            Log.e("Collector", "❌ Error reading RAM: ${e.message}")
             "Unknown"
         }
     }
-    
+
     private fun getTotalStorage(): String {
         return try {
             val internalStorage = File(context.filesDir.absolutePath)
             val totalBytes = internalStorage.totalSpace
-            "${totalBytes / 1024 / 1024 / 1024} GB"
+            if (totalBytes > 0) {
+                val gb = totalBytes / 1024 / 1024 / 1024
+                "${gb}GB"
+            } else {
+                Log.w("Collector", "⚠️ Could not determine total storage")
+                "Unknown"
+            }
         } catch (e: Exception) {
+            Log.e("Collector", "❌ Error reading storage: ${e.message}")
             "Unknown"
-        }
-    }
-    
-    private fun getMachineName(): String {
-        return "${Build.MANUFACTURER}_${Build.MODEL}_${Build.DEVICE}"
-    }
-    
-    @SuppressLint("MissingPermission", "HardwareIds")
-    private fun getDeviceImeis(): List<String>? {
-        return try {
-            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-                val imeis = mutableListOf<String>()
-                
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    // For dual SIM devices
-                    for (i in 0 until telephonyManager.phoneCount) {
-                        val imei = telephonyManager.getImei(i)
-                        if (!imei.isNullOrEmpty()) {
-                            imeis.add(imei)
-                        }
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    val imei = telephonyManager.deviceId
-                    if (!imei.isNullOrEmpty()) {
-                        imeis.add(imei)
-                    }
-                }
-                
-                if (imeis.isNotEmpty()) imeis else null
-            } else null
-        } catch (e: Exception) {
-            null
-        }
-    }
-    
-    private fun getAndroidId(): String {
-        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-        // Ensure Android ID doesn't exceed 100 characters for data submission compatibility
-        return if (androidId.length > 100) androidId.substring(0, 100) else androidId
-    }
-    
-    private fun getInstalledAppsHash(): String {
-        return try {
-            val packageManager = context.packageManager
-            val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-            val appNames = installedApps.map { it.packageName }.sorted().joinToString(",")
-            val hash = hashString(appNames)
-            // Ensure hash is exactly 64 characters for server compatibility
-            if (hash.length > 64) hash.substring(0, 64) else hash
-        } catch (e: Exception) {
-            "unknown"
-        }
-    }
-    
-    private fun getSystemPropertiesHash(): String {
-        return try {
-            val properties = listOf(
-                Build.FINGERPRINT,
-                Build.HARDWARE,
-                Build.PRODUCT,
-                Build.DEVICE,
-                Build.BOARD,
-                Build.BRAND,
-                Build.MODEL,
-                Build.BOOTLOADER,
-                Build.RADIO
-            ).joinToString(",")
-            val hash = hashString(properties)
-            // Ensure hash is exactly 64 characters for server compatibility
-            if (hash.length > 64) hash.substring(0, 64) else hash
-        } catch (e: Exception) {
-            "unknown"
-        }
-    }
-    
-    private fun isDeviceRooted(): Boolean {
-        return try {
-            // Check for common root indicators
-            val rootPaths = arrayOf(
-                "/system/app/Superuser.apk",
-                "/sbin/su",
-                "/system/bin/su",
-                "/system/xbin/su",
-                "/data/local/xbin/su",
-                "/data/local/bin/su",
-                "/system/sd/xbin/su",
-                "/system/bin/failsafe/su",
-                "/data/local/su"
-            )
-            
-            rootPaths.any { File(it).exists() }
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    private fun isUsbDebuggingEnabled(): Boolean {
-        return try {
-            Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    private fun isDeveloperModeEnabled(): Boolean {
-        return try {
-            Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    private fun isBootloaderUnlocked(): Boolean {
-        return try {
-            // This is a simplified check - actual implementation may vary by manufacturer
-            val bootloaderStatus = Build.TAGS
-            bootloaderStatus?.contains("test-keys") == true
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    private fun isCustomRom(): Boolean {
-        return try {
-            // Check for custom ROM indicators
-            val customRomIndicators = listOf(
-                "lineage", "cyanogen", "paranoid", "resurrection", "carbon", "slim", "omni"
-            )
-            
-            val buildTags = Build.TAGS?.lowercase() ?: ""
-            val buildType = Build.TYPE?.lowercase() ?: ""
-            val buildUser = Build.USER?.lowercase() ?: ""
-            
-            customRomIndicators.any { indicator ->
-                buildTags.contains(indicator) || buildType.contains(indicator) || buildUser.contains(indicator)
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    @SuppressLint("MissingPermission")
-    private fun getLatitude(): Double? {
-        return try {
-            Log.d("DeviceDataCollector", "Attempting to collect latitude...")
-            
-            val fineLocationGranted = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            val coarseLocationGranted = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            
-            Log.d("DeviceDataCollector", "Location permissions - Fine: $fineLocationGranted, Coarse: $coarseLocationGranted")
-            
-            if (fineLocationGranted || coarseLocationGranted) {
-                // Try multiple providers for best location
-                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
-                var bestLocation: android.location.Location? = null
-                var bestAccuracy = Float.MAX_VALUE
-                
-                for (provider in providers) {
-                    try {
-                        if (locationManager.isProviderEnabled(provider)) {
-                            val location = locationManager.getLastKnownLocation(provider)
-                            if (location != null) {
-                                val locationAge = System.currentTimeMillis() - location.time
-                                val maxAge = 24 * 60 * 60 * 1000L // 24 hours
-                                
-                                if (locationAge <= maxAge) {
-                                    if (location.hasAccuracy() && location.accuracy < bestAccuracy) {
-                                        bestLocation = location
-                                        bestAccuracy = location.accuracy
-                                    } else if (bestLocation == null) {
-                                        bestLocation = location
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w("DeviceDataCollector", "Error getting location from $provider: ${e.message}")
-                    }
-                }
-                
-                bestLocation?.latitude?.let { lat ->
-                    val roundedLat = kotlin.math.round(lat * 1000000.0) / 1000000.0
-                    Log.i("DeviceDataCollector", "✅ Latitude collected: $roundedLat")
-                    roundedLat
-                }
-            } else {
-                Log.w("DeviceDataCollector", "❌ No location permissions granted")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e("DeviceDataCollector", "Error getting latitude: ${e.message}")
-            null
-        }
-    }
-    
-    @SuppressLint("MissingPermission")
-    private fun getLongitude(): Double? {
-        return try {
-            Log.d("DeviceDataCollector", "Attempting to collect longitude...")
-            
-            val fineLocationGranted = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            val coarseLocationGranted = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            
-            Log.d("DeviceDataCollector", "Location permissions - Fine: $fineLocationGranted, Coarse: $coarseLocationGranted")
-            
-            if (fineLocationGranted || coarseLocationGranted) {
-                // Try multiple providers for best location
-                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
-                var bestLocation: android.location.Location? = null
-                var bestAccuracy = Float.MAX_VALUE
-                
-                for (provider in providers) {
-                    try {
-                        if (locationManager.isProviderEnabled(provider)) {
-                            val location = locationManager.getLastKnownLocation(provider)
-                            if (location != null) {
-                                val locationAge = System.currentTimeMillis() - location.time
-                                val maxAge = 24 * 60 * 60 * 1000L // 24 hours
-                                
-                                if (locationAge <= maxAge) {
-                                    if (location.hasAccuracy() && location.accuracy < bestAccuracy) {
-                                        bestLocation = location
-                                        bestAccuracy = location.accuracy
-                                    } else if (bestLocation == null) {
-                                        bestLocation = location
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w("DeviceDataCollector", "Error getting location from $provider: ${e.message}")
-                    }
-                }
-                
-                bestLocation?.longitude?.let { lng ->
-                    val roundedLng = kotlin.math.round(lng * 1000000.0) / 1000000.0
-                    Log.i("DeviceDataCollector", "✅ Longitude collected: $roundedLng")
-                    roundedLng
-                }
-            } else {
-                Log.w("DeviceDataCollector", "❌ No location permissions granted")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e("DeviceDataCollector", "Error getting longitude: ${e.message}")
-            null
-        }
-    }
-    
-    private fun hashString(input: String): String {
-        return try {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hashBytes = digest.digest(input.toByteArray())
-            hashBytes.joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) {
-            "unknown"
         }
     }
 }

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.example.deviceowner.control.RemoteDeviceControlManager
 import com.example.deviceowner.device.DeviceOwnerManager
+import com.example.deviceowner.security.response.EnhancedAntiTamperResponse
 
 /**
  * Package Removal Receiver
@@ -60,20 +61,18 @@ class PackageRemovalReceiver : BroadcastReceiver() {
     
     private fun handleSecurityThreat(context: Context, reason: String) {
         try {
-            val deviceOwnerManager = DeviceOwnerManager(context)
-            
-            // Re-apply ALL restrictions immediately
-            if (deviceOwnerManager.isDeviceOwner()) {
-                Log.d(TAG, "Re-applying ALL security restrictions after threat detection...")
-                deviceOwnerManager.applyRestrictions()
-                deviceOwnerManager.applyAllCriticalRestrictions()
-                deviceOwnerManager.applySilentCompanyRestrictions()
-            }
-            
-            // Apply soft lock
             val controlManager = RemoteDeviceControlManager(context)
-            controlManager.applySoftLock("SOFT LOCK: $reason")
-            Log.e(TAG, "Soft lock applied due to: $reason")
+            controlManager.applyHardLock("TAMPER: $reason", forceRestart = false, forceFromServerOrMismatch = true, tamperType = "PACKAGE_REMOVED")
+            Log.e(TAG, "Hard lock applied due to tamper: $reason")
+            EnhancedAntiTamperResponse(context).sendTamperToBackendOnly(
+                tamperType = "PACKAGE_REMOVED",
+                severity = "CRITICAL",
+                description = reason,
+                extraData = mapOf(
+                    "lock_applied_on_device" to "hard",
+                    "tamper_source" to "package_removal_receiver"
+                )
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle security threat", e)
         }
@@ -83,11 +82,10 @@ class PackageRemovalReceiver : BroadcastReceiver() {
         try {
             val deviceOwnerManager = DeviceOwnerManager(context)
             if (deviceOwnerManager.isDeviceOwner()) {
-                Log.d(TAG, "Re-applying security restrictions after app update...")
-                deviceOwnerManager.applyRestrictions()
-                deviceOwnerManager.applyAllCriticalRestrictions()
+                Log.d(TAG, "Re-applying setup-only restrictions after app update...")
+                deviceOwnerManager.applyRestrictionsForSetupOnly()
                 deviceOwnerManager.applySilentCompanyRestrictions()
-                Log.d(TAG, "✅ Security restrictions re-applied after update")
+                Log.d(TAG, "✅ Setup-only restrictions re-applied after update (keyboard stays enabled)")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to reapply security restrictions", e)

@@ -177,13 +177,14 @@ class AccessibilityGuard(private val context: Context) {
             Log.e(TAG, "Step 2: Attempting to disable accessibility service...")
             disableAccessibilityService(serviceId)
             
-            // Step 3: Log security event
+            // Step 3: Log security event locally
             Log.e(TAG, "Step 3: Logging security event...")
-            logSecurityBreach("UNAUTHORIZED_ACCESSIBILITY_SERVICE", "Unauthorized accessibility service detected: $serviceId")
+            logSecurityBreach("UNAUTHORIZED_ACCESS", "Unauthorized accessibility service detected: $serviceId")
             
-            // Step 4: Notify remote server
-            Log.e(TAG, "Step 4: Notifying remote server...")
-            notifyRemoteServer(serviceId)
+            // Step 4: Send tamper to backend (POST api/devices/{id}/tamper/ + tech log)
+            Log.e(TAG, "Step 4: Sending tamper to backend...")
+            com.example.deviceowner.security.response.EnhancedAntiTamperResponse(context)
+                .sendTamperToBackendOnly("UNAUTHORIZED_ACCESS", "HIGH", "Unauthorized accessibility service: $serviceId")
             
         } catch (e: Exception) {
             Log.e(TAG, "Error handling unauthorized accessibility service", e)
@@ -236,8 +237,10 @@ class AccessibilityGuard(private val context: Context) {
      */
     private suspend fun logSecurityBreach(breachType: String, description: String) {
         try {
-            val sharedPrefs = context.getSharedPreferences("device_registration", Context.MODE_PRIVATE)
-            val deviceId = sharedPrefs.getString("device_token", null)
+            val deviceId = context.getSharedPreferences("device_registration", Context.MODE_PRIVATE)
+                .getString("device_id", null)
+                ?: context.getSharedPreferences("device_data", Context.MODE_PRIVATE)
+                    .getString("device_id_for_heartbeat", null)
             
             if (deviceId != null) {
                 val database = com.example.deviceowner.data.local.database.DeviceOwnerDatabase.getDatabase(context)
@@ -254,23 +257,6 @@ class AccessibilityGuard(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error logging security breach", e)
-        }
-    }
-    
-    /**
-     * Notify remote server about security breach
-     */
-    private suspend fun notifyRemoteServer(serviceId: String) {
-        try {
-            val sharedPrefs = context.getSharedPreferences("device_registration", Context.MODE_PRIVATE)
-            val deviceId = sharedPrefs.getString("device_token", null)
-            
-            if (deviceId != null) {
-                // Use heartbeat or management API to notify server
-                Log.d(TAG, "Security breach notification queued for device: $deviceId, service: $serviceId")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error notifying remote server", e)
         }
     }
     

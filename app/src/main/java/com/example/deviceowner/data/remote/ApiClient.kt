@@ -1,13 +1,22 @@
 package com.example.deviceowner.data.remote
 
+// Force rebuild - timestamp: 2026-02-14
 import android.util.Log
-import com.example.deviceowner.BuildConfig
+import com.example.deviceowner.AppConfig
 import com.example.deviceowner.data.remote.api.ApiHeadersInterceptor
 import com.example.deviceowner.data.remote.api.HtmlResponseInterceptor
+import com.example.deviceowner.data.models.BugReportRequest
+import com.example.deviceowner.data.models.BugReportResponse
+import com.example.deviceowner.data.models.DeviceLogRequest
+import com.example.deviceowner.data.models.DeviceLogResponse
 import com.example.deviceowner.data.models.DeviceRegistrationRequest
 import com.example.deviceowner.data.models.DeviceRegistrationResponse
 import com.example.deviceowner.data.models.HeartbeatRequest
 import com.example.deviceowner.data.models.HeartbeatResponse
+import com.example.deviceowner.data.models.InstallationStatusRequest
+import com.example.deviceowner.data.models.InstallationStatusResponse
+import com.example.deviceowner.data.models.TamperEventRequest
+import com.example.deviceowner.data.models.TamperEventResponse
 import com.google.gson.GsonBuilder
 import okhttp3.CertificatePinner
 import okhttp3.ConnectionSpec
@@ -22,19 +31,21 @@ class ApiClient {
     
     private val gson = GsonBuilder()
         .setLenient()
-        .serializeNulls()
+        .serializeNulls()  // Include null values in JSON serialization
         .create()
     
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(120, TimeUnit.SECONDS)  // 2 minutes for SSL handshake
+        .readTimeout(120, TimeUnit.SECONDS)     // 2 minutes for slow networks
+        .writeTimeout(120, TimeUnit.SECONDS)    // 2 minutes for slow networks
+        .callTimeout(240, TimeUnit.SECONDS)     // 4 minutes overall request timeout
         .addInterceptor(ApiHeadersInterceptor())
         .addInterceptor(HtmlResponseInterceptor())
         .apply {
+            // Use HEADERS only - BODY consumes the response stream, leaving errorBody() empty for 400/404/500
             if (true) { // FORCED LOGGING ENABLED
                 val loggingInterceptor = HttpLoggingInterceptor().apply {
-                    level = HttpLoggingInterceptor.Level.BODY
+                    level = HttpLoggingInterceptor.Level.HEADERS
                 }
                 addInterceptor(loggingInterceptor)
             }
@@ -88,12 +99,12 @@ class ApiClient {
         .build()
     
     private val retrofit = Retrofit.Builder()
-        .baseUrl(BuildConfig.BASE_URL)
+        .baseUrl(AppConfig.BASE_URL)
         .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
     
-    private val apiService by lazy { 
+    private val apiService: ApiService by lazy { 
         try {
             retrofit.create(ApiService::class.java)
         } catch (e: Exception) {
@@ -103,13 +114,60 @@ class ApiClient {
     
     suspend fun registerDevice(deviceData: DeviceRegistrationRequest): Response<DeviceRegistrationResponse> {
         Log.d("ApiClient", "🔍 Device Owner Registration Attempt")
-        Log.d("ApiClient", "Base URL: ${BuildConfig.BASE_URL}")
+        Log.d("ApiClient", "Base URL: ${AppConfig.BASE_URL}")
         Log.d("ApiClient", "Endpoint: api/devices/mobile/register/")
-        Log.d("ApiClient", "Full URL: ${BuildConfig.BASE_URL}api/devices/mobile/register/")
-        
+        Log.d("ApiClient", "Device API Key: ${if (AppConfig.DEVICE_API_KEY.isNotEmpty()) "***" else "EMPTY"}")
+        try {
+            val gson = com.google.gson.Gson()
+            Log.d("ApiClient", "📤 REQUEST: loan_number=${deviceData.loanNumber}, device_type=${deviceData.deviceType}")
+        } catch (e: Exception) { Log.w("ApiClient", "Could not log: ${e.message}") }
         return try {
             val response = apiService.registerDevice(deviceData)
             Log.d("ApiClient", "✅ Registration response received: HTTP ${response.code()}")
+            if (response.isSuccessful) {
+                Log.d("ApiClient", "✅ Device registered successfully")
+            } else {
+                Log.e("ApiClient", "❌ Registration failed: HTTP ${response.code()}")
+            }
+            response
+        } catch (e: Exception) {
+            Log.e("ApiClient", "❌ Registration failed with exception: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /** Register with flat payload (Django expects top-level fields). */
+    suspend fun registerDevicePayload(payload: Map<String, Any?>): Response<DeviceRegistrationResponse> {
+        Log.d("ApiClient", "🔍 Device Owner Registration Attempt (Payload)")
+        Log.d("ApiClient", "Base URL: ${AppConfig.BASE_URL}")
+        Log.d("ApiClient", "Endpoint: api/devices/mobile/register/")
+        Log.d("ApiClient", "Device API Key: ${if (AppConfig.DEVICE_API_KEY.isNotEmpty()) "***" else "EMPTY"}")
+        try {
+            val gson = com.google.gson.Gson()
+            Log.d("ApiClient", "📤 REQUEST (flat): loan_number=${payload["loan_number"]}, device_id=${payload["device_id"]}")
+        } catch (e: Exception) { Log.w("ApiClient", "Could not log: ${e.message}") }
+        return try {
+            // Convert map to DeviceRegistrationRequest for API call
+            val request = DeviceRegistrationRequest(
+                loanNumber = payload["loan_number"] as? String ?: "",
+                deviceId = payload["device_id"] as? String,
+                deviceType = payload["device_type"] as? String ?: "phone",
+                deviceInfo = payload["device_info"] as? Map<String, Any?>,
+                androidInfo = payload["android_info"] as? Map<String, Any?>,
+                imeiInfo = payload["imei_info"] as? Map<String, Any?>,
+                storageInfo = payload["storage_info"] as? Map<String, Any?>,
+                locationInfo = payload["location_info"] as? Map<String, Any?>,
+                securityInfo = payload["security_info"] as? Map<String, Any?>,
+                systemIntegrity = payload["system_integrity"] as? Map<String, Any?>,
+                appInfo = payload["app_info"] as? Map<String, Any?>
+            )
+            val response = apiService.registerDevice(request)
+            Log.d("ApiClient", "✅ Registration response received: HTTP ${response.code()}")
+            if (response.isSuccessful) {
+                Log.d("ApiClient", "✅ Device registered successfully")
+            } else {
+                Log.e("ApiClient", "❌ Registration failed: HTTP ${response.code()}")
+            }
             response
         } catch (e: Exception) {
             Log.e("ApiClient", "❌ Registration failed with exception: ${e.message}", e)
@@ -119,19 +177,122 @@ class ApiClient {
     
     suspend fun sendHeartbeat(deviceId: String, heartbeatData: HeartbeatRequest): Response<HeartbeatResponse> {
         Log.d("ApiClient", "🔍 Heartbeat Attempt for device: $deviceId")
-        Log.d("ApiClient", "Endpoint: api/devices/$deviceId/data/")
+        Log.d("ApiClient", "   URL: ${AppConfig.BASE_URL}api/devices/$deviceId/data/")
+        Log.d("ApiClient", "   X-Device-Api-Key: ${if (AppConfig.DEVICE_API_KEY.isNotEmpty()) "***present" else "EMPTY"}")
+        
+        if (deviceId.isBlank() || deviceId.equals("unknown", ignoreCase = true)) {
+            Log.e("ApiClient", "❌ Heartbeat ABORTED: deviceId is blank or unknown")
+            throw IllegalArgumentException("deviceId cannot be blank or unknown for heartbeat")
+        }
         
         return try {
             val response = apiService.sendHeartbeat(deviceId, heartbeatData)
-            Log.d("ApiClient", "✅ Heartbeat response received: HTTP ${response.code()}")
+            if (response.isSuccessful) {
+                Log.d("ApiClient", "✅ Heartbeat SUCCESS: HTTP ${response.code()}")
+            } else {
+                val errorBodyStr = response.errorBody()?.string() ?: "(no body)"
+                Log.e("ApiClient", "❌ Heartbeat FAILED: HTTP ${response.code()} ${response.message()}")
+                Log.e("ApiClient", "   Error body: $errorBodyStr")
+                Log.e("ApiClient", "   Possible causes: 404=device not found in DB, 400=invalid payload, 401/403=API key issue")
+            }
+            response
+        } catch (e: java.net.UnknownHostException) {
+            Log.e("ApiClient", "❌ Heartbeat NETWORK ERROR: No internet / DNS failure - ${e.message}")
+            throw e
+        } catch (e: java.net.ConnectException) {
+            Log.e("ApiClient", "❌ Heartbeat NETWORK ERROR: Cannot connect to server - ${e.message}")
+            throw e
+        } catch (e: javax.net.ssl.SSLException) {
+            Log.e("ApiClient", "❌ Heartbeat SSL ERROR: Certificate/handshake failed - ${e.message}")
+            throw e
+        } catch (e: Exception) {
+            Log.e("ApiClient", "❌ Heartbeat failed: ${e.javaClass.simpleName} - ${e.message}", e)
+            throw e
+        }
+    }
+    
+    suspend fun sendInstallationStatus(deviceId: String, statusData: InstallationStatusRequest): Response<InstallationStatusResponse> {
+        Log.d("ApiClient", "🔍 Installation Status: device=$deviceId, url=api/devices/mobile/{device_id}/installation-status/")
+        if (deviceId.isBlank() || deviceId.equals("unknown", ignoreCase = true)) {
+            Log.e("ApiClient", "❌ Installation status ABORTED: device_id blank or unknown")
+            throw IllegalArgumentException("device_id cannot be blank or unknown for installation status")
+        }
+        Log.d("ApiClient", "Device API Key: ${if (AppConfig.DEVICE_API_KEY.isNotEmpty()) "***" else "EMPTY"}")
+        
+        // Log the request data being sent
+        try {
+            val gson = com.google.gson.Gson()
+            val requestJson = gson.toJson(statusData)
+            Log.d("ApiClient", "📤 REQUEST DATA:")
+            Log.d("ApiClient", requestJson)
+        } catch (e: Exception) {
+            Log.w("ApiClient", "Could not log request data: ${e.message}")
+        }
+        
+        return try {
+            val response = apiService.sendInstallationStatus(deviceId, statusData)
+            Log.d("ApiClient", "✅ Installation status response received: HTTP ${response.code()}")
+            if (response.isSuccessful) {
+                Log.d("ApiClient", "✅ Installation status sent successfully")
+            } else {
+                Log.e("ApiClient", "❌ Installation status failed: HTTP ${response.code()}")
+                Log.e("ApiClient", "   Error body: ${response.errorBody()?.string()}")
+            }
             response
         } catch (e: Exception) {
-            Log.e("ApiClient", "❌ Heartbeat failed with exception: ${e.message}", e)
+            Log.e("ApiClient", "❌ Installation status failed with exception: ${e.message}", e)
+            throw e
+        }
+    }
+    
+    /**
+     * POST /api/tech/devicecategory/logs/ - submit device log to sponsa_backend for tech support.
+     * Uses same X-Device-Api-Key as other device endpoints.
+     */
+    suspend fun postDeviceLog(request: DeviceLogRequest): Response<DeviceLogResponse> {
+        return try {
+            val response = apiService.postDeviceLog(request)
+            if (!response.isSuccessful) {
+                Log.e("ApiClient", "❌ Device log failed: HTTP ${response.code()} ${response.errorBody()?.string()?.take(500)}")
+            }
+            response
+        } catch (e: Exception) {
+            Log.e("ApiClient", "❌ Post device log failed: ${e.message}", e)
             throw e
         }
     }
 
-    suspend fun reportSecurityViolation(deviceId: String, violationData: Map<String, Any?>): Response<Map<String, Any>> {
-        return apiService.reportSecurityViolation(deviceId, violationData)
+    /**
+     * POST /api/tech/devicecategory/bugs/ - submit bug report to sponsa_backend for tech team.
+     * Uses same X-Device-Api-Key as other device endpoints.
+     */
+    suspend fun postBugReport(request: BugReportRequest): Response<BugReportResponse> {
+        return try {
+            apiService.postBugReport(request)
+        } catch (e: Exception) {
+            Log.e("ApiClient", "❌ Post bug report failed: ${e.message}", e)
+            throw e
+        }
+    }
+
+    suspend fun postTamperEvent(deviceId: String, request: TamperEventRequest): Response<TamperEventResponse> {
+        Log.d("ApiClient", "🔍 Tamper report: device=$deviceId, type=${request.tamperType}, url=api/tamper/mobile/{device_id}/report/")
+        if (deviceId.isBlank() || deviceId.equals("unknown", ignoreCase = true)) {
+            Log.e("ApiClient", "❌ Tamper ABORTED: device_id blank or unknown")
+            throw IllegalArgumentException("device_id cannot be blank or unknown for tamper report")
+        }
+        return try {
+            val response = apiService.postTamperEvent(deviceId, request)
+            if (response.isSuccessful) {
+                Log.d("ApiClient", "✅ Tamper event sent: ${request.tamperType}")
+            } else {
+                val errBody = response.errorBody()?.string()?.take(200) ?: ""
+                Log.e("ApiClient", "❌ Tamper failed: HTTP ${response.code()} $errBody")
+            }
+            response
+        } catch (e: Exception) {
+            Log.e("ApiClient", "❌ Post tamper event failed: ${e.message}", e)
+            throw e
+        }
     }
 }

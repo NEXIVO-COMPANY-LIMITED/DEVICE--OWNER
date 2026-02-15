@@ -33,12 +33,25 @@ object LogManager {
         PROVISIONING("provisioning", "device_provisioning"),
         SYNC("sync", "offline_sync"),
         ERRORS("errors", "application_errors"),
-        GENERAL("general", "general_logs")
+        GENERAL("general", "general_logs"),
+        JSON_LOGS("json_logs", "raw_json_data")
     }
     
     private lateinit var appContext: Context
     private lateinit var logBaseDir: File
-    
+
+    /**
+     * Optional callback to send logs to server (e.g. sponsa_backend tech API).
+     * Set from Application after initialize(). Called for ERROR and WARN only.
+     * Signature: (category, logLevel, message, extraData)
+     */
+    @Volatile
+    private var onRemoteLogCallback: ((LogCategory, String, String, Map<String, Any?>?) -> Unit)? = null
+
+    fun setOnRemoteLogCallback(callback: ((LogCategory, String, String, Map<String, Any?>?) -> Unit)?) {
+        onRemoteLogCallback = callback
+    }
+
     /**
      * Initialize the logging system
      */
@@ -74,6 +87,21 @@ object LogManager {
         }
     }
     
+    /**
+     * Specifically log raw JSON data for debugging
+     */
+    fun logJsonData(tag: String, json: String) {
+        val entry = buildString {
+            appendLine("--- NEW JSON SUBMISSION [$tag] ---")
+            appendLine("Timestamp: ${dateFormat.format(Date())}")
+            appendLine("Data:")
+            appendLine(json)
+            appendLine("--- END JSON ---")
+            appendLine()
+        }
+        logInfo(LogCategory.JSON_LOGS, entry, tag)
+    }
+
     /**
      * Log information message
      */
@@ -192,6 +220,8 @@ object LogManager {
     private fun writeLog(category: LogCategory, level: String, message: String, process: String, throwable: Throwable?) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                if (!::logBaseDir.isInitialized) return@launch
+                
                 val categoryDir = File(logBaseDir, category.folderName)
                 val today = fileNameFormat.format(Date())
                 val logFile = File(categoryDir, "${category.fileName}_$today.log")
@@ -225,6 +255,26 @@ object LogManager {
                 FileWriter(logFile, true).use { writer ->
                     writer.write(logEntry)
                     writer.flush()
+                }
+
+                // Send ERROR and WARNING to server if callback set (sponsa_backend tech API)
+                if (level == "ERROR" || level == "WARN") {
+                    try {
+                        val callback = onRemoteLogCallback
+                        if (callback != null) {
+                            val logLevelForServer = when (level) {
+                                "ERROR" -> "Error"
+                                "WARN" -> "Warning"
+                                else -> "Normal"
+                            }
+                            val extra = mutableMapOf<String, Any?>()
+                            if (process.isNotEmpty()) extra["process"] = process
+                            throwable?.let { extra["exception"] = it.javaClass.simpleName }
+                            callback(category, logLevelForServer, message, if (extra.isEmpty()) null else extra)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Remote log callback error: ${e.message}")
+                    }
                 }
                 
             } catch (e: Exception) {

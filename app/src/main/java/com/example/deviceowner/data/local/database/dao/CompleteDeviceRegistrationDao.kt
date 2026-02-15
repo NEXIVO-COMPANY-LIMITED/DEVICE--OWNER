@@ -15,15 +15,16 @@ interface CompleteDeviceRegistrationDao {
     
     @Query("SELECT * FROM complete_device_registrations WHERE registrationStatus = 'SUCCESS' LIMIT 1")
     suspend fun getSuccessfulRegistration(): CompleteDeviceRegistrationEntity?
+
+    /** Most recent in-progress registration (LOAN_NUMBER_SAVED or PENDING) for resuming flow. */
+    @Query("SELECT * FROM complete_device_registrations WHERE registrationStatus != 'SUCCESS' ORDER BY registeredAt DESC LIMIT 1")
+    suspend fun getMostRecentInProgressRegistration(): CompleteDeviceRegistrationEntity?
     
     @Query("SELECT * FROM complete_device_registrations LIMIT 1")
     suspend fun getAnyRegistration(): CompleteDeviceRegistrationEntity?
     
     @Query("SELECT COUNT(*) FROM complete_device_registrations WHERE registrationStatus = 'SUCCESS'")
     suspend fun hasSuccessfulRegistration(): Int
-    
-    @Query("SELECT loanNumber, nextPaymentDate, totalAmount, paidAmount, remainingAmount FROM complete_device_registrations WHERE registrationStatus = 'SUCCESS' LIMIT 1")
-    suspend fun getBasicLoanInfo(): BasicLoanInfo?
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRegistration(registration: CompleteDeviceRegistrationEntity)
@@ -33,9 +34,10 @@ interface CompleteDeviceRegistrationDao {
     
     @Query("UPDATE complete_device_registrations SET registrationStatus = :status, serverResponse = :response, lastSyncAt = :syncTime WHERE deviceId = :deviceId")
     suspend fun updateRegistrationStatus(deviceId: String, status: String, response: String?, syncTime: Long)
-    
-    @Query("UPDATE complete_device_registrations SET nextPaymentDate = :nextPayment, totalAmount = :total, paidAmount = :paid, remainingAmount = :remaining WHERE deviceId = :deviceId")
-    suspend fun updateLoanInfo(deviceId: String, nextPayment: String?, total: Double?, paid: Double?, remaining: Double?)
+
+    /** Update the registration row for this loan with server-assigned device_id and status (used after successful API register). */
+    @Query("UPDATE complete_device_registrations SET deviceId = :serverDeviceId, registrationStatus = :status, serverResponse = :response, lastSyncAt = :syncTime WHERE loanNumber = :loanNumber")
+    suspend fun updateRegistrationSuccessByLoan(loanNumber: String, serverDeviceId: String, status: String, response: String?, syncTime: Long)
     
     @Query("DELETE FROM complete_device_registrations")
     suspend fun clearAllRegistrations()
@@ -46,11 +48,3 @@ interface CompleteDeviceRegistrationDao {
     @Query("SELECT * FROM complete_device_registrations")
     suspend fun getAllRegistrations(): List<CompleteDeviceRegistrationEntity>
 }
-
-data class BasicLoanInfo(
-    val loanNumber: String,
-    val nextPaymentDate: String?,
-    val totalAmount: Double?,
-    val paidAmount: Double?,
-    val remainingAmount: Double?
-)

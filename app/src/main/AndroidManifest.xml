@@ -6,8 +6,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- Device information permissions -->
+    <!-- Device information permissions (SIM detection requires these) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE" tools:ignore="ProtectedPermissions" />
     
     <!-- Storage permissions for device data collection -->
@@ -42,28 +43,44 @@
     
     <!-- Wake lock permission -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Auto-update from GitHub Releases (Device Owner silent install) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.DELETE_PACKAGES" tools:ignore="ProtectedPermissions" />
     
     <!-- Power management permissions -->
     <uses-permission android:name="android.permission.DEVICE_POWER" />
     <uses-permission android:name="android.permission.REBOOT" />
     
+    <!-- Notifications (Android 13+) for update progress -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Foreground service permission (Android 9+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    
+    <!-- Account management permissions -->
+    <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
 
     <application
         android:name=".DeviceOwnerApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/nexivo"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@drawable/nexivo"
         android:supportsRtl="true"
         android:theme="@style/Theme.DEVICEOWNER"
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning">
+        <!-- Android 14+ (API 34+): Declare foreground service types used by the app -->
+        <property
+            android:name="android.app.PROPERTY_FOREGROUND_SERVICE_TYPES"
+            android:value="dataSync" />
         <!-- Registration Status Activity - Determines launch flow -->
         <activity
             android:name=".ui.activities.RegistrationStatusActivity"
@@ -75,9 +92,20 @@
             </intent-filter>
         </activity>
 
-        <!-- Main Activity - Shows device status and information -->
         <activity
-            android:name=".presentation.activities.MainActivity"
+            android:name=".ui.activities.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- FRP Status Activity - Enterprise Factory Reset Protection status -->
+        <activity
+            android:name=".ui.activities.FrpStatusActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Device Registration Activity - Input loan number for registration -->
+        <activity
+            android:name=".presentation.activities.DeviceRegistrationActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
@@ -87,36 +115,13 @@
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Loan ID Input Activity - First screen (Launcher) for device registration -->
+        <!-- Device Data Collection Activity - Collects and displays device data for user verification -->
         <activity
-            android:name=".ui.activities.provisioning.LoanIdInputActivity"
+            android:name=".ui.activities.DeviceDataCollectionActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Device Info Activity - Shows device information and handles registration -->
-        <activity
-            android:name=".ui.activities.provisioning.DeviceInfoActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Welcome Activity - Shows welcome screen after successful registration -->
-        <activity
-            android:name=".ui.activities.WelcomeActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER"
-            android:launchMode="singleTop" />
-
-        <!-- Registration Debug Activity - Debug tool for registration issues -->
-        <activity
-            android:name=".ui.activities.RegistrationDebugActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Device Data Inspector Activity - Shows what data the phone collects -->
-        <activity
-            android:name=".ui.activities.DeviceDataInspectorActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
 
         <!-- Enhanced Soft Lock Activity - Kotlin Compose implementation -->
         <activity
@@ -128,6 +133,14 @@
             android:theme="@style/Theme.DEVICEOWNER"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden|navigation" />
+
+        <!-- SIM Change Overlay - Full-screen warning when SIM card is changed -->
+        <activity
+            android:name=".ui.activities.SIMChangeOverlayActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.DEVICEOWNER" />
 
         <!-- Hard Lock Activity - Kiosk mode screen when device is hard locked -->
         <activity
@@ -154,7 +167,30 @@
             </intent-filter>
         </activity>
 
-        <!-- Android 12+ ADMIN_POLICY_COMPLIANCE handler -->
+        <!-- Device Compatibility Check Activity - Validates device before provisioning -->
+        <activity
+            android:name=".ui.activities.provisioning.DeviceCompatibilityCheckActivity"
+            android:exported="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Data Privacy Consent - Shown on first install, before loan number input -->
+        <activity
+            android:name=".ui.activities.provisioning.DataPrivacyConsentActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Provisioning Progress Activity - Shows installation status -->
+        <activity
+            android:name=".ui.activities.provisioning.ProvisioningProgressActivity"
+            android:exported="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Compatibility Success Activity - Shows when device meets all requirements -->
+        <activity
+            android:name=".ui.activities.provisioning.CompatibilitySuccessActivity"
+            android:exported="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
         <activity
             android:name=".ui.activities.provisioning.PolicyComplianceActivity"
             android:exported="true">
@@ -175,6 +211,9 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
                 <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
                 <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
+                <action android:name="android.app.action.ACTION_PASSWORD_CHANGED" />
+                <action android:name="android.app.action.ACTION_PASSWORD_FAILED" />
+                <action android:name="android.app.action.ACTION_PASSWORD_SUCCEEDED" />
             </intent-filter>
             <meta-data
                 android:name="android.app.device_admin"
@@ -193,17 +232,26 @@
             </intent-filter>
         </receiver>
 
-        <!-- Boot Receiver -->
+        <!-- Boot Receiver - High priority so persistent hard lock is re-applied first on boot -->
         <receiver
             android:name=".receivers.BootReceiver"
             android:exported="false"
             android:enabled="true"
             android:directBootAware="true">
-            <intent-filter android:priority="1000">
+            <intent-filter android:priority="999">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Update Installation Receiver - handles PackageInstaller callbacks -->
+        <receiver
+            android:name=".update.UpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.deviceowner.INSTALL_COMPLETE" />
             </intent-filter>
         </receiver>
 
@@ -221,68 +269,23 @@
             </intent-filter>
         </receiver>
 
-        <!-- Log Viewer Activity - For viewing application logs -->
-        <activity
-            android:name=".ui.activities.LogViewerActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- API Diagnostic Activity - For troubleshooting API connection issues -->
-        <activity
-            android:name=".ui.activities.ApiDiagnosticActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- JSON Data Viewer Activity - For viewing API request data in JSON format -->
+        <!-- Registration Success Activity - Shows success screen with Nexivo logo -->
+        <!-- IMPORTANT: App stays VISIBLE after registration for better service reliability -->
+        <!-- NO excludeFromRecents, NO noHistory, NO taskAffinity="" -->
+        <!-- This ensures heartbeat sends reliably and services continue working -->
         <activity
-            android:name=".ui.activities.JsonDataViewerActivity"
+            android:name=".ui.activities.RegistrationSuccessActivity"
             android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
+            android:theme="@style/Theme.DEVICEOWNER"
+            android:alwaysRetainTaskState="true"
+            android:finishOnTaskLaunch="false" />
 
-        <!-- Certificate Extractor Test Activity - For getting SSL certificate pins -->
-        <activity
-            android:name=".ui.activities.CertificateExtractorTestActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- SSL Certificate Setup Activity - For configuring perfect SSL security -->
-        <activity
-            android:name=".ui.activities.SSLCertificateSetupActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Network Diagnostic Activity - For troubleshooting connection issues -->
-        <activity
-            android:name=".ui.activities.NetworkDiagnosticActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Device Registration Activity - For entering loan number -->
-        <activity
-            android:name=".ui.activities.DeviceRegistrationActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Device Data Collection Activity - For collecting and sending device data -->
-        <activity
-            android:name=".presentation.activities.DeviceDataCollectionActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Soft Lock Test Activity - For testing different violation types -->
-        <activity
-            android:name=".ui.activities.SoftLockTestActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
 
         <!-- Services -->
         <!-- Critical services marked as directBootAware for zero-second persistence -->
-        <service
-            android:name=".services.HeartbeatService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:directBootAware="true" />
-
         <service
             android:name=".monitoring.SecurityMonitorService"
             android:exported="false"

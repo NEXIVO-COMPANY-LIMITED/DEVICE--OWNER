@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.presentation.activities.RegistrationStatusActivity
+import com.example.deviceowner.ui.activities.RegistrationStatusActivity
 import com.example.deviceowner.work.RestrictionEnforcementWorker
 import kotlinx.coroutines.*
 
@@ -56,26 +56,37 @@ class QRProvisioningReceiver : BroadcastReceiver() {
         try {
             Log.d(TAG, "Starting QR provisioning handler - launching registration")
             
-            // Step 1: Initialize device owner manager
+            // Step 1: Enable keyboard and touch FIRST – so user can type loan number and complete registration.
+            context.getSharedPreferences("control_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("skip_security_restrictions", true).apply()
+            context.getSharedPreferences("device_owner_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("skip_security_restrictions", true).apply()
+            Log.d(TAG, "🔓 skip_security_restrictions set FIRST – keyboard and touch enabled")
+            
+            // Step 2: Initialize device owner manager
             val deviceOwnerManager = DeviceOwnerManager(context)
             
-            // Step 2: Verify Device Owner status
+            // Step 3: Verify Device Owner status
             if (!deviceOwnerManager.isDeviceOwner()) {
                 Log.e(TAG, "Device Owner verification failed")
                 return
             }
             Log.d(TAG, "✅ Device Owner verified")
-            
-            // Step 3: Apply security restrictions immediately
-            deviceOwnerManager.applyRestrictions()
-            Log.d(TAG, "✅ Security restrictions applied")
-            
-            // Step 4: Launch Device Registration Activity
+
+            // Step 4: Setup-only restrictions (Factory Reset, Safe Boot, etc.) – do NOT add DISALLOW_DEBUGGING_FEATURES so keyboard works
+            deviceOwnerManager.applyRestrictionsForSetupOnly()
+            Log.d(TAG, "🔒 Factory Reset & Safe Boot blocked; keyboard/touch left enabled for registration")
+
+            // Step 5: Grant READ_PHONE_STATE so IMEI/serial can be collected
+            deviceOwnerManager.grantRequiredPermissions()
+            Log.d(TAG, "✅ Runtime permissions granted for phone state (IMEI/serial)")
+
+            // Step 6: Launch Device Registration Activity
             withContext(Dispatchers.Main) {
                 launchDeviceRegistration(context)
             }
             
-            // Step 5: Schedule periodic work
+            // Step 7: Schedule periodic work
             schedulePeriodicWork(context)
             
             Log.d(TAG, "QR provisioning completed - device registration launched")

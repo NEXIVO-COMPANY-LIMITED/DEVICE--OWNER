@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internal files for update APK downloads -->
+    <files-path name="apk_files" path="." />
     <!-- External files directory for log files -->
     <external-files-path name="logs" path="DeviceOwnerLogs/" />
     <!-- External files root -->
     <external-files-path name="external_files" path="." />
+    <!-- Cache path -->
+    <cache-path name="cache" path="." />
 </paths>

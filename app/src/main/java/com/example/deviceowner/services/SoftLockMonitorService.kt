@@ -124,85 +124,18 @@ class SoftLockMonitorService : Service() {
     }
     
     private fun checkDebugModeActivation() {
-        val currentUsbDebugging = isUsbDebuggingEnabled()
-        val currentDeveloperMode = isDeveloperModeEnabled()
-        
-        // Check if USB debugging was just enabled
-        if (currentUsbDebugging && !wasUsbDebuggingEnabled) {
-            Log.w(TAG, "USB debugging enabled during soft lock - escalating to hard lock")
-            escalateToHardLock(
-                "Unauthorized debug mode activation detected",
-                "USB_DEBUG_ATTEMPT: User attempted to enable USB debugging while device was restricted. This violates security policies."
-            )
-        }
-        
-        // Check if developer mode was just enabled
-        if (currentDeveloperMode && !wasDeveloperModeEnabled) {
-            Log.w(TAG, "Developer mode enabled during soft lock - escalating to hard lock")
-            escalateToHardLock(
-                "Unauthorized developer settings access detected",
-                "DEVELOPER_MODE_ATTEMPT: User attempted to enable developer options while device was restricted. This provides unauthorized system access."
-            )
-        }
+        // Security checks are disabled - only payment-related locks are supported
+        Log.d(TAG, "Debug mode check skipped - security monitoring disabled")
     }
     
     private fun checkDeveloperSettingsAccess() {
-        // This is a simplified check - in a real implementation, you might monitor
-        // for specific activities or system events that indicate settings access
-        
-        // Check if developer options are newly enabled
-        val developerOptionsEnabled = isDeveloperModeEnabled()
-        if (developerOptionsEnabled && !wasDeveloperModeEnabled) {
-            Log.w(TAG, "Developer options accessed during soft lock")
-            escalateToHardLock(
-                "Unauthorized system settings modification",
-                "DEVELOPER_SETTINGS_ACCESS: User accessed developer settings while device was restricted. This could compromise device security."
-            )
-        }
+        // Security checks are disabled - only payment-related locks are supported
+        Log.d(TAG, "Developer settings check skipped - security monitoring disabled")
     }
     
     private fun registerPackageReceiver() {
-        if (packageReceiver != null) {
-            return // Already registered
-        }
-        
-        packageReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                when (intent?.action) {
-                    Intent.ACTION_PACKAGE_REMOVED,
-                    Intent.ACTION_PACKAGE_FULLY_REMOVED -> {
-                        val packageName = intent.data?.schemeSpecificPart
-                        if (packageName == context?.packageName) {
-                            Log.e(TAG, "App uninstall attempt detected during soft lock")
-                            escalateToHardLock(
-                                "Unauthorized app uninstall attempt detected",
-                                "UNINSTALL_ATTEMPT: User attempted to uninstall the device management application. This is strictly prohibited and violates the device agreement."
-                            )
-                        }
-                    }
-                    Intent.ACTION_PACKAGE_DATA_CLEARED -> {
-                        val packageName = intent.data?.schemeSpecificPart
-                        if (packageName == context?.packageName) {
-                            Log.e(TAG, "App data clear attempt detected during soft lock")
-                            escalateToHardLock(
-                                "Unauthorized app data manipulation detected",
-                                "DATA_CLEAR_ATTEMPT: User attempted to clear application data while device was restricted. This could disrupt device management and loan tracking."
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_FULLY_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_DATA_CLEARED)
-            addDataScheme("package")
-        }
-        
-        registerReceiver(packageReceiver, filter)
-        Log.d(TAG, "Package change receiver registered")
+        // Package monitoring is disabled - only payment-related locks are supported
+        Log.d(TAG, "Package receiver registration skipped - security monitoring disabled")
     }
     
     private fun escalateToHardLock(reason: String, triggerAction: String = "") {

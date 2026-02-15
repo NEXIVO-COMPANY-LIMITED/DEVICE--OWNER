@@ -82,12 +82,25 @@ for ($i = 0; $i -lt $hexHash.Length; $i += 2) {
 $base64 = [Convert]::ToBase64String($bytes)
 $base64url = $base64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
 
-Write-Host "APK:" -ForegroundColor Yellow
-Write-Host "  $((Resolve-Path $apkPath).Path)" -ForegroundColor White
-Write-Host "SHA256 (Hex):" -ForegroundColor Yellow
-Write-Host "  $hexHash" -ForegroundColor White
-Write-Host "Base64URL Checksum:" -ForegroundColor Yellow
-Write-Host "  $base64url" -ForegroundColor Green
+# Get file size
+$fileInfo = Get-Item $apkPath
+$fileSizeMB = [math]::Round($fileInfo.Length / 1MB, 2)
+
+Write-Host "APK Details:" -ForegroundColor Cyan
+Write-Host "  Location: $((Resolve-Path $apkPath).Path)" -ForegroundColor Green
+Write-Host "  Size: $fileSizeMB MB" -ForegroundColor Green
+Write-Host ""
+
+Write-Host "Checksums:" -ForegroundColor Cyan
+Write-Host "  SHA256 (Hex):" -ForegroundColor Yellow
+Write-Host "    $hexHash" -ForegroundColor White
+Write-Host ""
+Write-Host "  SHA256 (Base64URL):" -ForegroundColor Yellow
+Write-Host "    $base64url" -ForegroundColor Green
+Write-Host ""
+
+Write-Host "For Provisioning Config:" -ForegroundColor Cyan
+Write-Host "  packageChecksum: '$base64url'" -ForegroundColor Green
 Write-Host ""
 
 # Auto-update provisioning-config.json with new checksum (CRITICAL: must match APK at download URL)

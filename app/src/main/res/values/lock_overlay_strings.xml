@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lock Overlay Strings -->
+    <string name="device_locked">Device Locked</string>
+    <string name="lock_reason_default">Your device has been locked for security reasons. Please contact support.</string>
+    <string name="device_id_placeholder">Device ID: unknown</string>
+    <string name="contact_support">Contact Support</string>
+    <string name="emergency_unlock">Emergency Unlock</string>
+    <string name="lock_icon_description">Lock icon</string>
+    
+    <!-- Lock Overlay Colors -->
+    <color name="lock_background">#1a1a1a</color>
+    <color name="lock_icon_color">#ff6b6b</color>
+    <color name="lock_title_color">#ffffff</color>
+    <color name="lock_reason_color">#e0e0e0</color>
+    <color name="lock_device_id_color">#999999</color>
+    <color name="emergency_button_text_color">#ffffff</color>
+</resources>

@@ -6,7 +6,6 @@ import android.net.NetworkCapabilities
 import android.util.Log
 import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.data.remote.ApiService
-import com.example.deviceowner.BuildConfig
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
 import com.example.deviceowner.data.local.database.entities.*
 import com.example.deviceowner.data.remote.models.*

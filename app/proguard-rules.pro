@@ -46,9 +46,9 @@
 -keep class kotlinx.coroutines.** { *; }
 -keep class kotlin.Metadata { *; }
 
-# 9. Firmware security (JNI) - docs/android-firmware-security-complete, deviceowner-firmware-integration-complete
+# 9. Firmware security (stub – native/JNI removed)
 -keep class com.example.deviceowner.security.firmware.FirmwareSecurity { *; }
 -keep class com.example.deviceowner.security.firmware.FirmwareSecurity$* { *; }
--keepclasseswithmembernames class * {
-    native <methods>;
-}
+
+# 10. Keep BuildConfig (generated - contains BASE_URL, DEVICE_API_KEY, etc.)
+-keep class com.example.deviceowner.BuildConfig { *; }

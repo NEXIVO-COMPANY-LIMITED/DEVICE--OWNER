@@ -22,10 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.utils.RegistrationErrorLogger
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import android.os.Environment
 
 /**
  * Lists registration error HTML files in DeviceOwner/RegistrationErrors and opens them on the phone.
@@ -53,8 +53,14 @@ class RegistrationErrorViewerActivity : ComponentActivity() {
         val context = LocalContext.current
 
         LaunchedEffect(Unit) {
-            errorFiles = RegistrationErrorLogger.listErrorFiles(context)
-            folderPath = RegistrationErrorLogger.getErrorFolderPath(context)
+            // Get error files from RegistrationErrors folder
+            val errorDir = File(context.getExternalFilesDir(null), "RegistrationErrors")
+            errorFiles = if (errorDir.exists()) {
+                errorDir.listFiles { file -> file.extension == "html" }?.toList() ?: emptyList()
+            } else {
+                emptyList()
+            }
+            folderPath = errorDir.absolutePath
         }
 
         if (selectedFile != null) {

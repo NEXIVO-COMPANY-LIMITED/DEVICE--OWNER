@@ -398,7 +398,7 @@ class LocalDataServerService : Service() {
                     "loan_number" to prefsManager.getLoanNumber()
                 ),
                 "network" to mapOf(
-                    "base_url" to com.example.deviceowner.BuildConfig.BASE_URL,
+                    "base_url" to com.example.deviceowner.AppConfig.BASE_URL,
                     "ssl_enabled" to true,
                     "certificate_pinning" to true
                 ),
@@ -533,7 +533,7 @@ class LocalDataServerService : Service() {
                 ),
                 "registration_data" to repository.getAllRegistrationData(),
                 "network_config" to mapOf(
-                    "base_url" to com.example.deviceowner.BuildConfig.BASE_URL,
+                    "base_url" to com.example.deviceowner.AppConfig.BASE_URL,
                     "ssl_enabled" to true,
                     "certificate_pinning" to true,
                     "certificate_pin" to "y8S/sGw+VDqpDXnu4dKxrnI6nj1tdn0od2WAFM7zvog="

@@ -2,4 +2,8 @@
     <string name="app_name">PAYO</string>
     <string name="app_name_admin">DEVICE OWNER</string>
     <string name="app_name_stealth">PAYO</string>
+
+    <!-- Shown when app crashes instead of system "clear cache" dialog -->
+    <string name="crash_message">Something went wrong. Tap the button below to open PAYO again.</string>
+    <string name="crash_open_again">Open PAYO again</string>
 </resources>
