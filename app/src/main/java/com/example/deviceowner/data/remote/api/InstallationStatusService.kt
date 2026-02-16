@@ -2,8 +2,8 @@ package com.example.deviceowner.data.remote.api
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.models.InstallationStatusInner
-import com.example.deviceowner.data.models.InstallationStatusRequest
+import com.example.deviceowner.data.models.installation.InstallationStatusInner
+import com.example.deviceowner.data.models.installation.InstallationStatusRequest
 import com.example.deviceowner.data.remote.ApiClient
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat

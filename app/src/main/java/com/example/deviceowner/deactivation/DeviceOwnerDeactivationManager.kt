@@ -11,16 +11,16 @@ import android.os.UserManager
 import android.util.Log
 import com.example.deviceowner.monitoring.SecurityMonitorService
 import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.services.FirmwareSecurityMonitorService
-import com.example.deviceowner.services.LocalDataServerService
-import com.example.deviceowner.services.RemoteManagementService
-import com.example.deviceowner.services.SoftLockMonitorService
-import com.example.deviceowner.services.SoftLockOverlayService
-import com.example.deviceowner.services.HeartbeatWorker
+import com.example.deviceowner.services.security.FirmwareSecurityMonitorService
+import com.example.deviceowner.services.data.LocalDataServerService
+import com.example.deviceowner.services.remote.RemoteManagementService
+import com.example.deviceowner.services.lock.SoftLockMonitorService
+import com.example.deviceowner.services.lock.SoftLockOverlayService
+import com.example.deviceowner.services.heartbeat.HeartbeatWorker
 import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.update.UpdateConfig
+import com.example.deviceowner.update.config.UpdateConfig
 import com.example.deviceowner.work.RestrictionEnforcementWorker
-import com.example.deviceowner.utils.SharedPreferencesManager
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicBoolean
 

@@ -3,8 +3,8 @@ package com.example.deviceowner.data.repository
 import android.content.Context
 import android.util.Log
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.CompleteDeviceRegistrationEntity
-import com.example.deviceowner.data.models.DeviceRegistrationRequest
+import com.example.deviceowner.data.local.database.entities.device.CompleteDeviceRegistrationEntity
+import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
 import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.data.remote.ApiService
 import com.example.deviceowner.utils.logging.LogManager

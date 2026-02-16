@@ -5,10 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.deviceowner.data.local.database.dao.DeviceDataDao
-import com.example.deviceowner.data.local.database.dao.HeartbeatHistoryDao
-import com.example.deviceowner.data.local.database.entities.DeviceDataEntity
-import com.example.deviceowner.data.local.database.entities.HeartbeatHistoryEntity
+import com.example.deviceowner.data.local.database.dao.device.DeviceDataDao
+import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatHistoryDao
+import com.example.deviceowner.data.local.database.entities.device.DeviceDataEntity
+import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
 import com.example.deviceowner.data.local.database.converters.JsonConverters
 
 /**

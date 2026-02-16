@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.ui.activities.RegistrationStatusActivity
+import com.example.deviceowner.ui.activities.registration.RegistrationStatusActivity
 import com.example.deviceowner.work.RestrictionEnforcementWorker
 import kotlinx.coroutines.*
 
@@ -73,9 +73,23 @@ class QRProvisioningReceiver : BroadcastReceiver() {
             }
             Log.d(TAG, "✅ Device Owner verified")
 
-            // Step 4: Setup-only restrictions (Factory Reset, Safe Boot, etc.) – do NOT add DISALLOW_DEBUGGING_FEATURES so keyboard works
+            // Step 4: Setup-only restrictions and block factory reset TOTALLY immediately
             deviceOwnerManager.applyRestrictionsForSetupOnly()
-            Log.d(TAG, "🔒 Factory Reset & Safe Boot blocked; keyboard/touch left enabled for registration")
+            val factoryResetBlocked = deviceOwnerManager.blockFactoryReset()
+            if (factoryResetBlocked) {
+                Log.d(TAG, "✅ Factory reset BLOCKED totally immediately after QR provisioning")
+            } else {
+                Log.e(TAG, "⚠️ Factory reset block failed – check Device Owner")
+            }
+
+            // Block USB debugging and Developer Options menu at provisioning (USB file transfer blocked only during hard lock)
+            try {
+                deviceOwnerManager.disableDeveloperOptions(true)
+                deviceOwnerManager.applySManager.disableDeveloperOptions(true)
+                Log.d(TAG, "✅ USB debugging and Developer Options menu BLOCKED at QR provisioning")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to block USB/debug at QR provisioning: ${e.message}", e)
+            }
 
             // Step 5: Grant READ_PHONE_STATE so IMEI/serial can be collected
             deviceOwnerManager.grantRequiredPermissions()

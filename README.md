@@ -1,65 +1,60 @@
-# Device Owner App
+# DEVICE OWNER - Enterprise Device Management App
 
-Android enterprise **Device Owner** application for loan/asset-backed device management. The app runs with Device Owner and Device Admin privileges to enforce security, report device status, support remote lock/unlock, and deactivate when the loan is complete.
+This project is a specialized Android application designed to run with **Device Owner** (DO) and **Device Admin** privileges. It is primarily used for asset management, loan compliance, and device security hardening.
 
----
+## 🚀 Overview
 
-## Overview
+The application acts as a Device Policy Controller (DPC) to enforce enterprise-level security policies on Android devices. It ensures that devices remain in a secure state, reports health status (heartbeat) to a central server, and provides remote control capabilities like locking or deactivating the device based on loan status.
 
-- **Purpose**: Manage devices tied to a loan: restrict risky actions (factory reset, developer options, unknown sources), detect tamper (bootloader unlock, root, SIM change, etc.), send heartbeat data to the backend every 30 seconds, and apply hard or soft lock based on server or local policy.
-- **Backend**: Registration, heartbeat, tamper reporting, installation status, device logs, and bug reports are sent to a Django backend (e.g. sponsa_backend). Base URL and API key are configured in the app (e.g. `AppConfig`).
-- **Minimum Android**: API 31 (Android 12) for policy; provisioning compatibility check requires Android 13+ (API 33).
-- **Provisioning**: The app is set as Device Owner via Android managed provisioning (e.g. QR code). It does not set itself as Device Owner; the system does during provisioning.
+## 🛠 Features Implemented
 
----
+### 1. Device Management & Hardening
+- **Device Owner Provisioning**: Deployed via QR code or NFC to gain full control over the device.
+- **Enterprise Restrictions**: Blocks factory reset, developer options, USB debugging, safe boot, and manual user management.
+- **Security Modes**: 
+  - `STANDARD`: Critical restrictions active (Factory Reset, Safe Boot blocked).
+  - `STRICT`: Maximum lockdown, including blocking ADB and Developer Options.
+- **Silent Operation**: Management messages and policy dialogs are suppressed for a seamless user experience.
 
-## Main capabilities
+### 2. Device Registration & Tracking
+- **Loan Integration**: Devices are registered using a loan number.
+- **Data Collection**: Automatically gathers device metadata (IMEI, Serial, Model, OS Version, Storage, Battery status).
+- **Unique Identification**: Stores a persistent `device_id` from the backend for all communications.
 
-| Area | Description |
-|------|-------------|
-| **Device Owner / Admin** | User restrictions, factory reset block, security modes (STANDARD / STRICT), silent restrictions |
-| **Registration** | Loan number entry → device data collection → POST register → store device_id |
-| **Heartbeat** | 30s interval (SecurityMonitorService + HeartbeatService); server can return lock, deactivation, next_payment |
-| **Hard lock** | Full kiosk (HardLockActivity), persists across reboot; used on server lock or tamper |
-| **Soft lock** | Dismissible overlay (payment reminder, SIM change warning) |
-| **Tamper** | Boot/runtime/SIM/package-removal/Device-Owner-removal detection → hard lock + POST tamper |
-| **Logs & bugs** | Local LogManager + remote tech API (logs, bug reports, uncaught exceptions) |
-| **Local DB** | Room (DeviceOwnerDatabase): registration, heartbeat, tamper, offline queue, lock history |
-| **Auto-update** | GitHub Releases: check for new APK, download, silent install (Device Owner) |
+### 3. Monitoring & Heartbeat
+- **30-Second Heartbeat**: Continuous background reporting of device status, security flags, and location.
+- **Server-Driven Instructions**: Receives and processes real-time commands from the backend (Lock, Unlock, Deactivate, Wipe).
 
----
+### 4. Lock & Kiosk Mechanisms
+- **Hard Lock (Kiosk Mode)**: Forces the device into a dedicated lock screen activity that persists across reboots. Blocks navigation and status bar.
+- **Soft Lock**: Overlays reminders or warnings (e.g., SIM change or payment reminders) without completely blocking the device.
+- **PIN Unlock**: Supports remote or local PIN entry for authorized unlocking.
 
-## Documentation
+### 5. Advanced Tamper Detection
+- **Boot-time Integrity Checks**: Checks for unlocked bootloaders, developer options, and debugging on every boot.
+- **Runtime Monitoring**: Real-time detection of SIM changes, package removal, or attempts to remove Device Owner status.
+- **Anti-Tamper Response**: Automatic escalation to Hard Lock if tampering is detected.
 
-Full technical documentation is in the **[docs/](docs/)** folder. Documents are ordered so you can read them in sequence:
+### 6. Maintenance & Updates
+- **Silent Auto-Update**: Downloads and installs updates from GitHub Releases in the background without user intervention.
+- **Logging & Bug Reporting**: Comprehensive local log management and remote technical reporting for troubleshooting.
 
-1. Start with **[docs/01-device-owner-overview.md](docs/01-device-owner-overview.md)** for architecture and purpose.  
-2. Then **[docs/02-features-implemented.md](docs/02-features-implemented.md)** for a list of features.  
-3. Follow the **[docs/README.md](docs/README.md)** index for the full reading order (compatibility → installation → registration → APIs → heartbeat → hard/soft lock → tamper → local databases → logs & bugs → agent update → services → folder structure).
+## 📂 Project Structure
 
-*Unaweza kupitia docs kwa mpangilio wa semantic: overview → features → compatibility → installation → registration → APIs → heartbeat → locks → tamper → databases → logs → update → services → folder structure.*
+- `app/src/main/java/com/example/deviceowner/device/`: Core `DeviceOwnerManager` and policy logic.
+- `app/src/main/java/com/example/deviceowner/services/`: Background monitors and heartbeat services.
+- `app/src/main/java/com/example/deviceowner/ui/`: Activities for registration, status, and lock screens.
+- `app/src/main/java/com/example/deviceowner/data/`: Room database and API clients.
 
----
+## 📖 Detailed Documentation
 
-## Project structure (summary)
-
-- **app/src/main/java/com/example/deviceowner/** — Kotlin source (config, control, core, data, device, monitoring, security, services, ui, update, utils, receivers, etc.).  
-- **app/src/main/res/** — Layouts, values, xml, drawable.  
-- **app/src/main/AndroidManifest.xml** — Activities, services, receivers, permissions.  
-- **docs/** — All documentation (01–14 in semantic order).
-
-See **[docs/14-folder-structure.md](docs/14-folder-structure.md)** for the full tree.
-
----
-
-## Build and run
-
-- Open the project in Android Studio; build with Gradle.  
-- Device Owner must be set via provisioning (e.g. QR code for `PROVISION_MANAGED_DEVICE`).  
-- Configure backend base URL and API key (e.g. in `AppConfig` / BuildConfig) before release.
+Comprehensive documentation for developers is located in the [docs/](./docs/) directory:
+- [01 Device Owner Overview](./docs/01-device-owner-overview.md)
+- [02 Features Implemented](./docs/02-features-implemented.md)
+- [06 API Reference](./docs/06-apis.md)
+- [07 Heartbeat Mechanism](./docs/07-device-heartbeat.md)
+- [09 Tamper Detection](./docs/09-device-tamper.md)
+- [13 Services Overview](./docs/13-services.md)
 
 ---
-
-## License and support
-
-See repository and organization policies. For technical details, use the [docs/](docs/) folder.
+*Note: This app requires Android 12 (API 31) or higher.*

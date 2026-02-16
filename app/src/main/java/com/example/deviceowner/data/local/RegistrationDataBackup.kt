@@ -3,7 +3,7 @@ package com.example.deviceowner.data.local
 import android.content.Context
 import android.util.Log
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.CompleteDeviceRegistrationEntity
+import com.example.deviceowner.data.local.database.entities.device.CompleteDeviceRegistrationEntity
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

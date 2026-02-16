@@ -83,7 +83,7 @@
             android:value="dataSync" />
         <!-- Registration Status Activity - Determines launch flow -->
         <activity
-            android:name=".ui.activities.RegistrationStatusActivity"
+            android:name=".ui.activities.registration.RegistrationStatusActivity"
             android:exported="true"
             android:theme="@style/Theme.DEVICEOWNER">
             <intent-filter>
@@ -93,13 +93,13 @@
         </activity>
 
         <activity
-            android:name=".ui.activities.MainActivity"
+            android:name=".ui.activities.main.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.DEVICEOWNER" />
 
         <!-- FRP Status Activity - Enterprise Factory Reset Protection status -->
         <activity
-            android:name=".ui.activities.FrpStatusActivity"
+            android:name=".ui.activities.status.FrpStatusActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
@@ -117,7 +117,7 @@
 
         <!-- Device Data Collection Activity - Collects and displays device data for user verification -->
         <activity
-            android:name=".ui.activities.DeviceDataCollectionActivity"
+            android:name=".ui.activities.data.DeviceDataCollectionActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
@@ -136,13 +136,15 @@
 
         <!-- SIM Change Overlay - Full-screen warning when SIM card is changed -->
         <activity
-            android:name=".ui.activities.SIMChangeOverlayActivity"
+            android:name=".ui.activities.overlay.SIMChangeOverlayActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTop"
             android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Hard Lock Activity - Kiosk mode screen when device is hard locked -->
+        <!-- Hard Lock Activity - Kiosk mode screen when device is hard locked.
+             directBootAware: show before user unlocks on boot.
+             showWhenLocked/turnScreenOn: display over keyguard, turn screen on. -->
         <activity
             android:name=".ui.activities.lock.HardLockActivity"
             android:exported="false"
@@ -152,13 +154,16 @@
             android:noHistory="false"
             android:finishOnTaskLaunch="false"
             android:clearTaskOnLaunch="false"
+            android:directBootAware="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:theme="@style/Theme.DEVICEOWNER"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden|navigation" />
 
         <!-- Android 12+ GET_PROVISIONING_MODE handler -->
         <activity
-            android:name=".ui.activities.provisioning.ProvisioningModeActivity"
+            android:name=".ui.activities.provisioning.mode.ProvisioningModeActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
@@ -169,30 +174,30 @@
 
         <!-- Device Compatibility Check Activity - Validates device before provisioning -->
         <activity
-            android:name=".ui.activities.provisioning.DeviceCompatibilityCheckActivity"
+            android:name=".ui.activities.provisioning.compatibility.DeviceCompatibilityCheckActivity"
             android:exported="true"
             android:theme="@style/Theme.DEVICEOWNER" />
 
         <!-- Data Privacy Consent - Shown on first install, before loan number input -->
         <activity
-            android:name=".ui.activities.provisioning.DataPrivacyConsentActivity"
+            android:name=".ui.activities.provisioning.consent.DataPrivacyConsentActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
         <!-- Provisioning Progress Activity - Shows installation status -->
         <activity
-            android:name=".ui.activities.provisioning.ProvisioningProgressActivity"
+            android:name=".ui.activities.provisioning.progress.ProvisioningProgressActivity"
             android:exported="true"
             android:theme="@style/Theme.DEVICEOWNER" />
 
         <!-- Compatibility Success Activity - Shows when device meets all requirements -->
         <activity
-            android:name=".ui.activities.provisioning.CompatibilitySuccessActivity"
+            android:name=".ui.activities.provisioning.compatibility.CompatibilitySuccessActivity"
             android:exported="true"
             android:theme="@style/Theme.DEVICEOWNER" />
 
         <activity
-            android:name=".ui.activities.provisioning.PolicyComplianceActivity"
+            android:name=".ui.activities.provisioning.policy.PolicyComplianceActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
@@ -248,7 +253,7 @@
 
         <!-- Update Installation Receiver - handles PackageInstaller callbacks -->
         <receiver
-            android:name=".update.UpdateReceiver"
+            android:name=".update.receiver.UpdateReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.example.deviceowner.INSTALL_COMPLETE" />
@@ -276,7 +281,7 @@
         <!-- NO excludeFromRecents, NO noHistory, NO taskAffinity="" -->
         <!-- This ensures heartbeat sends reliably and services continue working -->
         <activity
-            android:name=".ui.activities.RegistrationSuccessActivity"
+            android:name=".ui.activities.registration.RegistrationSuccessActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER"
             android:alwaysRetainTaskState="true"
@@ -293,31 +298,31 @@
             android:directBootAware="true" />
 
         <service
-            android:name=".services.RemoteManagementService"
+            android:name=".services.remote.RemoteManagementService"
             android:exported="false"
             android:foregroundServiceType="dataSync"
             android:directBootAware="true" />
 
         <!-- Enhanced Soft Lock Services -->
         <service
-            android:name=".services.SoftLockOverlayService"
+            android:name=".services.lock.SoftLockOverlayService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <service
-            android:name=".services.SoftLockMonitorService"
+            android:name=".services.lock.SoftLockMonitorService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <service
-            android:name=".services.FirmwareSecurityMonitorService"
+            android:name=".services.security.FirmwareSecurityMonitorService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <!-- Local JSON Data Server Service - Serves device data via HTTP -->
         <service
-            android:name=".services.LocalDataServerService"
+            android:name=".services.data.LocalDataServerService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync"

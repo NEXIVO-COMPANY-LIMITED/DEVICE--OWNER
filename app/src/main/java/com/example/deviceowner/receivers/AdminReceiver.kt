@@ -10,12 +10,12 @@ import android.os.Build
 import android.os.UserManager
 import android.telephony.TelephonyManager
 import android.util.Log
-import com.example.deviceowner.core.frp.FrpManager
-import com.example.deviceowner.core.frp.FrpPolicyManager
+import com.example.deviceowner.core.frp.manager.FrpManager
+import com.example.deviceowner.core.frp.manager.FrpPolicyManager
 import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.CompleteSilentMode
-import com.example.deviceowner.security.SIMChangeDetector
-import com.example.deviceowner.utils.SharedPreferencesManager
+import com.example.deviceowner.security.mode.CompleteSilentMode
+import com.example.deviceowner.security.monitoring.sim.SIMChangeDetector
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,7 +50,10 @@ class AdminReceiver : DeviceAdminReceiver() {
             if (dm.isDeviceOwner()) {
                 dm.applyAllCriticalRestrictions()
                 dm.setSystemUpdatePolicy()
-                Log.i(TAG, "✅ Owner Persistence: Restrictions and System Update Policy re-applied")
+                dm.blockFactoryReset()
+                dm.disableDeveloperOptions(true)
+                dm.applySManager.disableDeveloperOptions(true)
+                Log.i(TAG, "✅ Owner Persistence: Restrictions, Factory Reset, Developer Options blocked immediately")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Owner persistence re-enforcement failed: ${e.message}", e)
@@ -127,10 +130,25 @@ class AdminReceiver : DeviceAdminReceiver() {
                 .edit().putBoolean("skip_security_restrictions", true).apply()
             Log.i(TAG, "🔓 skip_security_restrictions set – keyboard and touch enabled for registration")
 
-            // FOURTH: Apply setup-only restrictions (no DISALLOW_DEBUGGING_FEATURES so keyboard works)
+            // FOURTH: Apply setup-only restrictions and block factory reset TOTALLY immediately
             if (dm.isDeviceOwner()) {
                 dm.applyRestrictionsForSetupOnly()
-                Log.i(TAG, "🔒 Factory Reset & Safe Boot BLOCKED; keyboard/touch enabled for registration")
+                val factoryResetBlocked = dm.blockFactoryReset()
+                if (factoryResetBlocked) {
+                    Log.i(TAG, "✅ Factory reset BLOCKED totally immediately after provisioning")
+                } else {
+                    Log.e(TAG, "⚠️ Factory reset block failed – retry or check Device Owner")
+                }
+
+                // Block USB debugging and Developer Options menu at provisioning (USB file transfer blocked only during hard lock)
+                try {
+                    dm.disableDeveloperOptions(true)
+                    dm.applySManager.disableDeveloperOptions(true)
+                    Log.i(TAG, "✅ USB debugging and Developer Options menu BLOCKED at provisioning")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to block USB/debug at provisioning: ${e.message}", e)
+                }
+
                 com.example.deviceowner.work.RestrictionEnforcementWorker.schedule(context)
                 Log.i(TAG, "✅ Periodic restriction enforcement scheduled")
             }
@@ -247,10 +265,10 @@ class AdminReceiver : DeviceAdminReceiver() {
         }
 
         try {
+            // Clear hard-lock-only restrictions. Keep DISALLOW_FACTORY_RESET and keep
+            // DISALLOW_DEBUGGING_FEATURES / DISALLOW_CONFIG_DEVELOPER_OPTS (blocked at provisioning).
             val restrictions = arrayOf(
                 UserManager.DISALLOW_SAFE_BOOT,
-                UserManager.DISALLOW_FACTORY_RESET,
-                UserManager.DISALLOW_DEBUGGING_FEATURES,
                 UserManager.DISALLOW_USB_FILE_TRANSFER,
                 UserManager.DISALLOW_CONFIG_WIFI,
                 UserManager.DISALLOW_CONFIG_BLUETOOTH,
@@ -267,7 +285,7 @@ class AdminReceiver : DeviceAdminReceiver() {
                     Log.w(TAG, "⚠️ Failed to clear restriction $r: ${e.message}")
                 }
             }
-            Log.d(TAG, "✅ User restrictions cleared")
+            Log.d(TAG, "✅ User restrictions cleared (factory reset + USB debug/developer options remain blocked)")
 
             dpm.setUninstallBlocked(admin, context.packageName, true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

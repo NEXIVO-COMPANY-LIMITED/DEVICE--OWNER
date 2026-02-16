@@ -7,7 +7,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.ui.activities.LockScreenActivity
+import com.example.deviceowner.ui.activities.lock.LockScreenActivity
 
 /**
  * Kiosk Mode Manager

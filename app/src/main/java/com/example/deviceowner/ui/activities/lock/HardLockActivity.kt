@@ -58,7 +58,7 @@ import android.net.Uri
 import com.example.deviceowner.control.RemoteDeviceControlManager
 import com.example.deviceowner.receivers.AdminReceiver
 import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.utils.SharedPreferencesManager
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -87,6 +87,11 @@ class HardLockActivity : ComponentActivity() {
         dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         admin = ComponentName(this, AdminReceiver::class.java)
         
+        // Show over keyguard (so Hard Lock appears after reboot before user enters PIN – Direct Boot)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
         // Configure window to prevent escape and block screenshots (standard for lock screens)
         window.apply {
             addFlags(
@@ -394,11 +399,14 @@ class HardLockActivity : ComponentActivity() {
             if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_USER_PRESENT) {
                 Log.d(TAG, "📱 Screen turned on - bringing hard lock to foreground")
                 try {
-                    // Bring this activity to the front
+                    // Bring this activity to the front; show over keyguard so user sees lock screen, not PIN
                     val bringToFrontIntent = Intent(context, HardLockActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
                                 Intent.FLAG_ACTIVITY_SINGLE_TOP or
                                 Intent.FLAG_ACTIVITY_NEW_TASK
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            addFlags(0x00000400 or 0x00000200)  // FLAG_ACTIVITY_SHOW_WHEN_LOCKED | FLAG_ACTIVITY_TURN_SCREEN_ON
+                        }
                     }
                     context?.startActivity(bringToFrontIntent)
                     

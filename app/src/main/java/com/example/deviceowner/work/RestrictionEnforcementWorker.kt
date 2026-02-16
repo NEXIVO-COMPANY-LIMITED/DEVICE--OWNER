@@ -9,8 +9,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.deviceowner.core.SilentDeviceOwnerManager
 import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.CompleteSilentMode
-import com.example.deviceowner.utils.SharedPreferencesManager
+import com.example.deviceowner.security.mode.CompleteSilentMode
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit

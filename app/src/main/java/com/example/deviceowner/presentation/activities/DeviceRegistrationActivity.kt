@@ -111,10 +111,10 @@ class DeviceRegistrationActivity : ComponentActivity() {
     private fun navigateToDataCollection(loanNumber: String) {
         val intent = Intent(
             this,
-            com.example.deviceowner.ui.activities.DeviceDataCollectionActivity::class.java
+            com.example.deviceowner.ui.activities.data.DeviceDataCollectionActivity::class.java
         )
         intent.putExtra(
-            com.example.deviceowner.ui.activities.DeviceDataCollectionActivity.EXTRA_LOAN_NUMBER,
+            com.example.deviceowner.ui.activities.data.DeviceDataCollectionActivity.EXTRA_LOAN_NUMBER,
             loanNumber
         )
         startActivity(intent)

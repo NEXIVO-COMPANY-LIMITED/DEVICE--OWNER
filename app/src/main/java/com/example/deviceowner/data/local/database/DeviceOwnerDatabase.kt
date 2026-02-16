@@ -4,8 +4,26 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import android.content.Context
-import com.example.deviceowner.data.local.database.dao.*
-import com.example.deviceowner.data.local.database.entities.*
+import com.example.deviceowner.data.local.database.dao.device.CompleteDeviceRegistrationDao
+import com.example.deviceowner.data.local.database.dao.device.DeviceBaselineDao
+import com.example.deviceowner.data.local.database.dao.device.DeviceDataDao
+import com.example.deviceowner.data.local.database.dao.device.DeviceRegistrationDao
+import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatDao
+import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatHistoryDao
+import com.example.deviceowner.data.local.database.dao.lock.LockStateRecordDao
+import com.example.deviceowner.data.local.database.dao.offline.OfflineEventDao
+import com.example.deviceowner.data.local.database.dao.sim.SimChangeHistoryDao
+import com.example.deviceowner.data.local.database.dao.tamper.TamperDetectionDao
+import com.example.deviceowner.data.local.database.entities.device.CompleteDeviceRegistrationEntity
+import com.example.deviceowner.data.local.database.entities.device.DeviceBaselineEntity
+import com.example.deviceowner.data.local.database.entities.device.DeviceDataEntity
+import com.example.deviceowner.data.local.database.entities.device.DeviceRegistrationEntity
+import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatEntity
+import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
+import com.example.deviceowner.data.local.database.entities.lock.LockStateRecordEntity
+import com.example.deviceowner.data.local.database.entities.offline.OfflineEvent
+import com.example.deviceowner.data.local.database.entities.sim.SimChangeHistoryEntity
+import com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity
 
 /**
  * Primary operational database: offline queue, registration, heartbeat, and tamper sync.

@@ -7,11 +7,11 @@ import androidx.work.WorkerParameters
 import com.example.deviceowner.control.RemoteDeviceControlManager
 import com.example.deviceowner.core.device.DeviceDataCollector
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.models.HeartbeatRequest
-import com.example.deviceowner.data.models.HeartbeatResponse
-import com.example.deviceowner.data.models.TamperEventRequest
+import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
+import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
+import com.example.deviceowner.data.models.tamper.TamperEventRequest
 import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.utils.SharedPreferencesManager
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

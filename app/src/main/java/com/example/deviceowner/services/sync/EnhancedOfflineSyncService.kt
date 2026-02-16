@@ -6,8 +6,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.util.Log
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.OfflineEvent
-import com.example.deviceowner.data.models.HeartbeatRequest
+import com.example.deviceowner.data.local.database.entities.offline.OfflineEvent
+import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
 import com.example.deviceowner.data.remote.ApiClient
 import com.google.gson.Gson
 import kotlinx.coroutines.*

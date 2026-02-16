@@ -4,12 +4,12 @@ import android.content.Context
 import android.util.Log
 import com.example.deviceowner.control.RemoteDeviceControlManager
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.OfflineEvent
-import com.example.deviceowner.data.models.TamperEventRequest
+import com.example.deviceowner.data.local.database.entities.offline.OfflineEvent
+import com.example.deviceowner.data.models.tamper.TamperEventRequest
 import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.device.DeviceOwnerManager
 import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
-import com.example.deviceowner.utils.SharedPreferencesManager
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

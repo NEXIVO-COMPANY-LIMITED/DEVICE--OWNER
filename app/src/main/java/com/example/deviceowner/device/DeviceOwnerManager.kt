@@ -13,6 +13,7 @@ import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import com.example.deviceowner.receivers.AdminReceiver
+import com.example.deviceowner.utils.constants.UserManagerConstants
 
 /**
  * Optimized DeviceOwnerManager - Enterprise Device Policy Controller.
@@ -20,35 +21,37 @@ import com.example.deviceowner.receivers.AdminReceiver
  * Optimizations: cached reflection, shared constants, batched operations, reduced logging.
  *
  * Security Modes (GAP Analysis):
- * - STANDARD: ADB/Developer options allowed for support; factory reset blocked
- * - STRICT: ADB/USB debugging blocked; maximum security
+ * - STANDARD: ADB/Developer options blocked from provisioning; factory reset blocked
+ * - STRICT: Maximum security mode
  */
 class DeviceOwnerManager(private val context: Context) {
 
     enum class SecurityMode {
-        /** ADB allowed for support/troubleshooting; factory reset blocked */
+        /** ADB and Developer options blocked from provisioning; factory reset blocked */
         STANDARD,
-        /** ADB blocked; maximum security */
+        /** Maximum security */
         STRICT
     }
 
     companion object {
         private const val TAG = "DeviceOwnerManager"
-        private const val LAUNCHER_ACTIVITY = "com.example.deviceowner.ui.activities.RegistrationStatusActivity"
+        private const val LAUNCHER_ACTIVITY = "com.example.deviceowner.ui.activities.registration.RegistrationStatusActivity"
         private const val PREF_SECURITY_MODE = "security_mode"
         /** Minimum Android version: 12 (API 31). Any device model allowed. */
         private const val MIN_SDK = 31
 
-        /** Setup-only: minimal restrictions during registration (keyboard stays enabled). GAP FIX: Factory reset blocked. */
+        /** Setup-only: minimal restrictions during registration (keyboard stays enabled). GAP FIX: Factory reset and Developer Options blocked. */
         val SETUP_RESTRICTIONS = arrayOf(
-            UserManager.DISALLOW_FACTORY_RESET,     // ✓ ADDED - Gap Analysis Fix #2
+            UserManager.DISALLOW_FACTORY_RESET,
             UserManager.DISALLOW_SAFE_BOOT,
-            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA
+            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
+            UserManager.DISALLOW_DEBUGGING_FEATURES,
+            UserManagerConstants.DISALLOW_CONFIG_DEVELOPER_OPTS
         )
 
-        /** Base critical restrictions (STANDARD mode). GAP FIX: Factory reset now blocked. */
+        /** Base critical restrictions (STANDARD mode). GAP FIX: Factory reset, ADB, and Dev Options blocked. */
         val CRITICAL_RESTRICTIONS = arrayOf(
-            UserManager.DISALLOW_FACTORY_RESET,     // ✓ ADDED - Gap Analysis Fix #1
+            UserManager.DISALLOW_FACTORY_RESET,
             UserManager.DISALLOW_SAFE_BOOT,
             UserManager.DISALLOW_ADD_USER,
             UserManager.DISALLOW_REMOVE_USER,
@@ -56,14 +59,13 @@ class DeviceOwnerManager(private val context: Context) {
             UserManager.DISALLOW_CONFIG_WIFI,
             UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS,
             UserManager.DISALLOW_CONFIG_BLUETOOTH,
-            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA
+            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
+            UserManager.DISALLOW_DEBUGGING_FEATURES,
+            UserManagerConstants.DISALLOW_CONFIG_DEVELOPER_OPTS
         )
 
-        /** Additional restrictions for STRICT mode (blocks ADB/USB debugging). */
-        val STRICT_MODE_RESTRICTIONS = arrayOf(
-            UserManager.DISALLOW_DEBUGGING_FEATURES,
-            UserManager.DISALLOW_USB_FILE_TRANSFER
-        )
+        /** Additional restrictions for STRICT mode. USB File Transfer is handled only during HARD LOCK by policy. */
+        val STRICT_MODE_RESTRICTIONS = emptyArray<String>()
 
         @Volatile
         private var bootloaderCheckClass: Class<*>? = null
@@ -97,7 +99,7 @@ class DeviceOwnerManager(private val context: Context) {
     }
 
     /**
-     * Gets the current security mode. Default: STANDARD (ADB allowed for support).
+     * Gets the current security mode. Default: STANDARD.
      */
     fun getSecurityMode(): SecurityMode {
         val name = securityPrefs.getString(PREF_SECURITY_MODE, SecurityMode.STANDARD.name)
@@ -110,7 +112,6 @@ class DeviceOwnerManager(private val context: Context) {
 
     /**
      * Sets security mode. Call before applyAllCriticalRestrictions() or applySecurityMode().
-     * STANDARD: ADB allowed for support. STRICT: ADB blocked.
      */
     fun setSecurityMode(mode: SecurityMode) {
         securityPrefs.edit().putString(PREF_SECURITY_MODE, mode.name).apply()
@@ -129,7 +130,6 @@ class DeviceOwnerManager(private val context: Context) {
 
     /**
      * Applies restrictions based on configured security mode.
-     * Use this for configurable ADB blocking (STRICT = block ADB).
      */
     fun applySecurityMode(): Boolean {
         if (!isDeviceOwner()) return false
@@ -232,7 +232,7 @@ class DeviceOwnerManager(private val context: Context) {
 
     /**
      * Setup-only restrictions: minimal hardening during registration.
-     * Keeps keyboard/touch enabled - no DISALLOW_DEBUGGING_FEATURES.
+     * Blocks Factory Reset, ADB, and Developer Options menu immediately.
      */
     fun applyRestrictionsForSetupOnly() {
         if (!isDeviceOwner()) return
@@ -241,9 +241,16 @@ class DeviceOwnerManager(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 devicePolicyManager.setUninstallBlocked(adminComponent, packageName, true)
             }
+            // Explicitly disable ADB and Developer Options settings
+            try {
+                Settings.Global.putInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0)
+                Settings.Global.putInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to disable ADB/Dev settings during setup: ${e.message}")
+            }
             updateBranding()
             grantRequiredPermissions()
-            Log.d(TAG, "✅ Setup-only restrictions applied")
+            Log.d(TAG, "✅ Setup-only restrictions applied (including ADB/Developer Options block)")
         } catch (e: Exception) {
             Log.e(TAG, "Error applying setup-only restrictions: ${e.message}")
         }
@@ -251,7 +258,6 @@ class DeviceOwnerManager(private val context: Context) {
 
     /**
      * MAXIMUM HARDENING: Blocks all potential bypass methods.
-     * Respects security mode (STANDARD=ADB allowed, STRICT=ADB blocked).
      */
     fun applyAllCriticalRestrictions() {
         if (!isDeviceOwner()) return
@@ -403,10 +409,12 @@ class DeviceOwnerManager(private val context: Context) {
         return try {
             if (disable) {
                 devicePolicyManager.addUserRestriction(adminComponent, UserManager.DISALLOW_DEBUGGING_FEATURES)
+                devicePolicyManager.addUserRestriction(adminComponent, UserManagerConstants.DISALLOW_CONFIG_DEVELOPER_OPTS)
                 Settings.Global.putInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0)
                 Settings.Global.putInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0)
             } else {
                 devicePolicyManager.clearUserRestriction(adminComponent, UserManager.DISALLOW_DEBUGGING_FEATURES)
+                devicePolicyManager.clearUserRestriction(adminComponent, UserManagerConstants.DISALLOW_CONFIG_DEVELOPER_OPTS)
             }
             true
         } catch (e: Exception) {
@@ -455,8 +463,7 @@ class DeviceOwnerManager(private val context: Context) {
         if (!isDeviceOwner()) return
         try {
             applyAllCriticalRestrictions()
-            // USB debugging allowed – do not disable developer options
-            Log.d(TAG, "✅ Silent company restrictions applied (USB debug/file transfer allowed)")
+            Log.d(TAG, "✅ Silent company restrictions applied (ADB/Developer Options blocked)")
         } catch (e: Exception) {
             Log.e(TAG, "Error applying silent company restrictions: ${e.message}")
         }
@@ -512,10 +519,12 @@ class SystemRestrictionManager(
             if (dpm.isDeviceOwnerApp(context.packageName)) {
                 if (disable) {
                     dpm.addUserRestriction(admin, UserManager.DISALLOW_DEBUGGING_FEATURES)
+                    dpm.addUserRestriction(admin, UserManagerConstants.DISALLOW_CONFIG_DEVELOPER_OPTS)
                     Settings.Global.putInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0)
                     Settings.Global.putInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0)
                 } else {
                     dpm.clearUserRestriction(admin, UserManager.DISALLOW_DEBUGGING_FEATURES)
+                    dpm.clearUserRestriction(admin, UserManagerConstants.DISALLOW_CONFIG_DEVELOPER_OPTS)
                 }
                 true
             } else false

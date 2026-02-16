@@ -2,7 +2,9 @@ package com.example.deviceowner.security.ssl
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.utils.SSLCertificateExtractor
+import com.example.deviceowner.utils.ssl.CertificateInfo
+import com.example.deviceowner.utils.ssl.SSLCertificateExtractor
+import com.example.deviceowner.utils.ssl.SSLValidationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.KeyStore
@@ -118,8 +120,8 @@ class DeviceOwnerSSLManager(private val context: Context) {
      * Generate security recommendations based on SSL analysis
      */
     private fun generateSecurityRecommendations(
-        certInfo: com.example.deviceowner.utils.CertificateInfo,
-        sslValidation: com.example.deviceowner.utils.SSLValidationResult
+        certInfo: CertificateInfo,
+        sslValidation: SSLValidationResult
     ): List<String> {
         val recommendations = mutableListOf<String>()
         

@@ -29,7 +29,7 @@ class DeviceRegistrationManager(private val context: Context) {
      * for installation status, heartbeat, tamper - never generate locally.
      */
     fun getOrGenerateDeviceId(): String {
-        val deviceId = com.example.deviceowner.utils.SharedPreferencesManager(context).getDeviceIdForHeartbeat()
+        val deviceId = com.example.deviceowner.utils.storage.SharedPreferencesManager(context).getDeviceIdForHeartbeat()
             ?: prefs.getString(KEY_DEVICE_ID, null)
             ?: context.getSharedPreferences("device_data", Context.MODE_PRIVATE).getString("device_id_for_heartbeat", null)
         if (!deviceId.isNullOrBlank()) return deviceId

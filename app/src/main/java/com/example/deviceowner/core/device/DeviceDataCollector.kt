@@ -10,9 +10,9 @@ import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.example.deviceowner.core.frp.FrpManager
-import com.example.deviceowner.data.models.DeviceRegistrationRequest
-import com.example.deviceowner.data.models.HeartbeatRequest
+import com.example.deviceowner.core.frp.manager.FrpManager
+import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
+import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -138,19 +138,35 @@ class DeviceDataCollector(private val context: Context) {
             val imeiList = (imeiInfo["device_imeis"] as? List<*>)?.map { it?.toString() ?: "NO_IMEI_FOUND" }
                 ?: listOf("NO_IMEI_FOUND")
             val serialNum = getRealSerialNumber()
+            val lat = (locationInfo["latitude"] as? Number)?.toDouble()
+            val lon = (locationInfo["longitude"] as? Number)?.toDouble()
+            // Sanitize coords so server never gets NaN/Infinity (can cause 500 when storing JSON).
+            val safeLat = if (lat != null && !lat.isNaN() && lat.isFinite()) lat else null
+            val safeLon = if (lon != null && !lon.isNaN() && lon.isFinite()) lon else null
+            // Security info: only keys Django uses; avoid frp_hours_remaining etc. that might be non-JSON-safe.
+            val heartbeatSecurityInfo = mapOf<String, Any?>(
+                "is_device_rooted" to (securityInfo["is_device_rooted"] == true),
+                "is_usb_debugging_enabled" to (securityInfo["is_usb_debugging_enabled"] == true),
+                "is_developer_mode_enabled" to (securityInfo["is_developer_mode_enabled"] == true),
+                "is_bootloader_unlocked" to (securityInfo["is_bootloader_unlocked"] == true),
+                "is_custom_rom" to (securityInfo["is_custom_rom"] == true)
+            )
+            val bootloaderVal = if (Build.BOOTLOADER.length > 100) Build.BOOTLOADER.substring(0, 100) else Build.BOOTLOADER
             return HeartbeatRequest(
                 heartbeatTimestamp = deviceTimestamp,
-                deviceId = deviceId,
+                deviceId = null, // Do not send device_id in body; it is in the URL only (Django expects this).
                 serialNumber = serialNum,
                 serial = serialNum,
+                fingerprint = Build.FINGERPRINT,
+                bootloader = bootloaderVal,
                 model = deviceInfo["model"] as? String,
                 manufacturer = deviceInfo["manufacturer"] as? String,
                 androidId = deviceInfo["android_id"] as? String,
                 deviceImeis = imeiList,
                 installedRam = storageInfo["installed_ram"] as? String,
                 totalStorage = storageInfo["total_storage"] as? String,
-                latitude = (locationInfo["latitude"] as? Number)?.toDouble(),
-                longitude = (locationInfo["longitude"] as? Number)?.toDouble(),
+                latitude = safeLat,
+                longitude = safeLon,
                 isDeviceRooted = securityInfo["is_device_rooted"] as? Boolean,
                 isUsbDebuggingEnabled = securityInfo["is_usb_debugging_enabled"] as? Boolean,
                 isDeveloperModeEnabled = securityInfo["is_developer_mode_enabled"] as? Boolean,
@@ -164,7 +180,7 @@ class DeviceDataCollector(private val context: Context) {
                 imeiInfo = imeiInfo,
                 storageInfo = storageInfo,
                 locationInfo = locationInfo,
-                securityInfo = securityInfo,
+                securityInfo = heartbeatSecurityInfo,
                 systemIntegrity = mapOf("integrity" to "passed"),
                 appInfo = mapOf("package_name" to context.packageName)
             )
@@ -380,7 +396,7 @@ class DeviceDataCollector(private val context: Context) {
     } catch (_: Exception) { false }
 
     private fun isBootloaderUnlockedCheck(): Boolean = try {
-        com.example.deviceowner.security.enforcement.BootloaderLockEnforcer(context).isBootloaderUnlocked()
+        com.example.deviceowner.security.enforcement.bootloader.BootloaderLockEnforcer(context).isBootloaderUnlocked()
     } catch (_: Exception) { false }
 
     private fun isDeviceRootedCheck(): Boolean = try {

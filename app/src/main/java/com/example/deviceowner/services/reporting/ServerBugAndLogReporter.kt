@@ -3,8 +3,8 @@ package com.example.deviceowner.services.reporting
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.data.models.BugReportRequest
-import com.example.deviceowner.data.models.DeviceLogRequest
+import com.example.deviceowner.data.models.tech.BugReportRequest
+import com.example.deviceowner.data.models.tech.DeviceLogRequest
 import com.example.deviceowner.data.remote.ApiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +49,7 @@ object ServerBugAndLogReporter {
     private fun getDeviceId(): String {
         val ctx = appContext ?: return "UNREGISTERED-${Build.MODEL ?: "unknown"}"
         return try {
-            val id = com.example.deviceowner.utils.SharedPreferencesManager(ctx).getDeviceIdForHeartbeat()
+            val id = com.example.deviceowner.utils.storage.SharedPreferencesManager(ctx).getDeviceIdForHeartbeat()
                 ?: ctx.getSharedPreferences("device_registration", Context.MODE_PRIVATE).getString("device_id", null)
                 ?: ctx.getSharedPreferences("device_data", Context.MODE_PRIVATE).getString("device_id_for_heartbeat", null)
             id?.trim()?.takeIf { it.isNotEmpty() } ?: "UNREGISTERED-${Build.MANUFACTURER}-${Build.MODEL}"

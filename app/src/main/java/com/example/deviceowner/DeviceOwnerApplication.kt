@@ -20,13 +20,14 @@ import com.example.deviceowner.data.local.repository.LocalDeviceRepository
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import com.example.deviceowner.services.sync.OfflineSyncWorker
-import com.example.deviceowner.ui.activities.RegistrationSuccessActivity
+import com.example.deviceowner.ui.activities.registration.RegistrationSuccessActivity
 import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.CompleteSilentMode
-import com.example.deviceowner.security.SIMChangeDetector
-import com.example.deviceowner.update.GitHubUpdateManager
-import com.example.deviceowner.update.UpdateScheduler
-import com.example.deviceowner.utils.SharedPreferencesManager
+import com.example.deviceowner.security.mode.CompleteSilentMode
+import com.example.deviceowner.security.monitoring.sim.SIMChangeDetector
+import com.example.deviceowner.frp.CompleteFRPManager
+import com.example.deviceowner.update.github.GitHubUpdateManager
+import com.example.deviceowner.update.scheduler.UpdateScheduler
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.example.deviceowner.utils.logging.LogManager
 import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +57,8 @@ class DeviceOwnerApplication : Application() {
             if (DeviceOwnerManager(this).isDeviceOwner()) {
                 CompleteSilentMode(this).enableCompleteSilentMode()
                 Log.d(TAG, "Silent mode enabled on app start")
+                // FRP (Factory Reset Protection): setup on first run or verify on later runs
+                runCompleteFRPSetupOrVerify()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Silent mode failed: ${e.message}", e)
@@ -108,7 +111,7 @@ class DeviceOwnerApplication : Application() {
         
         // Start Local JSON Data Server
         try {
-            com.example.deviceowner.services.LocalDataServerService.startService(this)
+            com.example.deviceowner.services.data.LocalDataServerService.startService(this)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start Local Data Server: ${e.message}")
         }
@@ -157,6 +160,36 @@ class DeviceOwnerApplication : Application() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error scheduling heartbeat: ${e.message}")
             }
+        }
+    }
+
+    /**
+     * Complete FRP (email-based): setup on first run, verify on later runs.
+     * After factory reset only abubakariabushekhe87@gmail.com can unlock.
+     */
+    private fun runCompleteFRPSetupOrVerify() {
+        try {
+            val frpManager = CompleteFRPManager(this)
+            if (!frpManager.isFRPAlreadySetup()) {
+                Log.i(TAG, "First run detected - setting up Complete FRP...")
+                val success = frpManager.setupCompleteFRP()
+                if (success) {
+                    Log.i(TAG, "✓ Complete FRP configured. Email: ${CompleteFRPManager.COMPANY_FRP_EMAIL}. Wait 72h for full activation.")
+                } else {
+                    Log.e(TAG, "Complete FRP setup failed")
+                }
+            } else {
+                frpManager.verifyFRPStillActive()
+                if (frpManager.isFRPFullyActive()) {
+                    Log.d(TAG, "✓ Complete FRP is fully active")
+                } else {
+                    val status = frpManager.getFRPStatus()
+                    val hoursRemaining = status["hours_remaining"] as? Long ?: 72L
+                    Log.d(TAG, "Complete FRP activation in progress ($hoursRemaining hours remaining)")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Complete FRP setup/verify failed: ${e.message}", e)
         }
     }
 

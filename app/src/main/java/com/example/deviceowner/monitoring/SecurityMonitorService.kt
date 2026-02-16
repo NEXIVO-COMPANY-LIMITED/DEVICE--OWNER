@@ -18,7 +18,8 @@ import com.example.deviceowner.core.device.DeviceDataCollector
 import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.security.response.EnhancedAntiTamperResponse
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.services.HeartbeatService
+import com.example.deviceowner.services.heartbeat.HeartbeatService
+import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
 import kotlinx.coroutines.*
 
 /**
@@ -67,9 +68,17 @@ class SecurityMonitorService : Service() {
     private val SETTINGS_CHECK_INTERVAL = 500L // Check every 500ms for Settings app
     private var lastForegroundPackage = ""
     
+    // Heartbeat recovery watchdog
+    private var heartbeatWatchdogJob: Job? = null
+    private val HEARTBEAT_WATCHDOG_INTERVAL = 60_000L // Check every 60 seconds
+    // Throttle: report heartbeat block to server at most once per 5 min
+    private var lastHeartbeatBlockReportTime = 0L
+    private var lastHeartbeatBlockReason: String? = null
+    private val HEARTBEAT_BLOCK_REPORT_THROTTLE_MS = 5 * 60 * 1000L
+    
     // Real-Time Security Mesh Components
-    private val removalDetector by lazy { com.example.deviceowner.security.monitoring.DeviceOwnerRemovalDetector(this) }
-    private val accessibilityGuard by lazy { com.example.deviceowner.security.monitoring.AccessibilityGuard(this) }
+    private val removalDetector by lazy { com.example.deviceowner.security.monitoring.removal.DeviceOwnerRemovalDetector(this) }
+    private val accessibilityGuard by lazy { com.example.deviceowner.security.monitoring.accessibility.AccessibilityGuard(this) }
     
     override fun onCreate() {
         super.onCreate()
@@ -78,6 +87,7 @@ class SecurityMonitorService : Service() {
         startForeground(NOTIFICATION_ID, createNotification())
         startMonitoring()
         startHeartbeatLoop()
+        startHeartbeatWatchdog()
         
         // Start Real-Time Security Mesh
         startSecurityMesh()
@@ -93,35 +103,136 @@ class SecurityMonitorService : Service() {
         try {
             val deviceId = resolveDeviceIdForHeartbeat()
             if (deviceId.isNullOrBlank()) {
-                Log.w(TAG, "⚠️ device_id_for_heartbeat missing – heartbeat will start when device is registered")
-                Log.w(TAG, "   Check: device_data, device_registration, device_owner_prefs")
+                Log.w(TAG, "⚠️ HEARTBEAT BLOCKED: device_id missing – heartbeat will start when device is registered")
+                Log.w(TAG, "   Check: device_data.device_id_for_heartbeat, device_registration.device_id, device_owner_prefs")
+                logHeartbeatBlockDiagnostics(null)
+                reportHeartbeatBlockToServer("device_id_missing", "Heartbeat loop not started: device_id missing. Check device_data.device_id_for_heartbeat, device_registration.device_id.")
+                // Schedule retry in 5 seconds
+                handler.postDelayed({
+                    startHeartbeatLoop()
+                }, 5000L)
                 return
             }
-            Log.i(TAG, "Heartbeat using device_id: ${deviceId.take(8)}...")
+            
+            // Validate device_id format
+            if (deviceId.equals("unknown", ignoreCase = true) || deviceId.startsWith("ANDROID-")) {
+                Log.w(TAG, "⚠️ HEARTBEAT BLOCKED: device_id is invalid (unknown or ANDROID-*). Value: ${deviceId.take(20)}")
+                Log.w(TAG, "   Server expects server-assigned device_id from registration (e.g. DEV-B5AF7F0BEDEB)")
+                logHeartbeatBlockDiagnostics(deviceId)
+                reportHeartbeatBlockToServer("device_id_invalid", "Heartbeat loop not started: device_id is invalid (unknown or ANDROID-*). Value: ${deviceId.take(20)}. Server expects device_id from registration.")
+                handler.postDelayed({
+                    startHeartbeatLoop()
+                }, 5000L)
+                return
+            }
+            
+            Log.i(TAG, "✅ Heartbeat using device_id: ${deviceId.take(8)}...")
             val apiClient = ApiClient()
             val deviceDataCollector = DeviceDataCollector(this)
             heartbeatService = HeartbeatService(this, apiClient, deviceDataCollector)
+            
+            // Schedule heartbeat with immediate first send
             heartbeatService!!.schedulePeriodicHeartbeat(deviceId)
-            Log.i(TAG, "✅ Heartbeat loop started – every ${HEARTBEAT_INTERVAL_MS / 1000}s (in-process, exact interval)")
+            Log.i(TAG, "✅ Heartbeat loop started – first heartbeat IMMEDIATE, then every ${HEARTBEAT_INTERVAL_MS / 1000}s (in-process, exact interval)")
+            Log.i(TAG, "   Device ID: ${deviceId.take(12)}...")
+            Log.i(TAG, "   Interval: ${HEARTBEAT_INTERVAL_MS / 1000} seconds")
+            Log.i(TAG, "   Service: In-process (Handler-based, not WorkManager)")
         } catch (e: Exception) {
-            Log.e(TAG, "Heartbeat start error: ${e.message}", e)
+            Log.e(TAG, "❌ Heartbeat start error: ${e.message}", e)
+            Log.e(TAG, "   Stack trace: ${e.stackTraceToString()}")
+            // Retry after 5 seconds
+            handler.postDelayed({
+                startHeartbeatLoop()
+            }, 5000L)
         }
     }
     
-    /** Resolve device_id from multiple sources (device_data, device_registration, device_owner_prefs) */
+    /** Resolve device_id for heartbeat – must be the server-returned id from registration (saved in device_data/device_registration by RegistrationSuccessActivity). */
     private fun resolveDeviceIdForHeartbeat(): String? {
+        // Use the centralized DeviceIdProvider for consistency
+        val deviceId = com.example.deviceowner.data.DeviceIdProvider.getDeviceId(this)
+        if (!deviceId.isNullOrBlank()) {
+            Log.d(TAG, "✅ Device ID resolved from DeviceIdProvider: ${deviceId.take(8)}...")
+            return deviceId
+        }
+        
+        // Fallback to direct SharedPreferences access
         val deviceDataPrefs = getSharedPreferences("device_data", Context.MODE_PRIVATE)
         val fromDeviceData = deviceDataPrefs.getString("device_id_for_heartbeat", null)
-        if (!fromDeviceData.isNullOrBlank()) return fromDeviceData
+        if (!fromDeviceData.isNullOrBlank()) {
+            Log.d(TAG, "✅ Device ID resolved from device_data: ${fromDeviceData.take(8)}...")
+            return fromDeviceData
+        }
         
         val deviceReg = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
             .getString("device_id", null)
         if (!deviceReg.isNullOrBlank()) {
+            Log.d(TAG, "✅ Device ID resolved from device_registration: ${deviceReg.take(8)}...")
             deviceDataPrefs.edit().putString("device_id_for_heartbeat", deviceReg).apply()
             return deviceReg
         }
         
-        return com.example.deviceowner.utils.SharedPreferencesManager(this).getDeviceIdForHeartbeat()
+        val fromPrefs = com.example.deviceowner.utils.storage.SharedPreferencesManager(this).getDeviceIdForHeartbeat()
+        if (!fromPrefs.isNullOrBlank()) {
+            Log.d(TAG, "✅ Device ID resolved from SharedPreferencesManager: ${fromPrefs.take(8)}...")
+            return fromPrefs
+        }
+        
+        Log.w(TAG, "❌ Device ID not found in any location")
+        return null
+    }
+    
+    /** Log why heartbeat may be blocked (device_id sources empty or invalid). */
+    private fun logHeartbeatBlockDiagnostics(invalidDeviceId: String?) {
+        val deviceData = getSharedPreferences("device_data", Context.MODE_PRIVATE).getString("device_id_for_heartbeat", null)
+        val deviceReg = getSharedPreferences("device_registration", Context.MODE_PRIVATE).getString("device_id", null)
+        val fromPrefs = com.example.deviceowner.utils.storage.SharedPreferencesManager(this).getDeviceIdForHeartbeat()
+        Log.d(TAG, "   device_data.device_id_for_heartbeat: ${deviceData?.take(12) ?: "null"}")
+        Log.d(TAG, "   device_registration.device_id: ${deviceReg?.take(12) ?: "null"}")
+        Log.d(TAG, "   SharedPreferencesManager.getDeviceIdForHeartbeat: ${fromPrefs?.take(12) ?: "null"}")
+        if (invalidDeviceId != null) Log.d(TAG, "   invalid device_id was: $invalidDeviceId")
+    }
+
+    /** Report heartbeat block to tech logs + bugs API so backend sees why heartbeat is not sending. Throttled. */
+    private fun reportHeartbeatBlockToServer(reason: String, message: String) {
+        val now = System.currentTimeMillis()
+        if (lastHeartbeatBlockReason == reason && (now - lastHeartbeatBlockReportTime) < HEARTBEAT_BLOCK_REPORT_THROTTLE_MS) return
+        lastHeartbeatBlockReason = reason
+        lastHeartbeatBlockReportTime = now
+        ServerBugAndLogReporter.postLog("heartbeat", "Error", message, mapOf("block_reason" to reason))
+        ServerBugAndLogReporter.postBug(
+            title = "Heartbeat blocked: $reason",
+            message = message,
+            priority = "high",
+            extraData = mapOf("block_reason" to reason)
+        )
+    }
+    
+    /**
+     * Heartbeat Watchdog - Monitors and recovers heartbeat if it crashes.
+     * Checks every 60 seconds if heartbeat is still running.
+     * If not, restarts it automatically.
+     */
+    private fun startHeartbeatWatchdog() {
+        heartbeatWatchdogJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+            while (isActive) {
+                try {
+                    delay(HEARTBEAT_WATCHDOG_INTERVAL)
+                    
+                    // Check if heartbeat service is still running
+                    if (heartbeatService == null) {
+                        Log.w(TAG, "⚠️ Heartbeat service is null - restarting...")
+                        startHeartbeatLoop()
+                    } else {
+                        // Heartbeat is running, continue monitoring
+                        Log.d(TAG, "✓ Heartbeat watchdog: service is healthy")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Heartbeat watchdog error: ${e.message}", e)
+                }
+            }
+        }
+        Log.i(TAG, "✅ Heartbeat watchdog started - will monitor every 60 seconds")
     }
     
     /**
@@ -458,7 +569,7 @@ class SecurityMonitorService : Service() {
         
         try {
             // Bootloader unlocked (e.g. after fastboot unlock) = CRITICAL
-            val bootloaderEnforcer = com.example.deviceowner.security.enforcement.BootloaderLockEnforcer(this)
+            val bootloaderEnforcer = com.example.deviceowner.security.enforcement.bootloader.BootloaderLockEnforcer(this)
             if (bootloaderEnforcer.isBootloaderUnlocked()) {
                 indicators.add("BOOTLOADER_UNLOCKED")
             }
@@ -481,7 +592,7 @@ class SecurityMonitorService : Service() {
                         .getString("device_id_for_heartbeat", null)
                     ?: android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
                     ?: "UNREGISTERED"
-                val entity = com.example.deviceowner.data.local.database.entities.TamperDetectionEntity(
+                val entity = com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity(
                     deviceId = deviceId,
                     tamperType = tamperType,
                     severity = "CRITICAL",
@@ -542,6 +653,7 @@ class SecurityMonitorService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         monitoringJob?.cancel()
+        heartbeatWatchdogJob?.cancel()
         heartbeatService?.cancelPeriodicHeartbeat()
         heartbeatService = null
         
