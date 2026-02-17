@@ -20,6 +20,7 @@ import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.receivers.AdminReceiver
 import com.example.deviceowner.services.lock.SoftLockOverlayService
 import com.example.deviceowner.services.sync.OfflineSyncWorker
+import com.example.deviceowner.utils.storage.PaymentDataManager
 import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
 import com.example.deviceowner.ui.screens.lock.LockScreenState
@@ -274,13 +275,34 @@ class HeartbeatService(
                 Log.d(TAG, "   - Mismatches: ${response.comparisonResult?.totalMismatches ?: 0}")
 
                 // Save response data for UI and offline reference
+                val nextPaymentDate = response.getNextPaymentDateTime()
+                val unlockPassword = response.getUnlockPassword()
                 SharedPreferencesManager(context).saveHeartbeatResponse(
-                    nextPaymentDate = response.getNextPaymentDateTime(),
-                    unlockPassword = response.getUnlockPassword(),
+                    nextPaymentDate = nextPaymentDate,
+                    unlockPassword = unlockPassword,
                     serverTime = response.serverTime,
                     isLocked = response.isDeviceLocked(),
                     lockReason = response.getLockReason().takeIf { it.isNotBlank() }
                 )
+                // Save to local payment DB (next_payment + password) for lock screen and payment UI
+                PaymentDataManager(context).apply {
+                    saveNextPaymentInfo(nextPaymentDate, unlockPassword)
+                    saveServerTime(response.serverTime)
+                    saveLockState(response.isDeviceLocked(), response.getLockReason().takeIf { it.isNotBlank() })
+                }
+
+                // Process payment status and apply appropriate lock/unlock
+                com.example.deviceowner.services.payment.PaymentLockManager(context).processPaymentStatus(
+                    nextPaymentDate = nextPaymentDate,
+                    unlockPassword = unlockPassword,
+                    shopName = response.content?.shop
+                )
+
+                // Schedule payment reminder and overdue check
+                com.example.deviceowner.services.payment.PaymentReminderService(context).apply {
+                    schedulePaymentReminder(nextPaymentDate)
+                    schedulePaymentOverdueCheck(nextPaymentDate)
+                }
                 
                 // PRIORITY 1: Deactivation requested – start immediately (deactivation, loan complete, payment complete)
                 if (response.isDeactivationRequested()) {

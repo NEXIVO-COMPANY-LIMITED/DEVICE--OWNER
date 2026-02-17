@@ -88,9 +88,24 @@ class BootReceiver : BroadcastReceiver() {
             }
         }
 
+        // Restore hard lock from device_lock_state if user had powered off while locked (e.g. offline lock)
+        if (isRegistered) {
+            val lockPrefs = context.getSharedPreferences("device_lock_state", Context.MODE_PRIVATE)
+            val deviceLocked = lockPrefs.getBoolean("device_locked", false)
+            val offlineLock = lockPrefs.getBoolean("offline_lock", false)
+            val savedReason = lockPrefs.getString("lock_reason", null)
+            if ((deviceLocked || offlineLock) && savedReason != null && savedReason.isNotBlank()) {
+                if (controlManager.getLockStateForBoot() != RemoteDeviceControlManager.LOCK_HARD) {
+                    Log.i(TAG, "🔒 Restoring hard lock from device_lock_state (offline/power-off) – reason=$savedReason")
+                    controlManager.applyHardLock(savedReason, forceRestart = true)
+                }
+            }
+        }
+        controlManager.checkAndEnforceLockStateFromBoot()
+        val effectiveLockState = controlManager.getLockStateForBoot()
+
         // ========== INPUT-BLOCKING SECURITY ONLY WHEN HARD LOCKED ==========
-        val lockState = controlManager.getLockStateForBoot()
-        if (isRegistered && lockState == RemoteDeviceControlManager.LOCK_HARD) {
+        if (isRegistered && effectiveLockState == RemoteDeviceControlManager.LOCK_HARD) {
             try {
                 Log.d(TAG, "🔒 Device hard locked – applying full security layers...")
                 val powerButtonBlocker = PowerButtonBlocker(context)
@@ -163,10 +178,7 @@ class BootReceiver : BroadcastReceiver() {
             context.getSharedPreferences("control_prefs", Context.MODE_PRIVATE).edit().putBoolean("skip_security_restrictions", true).apply()
             try { com.example.deviceowner.services.lock.SoftLockOverlayService.stopOverlay(context) } catch (_: Exception) { }
         } else {
-            // Re-enforce lock state: LOCK_HARD → applyHardLock (kiosk)
-            controlManager.checkAndEnforceLockStateFromBoot()
-            
-            if (lockState == RemoteDeviceControlManager.LOCK_HARD) {
+            if (effectiveLockState == RemoteDeviceControlManager.LOCK_HARD) {
                 val lockReason = controlManager.getLockReasonForBoot().ifEmpty { "Device Locked" }
                 var lockTimestamp = controlManager.getLockTimestampForBoot()
                 if (lockTimestamp <= 0L) lockTimestamp = System.currentTimeMillis()
@@ -183,29 +195,37 @@ class BootReceiver : BroadcastReceiver() {
                     Log.w(TAG, "DB unavailable on boot: ${dbEx.message}")
                 }
 
-                // FIXED: REMOVED INCORRECT WindowManager FLAGS FROM INTENT
                 val intent = Intent(context, com.example.deviceowner.ui.activities.lock.HardLockActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
                     addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
                     addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-                    
                     putExtra("lock_reason", lockReason)
                     putExtra("lock_timestamp", lockTimestamp)
                     putExtra("from_boot", true)
                 }
-                
+
                 try {
                     withContext(Dispatchers.Main) {
                         context.startActivity(intent)
                     }
                     Log.i(TAG, "✅ Hard lock activity started on boot (reason=$lockReason)")
-                    
-                    // Launch again after a longer delay to ensure it covers everything
+                    // Second start after 5s so lock screen stays on top
                     scope.launch {
                         delay(5000)
                         withContext(Dispatchers.Main) {
                             context.startActivity(intent)
+                        }
+                        Log.d(TAG, "✅ Hard lock re-started (5s) – blocking continues")
+                    }
+                    // Third start after 15s so block continues indefinitely even if system briefly shows other UI
+                    scope.launch {
+                        delay(15000)
+                        withContext(Dispatchers.Main) {
+                            if (controlManager.getLockStateForBoot() == RemoteDeviceControlManager.LOCK_HARD) {
+                                context.startActivity(intent)
+                                Log.d(TAG, "✅ Hard lock re-started (15s) – display continues blocking")
+                            }
                         }
                     }
                 } catch (e: Exception) {

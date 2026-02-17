@@ -202,6 +202,64 @@ object LockScreenStrategy {
     }
 
     /**
+     * Determine lock/reminder state from locally saved next_payment (for offline or when using cached data).
+     * Same logic as payment part of determineLockScreenState: overdue → hard lock, 1 day before → reminder, else unlocked.
+     *
+     * @param nextPaymentDate ISO-8601 date_time (e.g. from PaymentDataManager)
+     * @param unlockPassword Password for unlock screen when overdue
+     * @return LockScreenState or null if no date
+     */
+    fun determineLockScreenStateFromLocal(nextPaymentDate: String?, unlockPassword: String?): LockScreenState? {
+        if (nextPaymentDate.isNullOrBlank()) return null
+        val timeUntilDue = getTimeUntilDue(nextPaymentDate)
+        return when {
+            timeUntilDue.daysUntilDue <= 0 -> LockScreenState(
+                type = LockScreenType.HARD_LOCK_PAYMENT,
+                nextPaymentDate = nextPaymentDate,
+                unlockPassword = unlockPassword,
+                shopName = null,
+                reason = "Payment overdue",
+                daysUntilDue = timeUntilDue.daysUntilDue,
+                hoursUntilDue = timeUntilDue.hoursUntilDue,
+                minutesUntilDue = timeUntilDue.minutesUntilDue,
+                enableKioskMode = false
+            )
+            timeUntilDue.daysUntilDue == REMINDER_DAYS_BEFORE -> LockScreenState(
+                type = LockScreenType.SOFT_LOCK_REMINDER,
+                nextPaymentDate = nextPaymentDate,
+                unlockPassword = null,
+                shopName = null,
+                reason = "Payment reminder",
+                daysUntilDue = timeUntilDue.daysUntilDue,
+                hoursUntilDue = timeUntilDue.hoursUntilDue,
+                minutesUntilDue = timeUntilDue.minutesUntilDue,
+                enableKioskMode = false
+            )
+            else -> LockScreenState(
+                type = LockScreenType.UNLOCKED,
+                nextPaymentDate = nextPaymentDate,
+                unlockPassword = null,
+                shopName = null,
+                reason = null,
+                daysUntilDue = timeUntilDue.daysUntilDue,
+                hoursUntilDue = timeUntilDue.hoursUntilDue,
+                minutesUntilDue = timeUntilDue.minutesUntilDue,
+                enableKioskMode = false
+            )
+        }
+    }
+
+    /**
+     * Calculate time remaining until payment due date (public for offline/local use).
+     *
+     * @param dueDateTimeString ISO-8601 datetime string (e.g., "2026-02-07T23:59:00+03:00")
+     * @return TimeUntilDue with days, hours, minutes
+     */
+    fun getTimeUntilDue(dueDateTimeString: String): TimeUntilDue {
+        return calculateTimeUntilDue(dueDateTimeString)
+    }
+
+    /**
      * Calculate time remaining until payment due date
      *
      * @param dueDateTimeString ISO-8601 datetime string (e.g., "2026-02-07T23:59:00+03:00")

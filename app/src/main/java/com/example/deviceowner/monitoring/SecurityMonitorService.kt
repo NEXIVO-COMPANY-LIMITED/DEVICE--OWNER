@@ -18,7 +18,7 @@ import com.example.deviceowner.core.device.DeviceDataCollector
 import com.example.deviceowner.data.remote.ApiClient
 import com.example.deviceowner.security.response.EnhancedAntiTamperResponse
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.services.heartbeat.HeartbeatService
+import com.example.deviceowner.services.heartbeat.HeartbeatServiceImproved
 import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
 import kotlinx.coroutines.*
 
@@ -57,7 +57,7 @@ class SecurityMonitorService : Service() {
     private val tamperResponse by lazy { EnhancedAntiTamperResponse(this) }
     private val database by lazy { DeviceOwnerDatabase.getDatabase(this) }
     private var monitoringJob: Job? = null
-    private var heartbeatService: HeartbeatService? = null
+    private var heartbeatService: HeartbeatServiceImproved? = null
     private val handler = Handler(Looper.getMainLooper())
     
     private var lastDeveloperOptionsState = false
@@ -129,9 +129,9 @@ class SecurityMonitorService : Service() {
             Log.i(TAG, "✅ Heartbeat using device_id: ${deviceId.take(8)}...")
             val apiClient = ApiClient()
             val deviceDataCollector = DeviceDataCollector(this)
-            heartbeatService = HeartbeatService(this, apiClient, deviceDataCollector)
+            heartbeatService = HeartbeatServiceImproved(this, apiClient, deviceDataCollector)
             
-            // Schedule heartbeat with immediate first send
+            // Schedule heartbeat with immediate first send (aligned with Django POST /api/devices/<id>/data/)
             heartbeatService!!.schedulePeriodicHeartbeat(deviceId)
             Log.i(TAG, "✅ Heartbeat loop started – first heartbeat IMMEDIATE, then every ${HEARTBEAT_INTERVAL_MS / 1000}s (in-process, exact interval)")
             Log.i(TAG, "   Device ID: ${deviceId.take(12)}...")

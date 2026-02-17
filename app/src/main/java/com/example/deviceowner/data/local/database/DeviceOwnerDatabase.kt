@@ -11,6 +11,7 @@ import com.example.deviceowner.data.local.database.dao.device.DeviceRegistration
 import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatDao
 import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatHistoryDao
 import com.example.deviceowner.data.local.database.dao.lock.LockStateRecordDao
+import com.example.deviceowner.data.local.database.dao.offline.HeartbeatSyncDao
 import com.example.deviceowner.data.local.database.dao.offline.OfflineEventDao
 import com.example.deviceowner.data.local.database.dao.sim.SimChangeHistoryDao
 import com.example.deviceowner.data.local.database.dao.tamper.TamperDetectionDao
@@ -21,6 +22,7 @@ import com.example.deviceowner.data.local.database.entities.device.DeviceRegistr
 import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatEntity
 import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
 import com.example.deviceowner.data.local.database.entities.lock.LockStateRecordEntity
+import com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity
 import com.example.deviceowner.data.local.database.entities.offline.OfflineEvent
 import com.example.deviceowner.data.local.database.entities.sim.SimChangeHistoryEntity
 import com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity
@@ -41,10 +43,11 @@ import com.example.deviceowner.data.local.database.entities.tamper.TamperDetecti
         TamperDetectionEntity::class,
         DeviceBaselineEntity::class,
         OfflineEvent::class,
+        HeartbeatSyncEntity::class,
         SimChangeHistoryEntity::class,
         LockStateRecordEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class DeviceOwnerDatabase : RoomDatabase() {
@@ -57,6 +60,7 @@ abstract class DeviceOwnerDatabase : RoomDatabase() {
     abstract fun tamperDetectionDao(): TamperDetectionDao
     abstract fun deviceBaselineDao(): DeviceBaselineDao
     abstract fun offlineEventDao(): OfflineEventDao
+    abstract fun heartbeatSyncDao(): HeartbeatSyncDao
     abstract fun simChangeHistoryDao(): SimChangeHistoryDao
     abstract fun lockStateRecordDao(): LockStateRecordDao
 

@@ -302,13 +302,23 @@ class DeviceOwnerDeactivationManager(private val context: Context) {
      * Clear all lock and control state so the device displays and behaves like a normal phone.
      * Removes any "managed" or "locked" state from preferences so the app and system don't show managed UI.
      */
+    /**
+     * Clear all lock, control, deactivation and heartbeat state so no stale device-owner state remains.
+     * Ensures after deactivation: no deactivation_requested flag, no lock state, no heartbeat/payment cache.
+     */
     private fun clearLockAndControlState() {
         try {
             val prefsToClear = listOf(
                 "control_prefs",
                 "device_owner_prefs",
                 "device_owner_config",
-                "device_lock"
+                "device_lock",
+                "device_deactivation",
+                "device_lock_state",
+                "heartbeat_response",
+                "heartbeat_full_response",
+                "payment_data",
+                "payment_reminder"
             )
             prefsToClear.forEach { name ->
                 try {

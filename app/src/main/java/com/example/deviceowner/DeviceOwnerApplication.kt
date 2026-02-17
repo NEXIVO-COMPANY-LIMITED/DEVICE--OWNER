@@ -27,6 +27,8 @@ import com.example.deviceowner.security.monitoring.sim.SIMChangeDetector
 import com.example.deviceowner.frp.CompleteFRPManager
 import com.example.deviceowner.update.github.GitHubUpdateManager
 import com.example.deviceowner.update.scheduler.UpdateScheduler
+import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.example.deviceowner.ui.activities.lock.HardLockActivity
 import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.example.deviceowner.utils.logging.LogManager
 import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
@@ -69,6 +71,19 @@ class DeviceOwnerApplication : Application() {
             override fun onActivityStarted(activity: Activity) {}
             override fun onActivityResumed(activity: Activity) {
                 currentActivity = activity
+                // When device is hard locked, HardLock must stay on top – bring it back if user reached another screen
+                if (activity !is HardLockActivity && RemoteDeviceControlManager(this@DeviceOwnerApplication).isHardLocked()) {
+                    val lockIntent = Intent(this@DeviceOwnerApplication, HardLockActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                        putExtra("lock_reason", RemoteDeviceControlManager(this@DeviceOwnerApplication).getLockReason())
+                        putExtra("lock_timestamp", RemoteDeviceControlManager(this@DeviceOwnerApplication).getLockTimestamp())
+                    }
+                    try {
+                        activity.startActivity(lockIntent)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not bring HardLock to front: ${e.message}")
+                    }
+                }
             }
             override fun onActivityPaused(activity: Activity) {
                 if (currentActivity == activity) currentActivity = null

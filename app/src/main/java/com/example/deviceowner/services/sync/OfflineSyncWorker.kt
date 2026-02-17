@@ -40,51 +40,86 @@ class OfflineSyncWorker(
     private val controlManager = RemoteDeviceControlManager(context)
     private val deviceDataCollector = DeviceDataCollector(context)
 
+    private val heartbeatSyncDao = database.heartbeatSyncDao()
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
-            val events = offlineEventDao.getAllEvents()
-            if (events.isEmpty()) {
-                Log.d(TAG, "No offline events to synchronize.")
-                syncFreshHeartbeatForLockState()
-                return@withContext Result.success()
+            // 1) Sync last 5 pending heartbeats from local DB with exact recorded time
+            val pendingHeartbeats = heartbeatSyncDao.getLast5Pending()
+            val toSend = pendingHeartbeats.sortedBy { it.recordedAt } // chronological order (oldest first)
+            var heartbeatSyncCount = 0
+            for (record in toSend) {
+                val sent = syncHeartbeatFromRecord(record)
+                if (sent) {
+                    heartbeatSyncDao.updateSyncStatus(record.id, com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity.STATUS_SYNCED)
+                    heartbeatSyncCount++
+                    Log.d(TAG, "Synced heartbeat id=${record.id} recordedAt=${record.recordedAt} time=${record.heartbeatTimestampIso}")
+                }
+            }
+            if (heartbeatSyncCount > 0) {
+                Log.i(TAG, "Synced $heartbeatSyncCount heartbeat(s) from local DB (exact time recorded).")
             }
 
-            Log.i(TAG, "Starting synchronization of ${events.size} offline events.")
-
-            var successCount = 0
+            // 2) Sync other offline events (tamper, etc.)
+            val events = offlineEventDao.getAllEvents()
+            var eventSyncCount = 0
             for (event in events) {
                 val success = when (event.eventType) {
-                    "HEARTBEAT" -> syncHeartbeat(event.jsonData)
+                    "HEARTBEAT" -> syncHeartbeat(event.jsonData) // legacy queue if any
                     "TAMPER_SIGNAL" -> syncTamperEvent(event.jsonData)
                     else -> {
                         Log.w(TAG, "Unknown event type: ${event.eventType}. Skipping.")
                         true
                     }
                 }
-
                 if (success) {
                     offlineEventDao.deleteEvent(event)
-                    successCount++
+                    eventSyncCount++
                 } else {
                     Log.w(TAG, "Failed to sync event ID: ${event.id}. Will retry later.")
                 }
             }
 
-            Log.i(TAG, "Successfully synchronized $successCount/${events.size} events.")
-
-            // When back online: send one fresh heartbeat and apply server lock state (100% device-server match)
-            if (successCount > 0) {
+            val totalSynced = heartbeatSyncCount + eventSyncCount
+            if (totalSynced > 0) {
+                Log.i(TAG, "Synchronized $heartbeatSyncCount heartbeat(s) from DB + $eventSyncCount other events.")
+                syncFreshHeartbeatForLockState()
+            } else if (events.isEmpty() && pendingHeartbeats.isEmpty()) {
+                Log.d(TAG, "No offline events to synchronize.")
                 syncFreshHeartbeatForLockState()
             }
 
-            if (successCount < events.size) {
-                Result.retry()
-            } else {
-                Result.success()
-            }
+            // Clean up old SYNCED records (keep last 24h)
+            try {
+                val cutoff = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
+                heartbeatSyncDao.deleteSyncedOlderThan(cutoff)
+            } catch (e: Exception) { Log.w(TAG, "Cleanup old heartbeats: ${e.message}") }
+
+            val allPendingSynced = heartbeatSyncDao.getPendingCount() == 0 && eventSyncCount >= events.size
+            if (allPendingSynced) Result.success() else Result.retry()
         } catch (e: Exception) {
             Log.e(TAG, "Error during offline synchronization: ${e.message}", e)
             Result.retry()
+        }
+    }
+
+    /**
+     * Send one heartbeat from local DB record (payload has exact heartbeat_timestamp).
+     */
+    private suspend fun syncHeartbeatFromRecord(record: com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity): Boolean {
+        return try {
+            val request = gson.fromJson(record.payloadJson, HeartbeatRequest::class.java) ?: return false
+            val deviceId = record.deviceId
+            if (deviceId.isBlank()) return false
+            val response = apiClient.sendHeartbeat(deviceId, request)
+            if (response.isSuccessful) {
+                SharedPreferencesManager(applicationContext).setLastHeartbeatTime(System.currentTimeMillis())
+                response.body()?.let { body -> processHeartbeatResponse(deviceId, body) }
+                true
+            } else false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing heartbeat record id=${record.id}: ${e.message}", e)
+            false
         }
     }
 
@@ -161,13 +196,20 @@ class OfflineSyncWorker(
         withContext(Dispatchers.Main) {
             try {
                 // Save response data (next_payment, server_time, lock state)
+                val nextPaymentDate = response.getNextPaymentDateTime()
+                val unlockPassword = response.getUnlockPassword()
                 SharedPreferencesManager(applicationContext).saveHeartbeatResponse(
-                    nextPaymentDate = response.getNextPaymentDateTime(),
-                    unlockPassword = response.getUnlockPassword(),
+                    nextPaymentDate = nextPaymentDate,
+                    unlockPassword = unlockPassword,
                     serverTime = response.serverTime,
                     isLocked = response.isDeviceLocked(),
                     lockReason = response.getLockReason().takeIf { it.isNotBlank() }
                 )
+                com.example.deviceowner.utils.storage.PaymentDataManager(applicationContext).apply {
+                    saveNextPaymentInfo(nextPaymentDate, unlockPassword)
+                    saveServerTime(response.serverTime)
+                    saveLockState(response.isDeviceLocked(), response.getLockReason().takeIf { it.isNotBlank() })
+                }
 
                 if (response.isDeactivationRequested()) {
                     Log.i(TAG, "Deactivation requested by server (from sync – deactivation/loan_complete/payment_complete) – starting immediately")

@@ -209,7 +209,7 @@ data class HeartbeatResponse(
 
     fun hasNextPayment(): Boolean = nextPayment != null
     fun getNextPaymentDateTime(): String? = nextPayment?.dateTime
-    fun getUnlockPassword(): String? = nextPayment?.unlockPassword
+    fun getUnlockPassword(): String? = nextPayment?.getPassword()
     fun getDeactivationCommand(): String? = if (isDeactivationRequested()) deactivation?.command else null
     
     fun hasHighSeverityMismatches(): Boolean {
@@ -253,10 +253,18 @@ data class LockContent(
     @SerializedName("shop") val shop: String? = null
 )
 
+/**
+ * Backend (Django) returns next_payment with "unlocking_password" (see devices/views.py _get_next_payment_info).
+ * We accept both keys so response parses correctly.
+ */
 data class NextPaymentInfo(
     @SerializedName("date_time") val dateTime: String? = null,
-    @SerializedName("unlock_password") val unlockPassword: String? = null
-)
+    @SerializedName("unlock_password") val unlockPassword: String? = null,
+    @SerializedName("unlocking_password") val unlockingPassword: String? = null
+) {
+    /** Password for unlock screen: Django sends "unlocking_password", support legacy "unlock_password". */
+    fun getPassword(): String? = unlockingPassword ?: unlockPassword
+}
 
 data class DeactivationStatus(
     @SerializedName("status") val status: String? = null,

@@ -162,6 +162,12 @@ class DeviceDataCollectionActivity : ComponentActivity() {
                     com.example.deviceowner.data.DeviceIdProvider.saveDeviceId(this@DeviceDataCollectionActivity, serverDeviceId)
                     Log.i(TAG, "✅ Saved server device_id for heartbeat: $serverDeviceId (from registration response)")
 
+                    // Save heartbeat baseline for offline comparison (same role as Django registration baseline)
+                    com.example.deviceowner.services.heartbeat.HeartbeatBaselineManager.saveBaselineFromRegistration(
+                        this@DeviceDataCollectionActivity,
+                        deviceData!!
+                    )
+
                     registrationRepository.updateRegistrationSuccessByLoan(
                         loanNumber = deviceData!!.loanNumber ?: "",
                         serverDeviceId = serverDeviceId,

@@ -92,7 +92,7 @@ class HardLockActivity : ComponentActivity() {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
         }
-        // Configure window to prevent escape and block screenshots (standard for lock screens)
+        // Configure window: fullscreen overlay so hard lock displays totally and blocks indefinitely
         window.apply {
             addFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN or
@@ -100,6 +100,7 @@ class HardLockActivity : ComponentActivity() {
                 WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_SECURE or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
