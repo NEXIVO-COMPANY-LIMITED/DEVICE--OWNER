@@ -28,9 +28,14 @@ object UpdateScheduler {
                 .setRequiresBatteryNotLow(false)
                 .build()
 
+            // UPDATED: WorkManager has a minimum interval of 15 minutes.
+            // Even though we set 30 seconds in UpdateConfig for the Foreground Loop,
+            // we'll set this backup worker to 15 minutes (the lowest allowed by Android).
+            val intervalMinutes = maxOf(15L, UpdateConfig.UPDATE_CHECK_INTERVAL_SECONDS / 60)
+
             val updateWork = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
-                UpdateConfig.UPDATE_CHECK_INTERVAL_HOURS,
-                TimeUnit.HOURS
+                intervalMinutes,
+                TimeUnit.MINUTES
             )
                 .setConstraints(constraints)
                 .setInitialDelay(UpdateConfig.INITIAL_DELAY_MINUTES, TimeUnit.MINUTES)
@@ -42,7 +47,7 @@ object UpdateScheduler {
                 updateWork
             )
 
-            Log.d(TAG, "Periodic update checks scheduled (every ${UpdateConfig.UPDATE_CHECK_INTERVAL_HOURS}h)")
+            Log.d(TAG, "Periodic update checks scheduled (WorkManager backup every ${intervalMinutes}m)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule update checks", e)
         }

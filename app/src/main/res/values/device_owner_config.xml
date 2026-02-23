@@ -11,8 +11,7 @@
     <string-array name="allowed_services_for_device_owner">
         <item>com.example.deviceowner.services.TamperDetectionService</item>
         <item>com.example.deviceowner.services.InstallmentMonitoringService</item>
-        <item>com.example.deviceowner.services.HeartbeatService</item>
-        <!-- DeviceOwnerInitializationService removed - part of old initialization logic -->
+        <!-- HeartbeatService removed -->
     </string-array>
     
 </resources>

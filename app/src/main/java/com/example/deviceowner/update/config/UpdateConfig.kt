@@ -16,10 +16,10 @@ object UpdateConfig {
     const val APK_FILE_NAME = "app-release.apk"
 
     // Update check intervals
-    const val UPDATE_CHECK_INTERVAL_HOURS = 6L
-    const val INITIAL_DELAY_MINUTES = 30L
+    const val UPDATE_CHECK_INTERVAL_SECONDS = 30L // AGGRESSIVE: 30 seconds
+    const val INITIAL_DELAY_MINUTES = 1L 
 
-    // WorkManager configuration
+    // WorkManager configuration (Keep as backup)
     const val WORK_NAME = "github_update_check"
 
     // Notification configuration

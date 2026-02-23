@@ -1,26 +1,28 @@
 package com.example.deviceowner.ui.activities.data
 
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -35,16 +37,49 @@ import com.example.deviceowner.services.data.DeviceDataCollector
 import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
 import com.example.deviceowner.ui.theme.DeviceOwnerTheme
 import com.example.deviceowner.ui.activities.registration.RegistrationSuccessActivity
+import com.example.deviceowner.utils.error.RegistrationErrorHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+
+// ─────────────────────────────────────────────────────────────
+//  Color palette
+// ─────────────────────────────────────────────────────────────
+private object AppColors {
+    val BluePrimary    = Color(0xFF1565C0)
+    val BlueLight      = Color(0xFF1976D2)
+    val BluePale       = Color(0xFFE3F2FD)
+    val GreenPrimary   = Color(0xFF2E7D32)
+    val GreenPale      = Color(0xFFC8E6C9)
+    val AmberPrimary   = Color(0xFFF57F17)
+    val AmberPale      = Color(0xFFFFF9C4)
+    val RedPrimary     = Color(0xFFC62828)
+    val RedPale        = Color(0xFFFFCDD2)
+    val Gray100        = Color(0xFFF4F6F8)
+    val Gray200        = Color(0xFFE8EAED)
+    val Gray500        = Color(0xFF9AA0A6)
+    val Gray600        = Color(0xFF80868B)
+    val Gray700        = Color(0xFF5F6368)
+    val Gray900        = Color(0xFF202124)
+    val White          = Color(0xFFFFFFFF)
+}
+
+private object DeviceDataCollectionState {
+    val isLoading        = mutableStateOf(false)
+    val isSubmitting     = mutableStateOf(false)
+    val errorMessage     = mutableStateOf<String?>(null)
+    val successMessage   = mutableStateOf<String?>(null)
+    val displayData      = mutableStateOf<DeviceRegistrationRequest?>(null)
+    val progressPercent  = mutableStateOf(0)
+    val submissionStatus = mutableStateOf("PENDING")
+    val loanNumber       = mutableStateOf("")
+}
 
 class DeviceDataCollectionActivity : ComponentActivity() {
-
     private lateinit var registrationRepository: DeviceRegistrationRepository
     private lateinit var deviceDataCollector: DeviceDataCollector
-    private var loanNumber: String = ""
     private var deviceData: DeviceRegistrationRequest? = null
 
     companion object {
@@ -52,14 +87,22 @@ class DeviceDataCollectionActivity : ComponentActivity() {
         const val EXTRA_LOAN_NUMBER = "loan_number"
     }
 
+    override fun attachBaseContext(newBase: Context) {
+        val configuration = Configuration(newBase.resources.configuration)
+        configuration.fontScale = 1.0f
+        val context = newBase.createConfigurationContext(configuration)
+        super.attachBaseContext(context)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         registrationRepository = DeviceRegistrationRepository(this)
-        deviceDataCollector = DeviceDataCollector(this)
-        loanNumber = intent.getStringExtra(EXTRA_LOAN_NUMBER) ?: ""
+        deviceDataCollector    = DeviceDataCollector(this)
+        
+        val initialLoan = intent.getStringExtra(EXTRA_LOAN_NUMBER) ?: ""
+        DeviceDataCollectionState.loanNumber.value = initialLoan
 
-        if (loanNumber.isEmpty()) {
-            Log.e(TAG, "Loan number not provided")
+        if (initialLoan.isEmpty()) {
             finish()
             return
         }
@@ -67,46 +110,55 @@ class DeviceDataCollectionActivity : ComponentActivity() {
         setContent {
             DeviceOwnerTheme {
                 DeviceDataCollectionScreen(
-                    loanNumber = loanNumber,
-                    onSubmit = { submitDeviceData() }
+                    loanNumber         = DeviceDataCollectionState.loanNumber.value,
+                    onLoanNumberChange = { retryWithNewLoanNumber(it) },
+                    onSubmit           = { submitDeviceData() },
+                    isLoading          = DeviceDataCollectionState.isLoading.value,
+                    isSubmitting       = DeviceDataCollectionState.isSubmitting.value,
+                    errorMessage       = DeviceDataCollectionState.errorMessage.value,
+                    data               = DeviceDataCollectionState.displayData.value,
+                    submissionStatus   = DeviceDataCollectionState.submissionStatus.value,
+                    progressPercent    = DeviceDataCollectionState.progressPercent.value,
                 )
             }
         }
-
         collectAndEmit()
     }
 
     private fun collectAndEmit() {
         lifecycleScope.launch {
             try {
-                DeviceDataCollectionState.isLoading.value = false
-                DeviceDataCollectionState.errorMessage.value = null
-
+                DeviceDataCollectionState.isLoading.value       = true
+                DeviceDataCollectionState.errorMessage.value    = null
+                DeviceDataCollectionState.progressPercent.value = 30
+                
+                val currentLoan = DeviceDataCollectionState.loanNumber.value
                 deviceData = withContext(Dispatchers.IO) {
-                    deviceDataCollector.collectDeviceData(loanNumber)
+                    deviceDataCollector.collectDeviceData(currentLoan)
                 }
-
-                DeviceDataCollectionState.displayData.value = deviceData
+                DeviceDataCollectionState.displayData.value     = deviceData
                 DeviceDataCollectionState.progressPercent.value = 100
+                DeviceDataCollectionState.isLoading.value       = false
             } catch (e: Exception) {
                 Log.e(TAG, "Error collecting device data: ${e.message}", e)
-                DeviceDataCollectionState.errorMessage.value = e.message ?: "Unknown error"
-                DeviceDataCollectionState.isLoading.value = false
+                setErrorMessage("Error", "Failed to collect device information. Please try again.")
+                DeviceDataCollectionState.isLoading.value       = false
+                DeviceDataCollectionState.progressPercent.value = 0
             }
         }
     }
 
     private fun submitDeviceData() {
         if (deviceData == null) {
-            Toast.makeText(this, "Device data not collected", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Please wait for information to be collected first", Toast.LENGTH_SHORT).show()
             return
         }
 
         lifecycleScope.launch {
             try {
-                DeviceDataCollectionState.isSubmitting.value = true
+                DeviceDataCollectionState.isSubmitting.value     = true
                 DeviceDataCollectionState.submissionStatus.value = "SUBMITTING"
-                DeviceDataCollectionState.errorMessage.value = null
+                DeviceDataCollectionState.errorMessage.value     = null
 
                 registrationRepository.saveRegistrationData(deviceData!!, "PENDING")
 
@@ -115,559 +167,383 @@ class DeviceDataCollectionActivity : ComponentActivity() {
                 }
 
                 if (response.isSuccessful) {
-                    val body = response.body()
-                    // Use only server-returned device_id – this same id is saved and used for heartbeat (POST /api/devices/{device_id}/data/)
+                    val body           = response.body()
                     val serverDeviceId = body?.extractDeviceId() ?: body?.deviceId
+
                     if (serverDeviceId.isNullOrBlank()) {
-                        Log.e(TAG, "Registration success but response missing device_id – heartbeat will not start until server returns device_id")
-                        reportRegistrationFailure(
-                            kind = "missing_device_id",
-                            message = "Registration HTTP 200 but response missing device_id – heartbeat will not run. Backend should return device_id in response.",
-                            extraData = mapOf(
-                                "loan_number" to (deviceData!!.loanNumber ?: ""),
-                                "response_has_device" to (body?.device != null),
-                                "response_has_data" to (body?.data != null),
-                            ),
-                            priority = "high"
-                        )
-                        DeviceDataCollectionState.errorMessage.value = "Server did not return device_id. Heartbeat will not run. Contact support."
-                        DeviceDataCollectionState.submissionStatus.value = "ERROR"
-                        Toast.makeText(this@DeviceDataCollectionActivity, "Registration OK but device_id missing in response.", Toast.LENGTH_LONG).show()
-                        DeviceDataCollectionState.isSubmitting.value = false
+                        setErrorMessage("Registration Failed", "System did not return an identification number. Contact support.")
                         return@launch
                     }
 
-                    // VALIDATE device_id before saving (Issue #4 fix)
-                    if (!com.example.deviceowner.data.DeviceIdValidator.isValid(serverDeviceId)) {
-                        val errorMsg = com.example.deviceowner.data.DeviceIdValidator.getErrorMessage(serverDeviceId)
-                        Log.e(TAG, "❌ Server returned invalid device_id: $serverDeviceId - $errorMsg")
-                        reportRegistrationFailure(
-                            kind = "invalid_device_id",
-                            message = "Server returned invalid device_id: $errorMsg",
-                            extraData = mapOf(
-                                "loan_number" to (deviceData!!.loanNumber ?: ""),
-                                "device_id" to serverDeviceId,
-                                "validation_error" to errorMsg,
-                            ),
-                            priority = "high"
-                        )
-                        DeviceDataCollectionState.errorMessage.value = "Server returned invalid device_id. Contact support."
-                        DeviceDataCollectionState.submissionStatus.value = "ERROR"
-                        Toast.makeText(this@DeviceDataCollectionActivity, "Invalid device_id from server.", Toast.LENGTH_LONG).show()
-                        DeviceDataCollectionState.isSubmitting.value = false
-                        return@launch
+                    // CRITICAL: Clear old device IDs before saving new one to prevent stale data
+                    Log.d(TAG, "🧹 Clearing old device IDs from all storage locations...")
+                    try {
+                        this@DeviceDataCollectionActivity.getSharedPreferences("device_data", Context.MODE_PRIVATE).edit().clear().apply()
+                        this@DeviceDataCollectionActivity.getSharedPreferences("device_registration", Context.MODE_PRIVATE).edit().clear().apply()
+                        Log.d(TAG, "✅ Old device IDs cleared successfully")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "⚠️ Warning clearing old device IDs: ${e.message}")
                     }
 
-                    // Save server-returned device_id using DeviceIdProvider (handles sync + validation)
+                    // Now save the correct server-assigned device ID
                     com.example.deviceowner.data.DeviceIdProvider.saveDeviceId(this@DeviceDataCollectionActivity, serverDeviceId)
-                    Log.i(TAG, "✅ Saved server device_id for heartbeat: $serverDeviceId (from registration response)")
-
-                    // Save heartbeat baseline for offline comparison (same role as Django registration baseline)
-                    com.example.deviceowner.services.heartbeat.HeartbeatBaselineManager.saveBaselineFromRegistration(
-                        this@DeviceDataCollectionActivity,
-                        deviceData!!
-                    )
-
+                    Log.i(TAG, "✅ Saved correct device ID: $serverDeviceId")
+                    
                     registrationRepository.updateRegistrationSuccessByLoan(
-                        loanNumber = deviceData!!.loanNumber ?: "",
+                        loanNumber     = DeviceDataCollectionState.loanNumber.value,
                         serverDeviceId = serverDeviceId,
-                        status = "SUCCESS"
+                        status         = "SUCCESS"
                     )
 
-                    val successMessage = body?.message ?: "Device registered successfully!"
-                    DeviceDataCollectionState.successMessage.value = successMessage
                     DeviceDataCollectionState.submissionStatus.value = "SUCCESSFUL"
-                    Toast.makeText(this@DeviceDataCollectionActivity, successMessage, Toast.LENGTH_LONG).show()
-
-                    delay(1500)
-                    navigateToSuccess()
+                    delay(1200)
+                    navigateToSuccess(serverDeviceId)
                 } else {
-                    val errorBody = response.errorBody()?.string() ?: "Unknown error"
-                    val errorMessage = "Registration failed: HTTP ${response.code()}"
-                    reportRegistrationFailure(
-                        kind = "http_error",
-                        message = errorMessage,
-                        extraData = mapOf(
-                            "http_code" to response.code(),
-                            "response_body" to errorBody.take(2000),
-                            "loan_number" to (deviceData!!.loanNumber ?: ""),
-                        ),
-                        priority = if (response.code() in 400..499) "high" else "medium"
-                    )
-                    DeviceDataCollectionState.errorMessage.value = errorMessage
-                    DeviceDataCollectionState.submissionStatus.value = "ERROR"
-                    Toast.makeText(this@DeviceDataCollectionActivity, "Error: ${response.code()}", Toast.LENGTH_LONG).show()
+                    handleServerError(response)
                 }
-
-                DeviceDataCollectionState.isSubmitting.value = false
+            } catch (e: java.net.UnknownHostException) {
+                setErrorMessage("Network", "No internet connection. Check data or WiFi and try again.")
             } catch (e: Exception) {
-                Log.e(TAG, "Error submitting device data: ${e.message}", e)
-                reportRegistrationException(e, deviceData?.loanNumber)
-                val errorMessage = e.message ?: "Unknown error"
-                DeviceDataCollectionState.errorMessage.value = errorMessage
-                DeviceDataCollectionState.submissionStatus.value = "ERROR"
+                Log.e(TAG, "Exception during submit: ${e.message}", e)
+                setErrorMessage("Error", "Failed to complete registration. Please try again later.")
+            } finally {
                 DeviceDataCollectionState.isSubmitting.value = false
-                Toast.makeText(this@DeviceDataCollectionActivity, "Error: $errorMessage", Toast.LENGTH_LONG).show()
             }
         }
     }
 
     /**
-     * Report registration failure to tech logs and bugs APIs so backend can fix issues.
-     * Sends to: POST /api/tech/devicecategory/logs/ and POST /api/tech/devicecategory/bugs/
+     * Enhanced server error processing for standardized Django responses.
+     * Automatically submits errors to Django APIs for logging and bug tracking.
      */
-    private fun reportRegistrationFailure(
-        kind: String,
-        message: String,
-        extraData: Map<String, Any?>,
-        priority: String = "medium"
-    ) {
-        val title = when (kind) {
-            "http_error" -> "Registration failed (HTTP error)"
-            "missing_device_id" -> "Registration response missing device_id"
-            else -> "Registration failed ($kind)"
+    private fun handleServerError(response: retrofit2.Response<*>) {
+        val currentLoan = DeviceDataCollectionState.loanNumber.value
+        
+        // Use the new error handler which also submits to Django APIs
+        val errorInfo = RegistrationErrorHandler.parseError(
+            response = response,
+            context = this,
+            loanNumber = currentLoan
+        )
+        
+        // Log the error
+        RegistrationErrorHandler.logError(errorInfo, "Registration attempt for loan: $currentLoan")
+        
+        // Display customer-friendly message
+        val customerMessage = RegistrationErrorHandler.buildCustomerErrorMessage(errorInfo)
+        setErrorMessage("Registration Failed", customerMessage)
+        
+        // Log for debugging
+        Log.e(TAG, """
+            ===== REGISTRATION ERROR =====
+            Loan: $currentLoan
+            HTTP Code: ${errorInfo.httpCode}
+            Message: ${errorInfo.customerMessage}
+            Technical: ${errorInfo.technicalMessage}
+            Field: ${errorInfo.field ?: "N/A"}
+            Retryable: ${errorInfo.isRetryable}
+            ==============================
+        """.trimIndent())
+    }
+
+    private fun setErrorMessage(title: String, msg: String) {
+        DeviceDataCollectionState.errorMessage.value = msg
+        DeviceDataCollectionState.submissionStatus.value = "ERROR"
+    }
+
+    private fun navigateToSuccess(deviceId: String) {
+        try {
+            val intent = Intent(this, RegistrationSuccessActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra(RegistrationSuccessActivity.EXTRA_DEVICE_ID, deviceId)
+            }
+            startActivity(intent)
+            finish()
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error navigating to success screen: ${e.message}", e)
+            Toast.makeText(this, "Failed to open success page", Toast.LENGTH_SHORT).show()
         }
-        ServerBugAndLogReporter.postLog(
-            logType = "registration",
-            logLevel = "Error",
-            message = message,
-            extraData = extraData + mapOf("failure_kind" to kind)
-        )
-        ServerBugAndLogReporter.postBug(
-            title = title,
-            message = message,
-            priority = priority,
-            extraData = extraData + mapOf("failure_kind" to kind)
-        )
-        Log.d(TAG, "Registration failure reported to logs and bugs API: $kind")
     }
 
-    /** Report registration exception to bugs API (includes stack trace) and logs API. */
-    private fun reportRegistrationException(throwable: Throwable, loanNumber: String?) {
-        ServerBugAndLogReporter.postException(
-            throwable = throwable,
-            contextMessage = "Registration failed during submit. Loan: $loanNumber"
-        )
-        ServerBugAndLogReporter.postLog(
-            logType = "registration",
-            logLevel = "Error",
-            message = "Registration exception: ${throwable.javaClass.simpleName} - ${throwable.message}",
-            extraData = mapOf(
-                "failure_kind" to "exception",
-                "exception_class" to throwable.javaClass.name,
-                "loan_number" to (loanNumber ?: ""),
-            )
-        )
-        Log.d(TAG, "Registration exception reported to logs and bugs API")
-    }
-
-    private fun navigateToSuccess() {
-        startActivity(Intent(this, RegistrationSuccessActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        })
-        finish()
+    private fun retryWithNewLoanNumber(newLoanNumber: String) {
+        DeviceDataCollectionState.loanNumber.value = newLoanNumber
+        DeviceDataCollectionState.submissionStatus.value = "PENDING"
+        DeviceDataCollectionState.isLoading.value        = true
+        DeviceDataCollectionState.progressPercent.value  = 0
+        DeviceDataCollectionState.displayData.value      = null
+        
+        lifecycleScope.launch {
+            runCatching {
+                com.example.deviceowner.utils.cache.RegistrationCacheManager.clearAllRegistrationCaches(this@DeviceDataCollectionActivity)
+            }
+            collectAndEmit()
+        }
     }
 }
 
-private object DeviceDataCollectionState {
-    val isLoading = mutableStateOf(false)
-    val isSubmitting = mutableStateOf(false)
-    val errorMessage = mutableStateOf<String?>(null)
-    val successMessage = mutableStateOf<String?>(null)
-    val displayData = mutableStateOf<DeviceRegistrationRequest?>(null)
-    val progressPercent = mutableStateOf(0)
-    val currentProgressStep = mutableStateOf("")
-    val submissionStatus = mutableStateOf("PENDING") // PENDING, SUBMITTING, SUCCESSFUL, ERROR
+@Composable
+fun DeviceDataCollectionScreen(
+    loanNumber: String,
+    onLoanNumberChange: (String) -> Unit = {},
+    onSubmit: () -> Unit,
+    isLoading: Boolean,
+    isSubmitting: Boolean,
+    errorMessage: String?,
+    data: DeviceRegistrationRequest?,
+    submissionStatus: String,
+    progressPercent: Int,
+) {
+    val scrollState = rememberScrollState()
+
+    Box(modifier = Modifier.fillMaxSize().background(AppColors.Gray100)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            DeviceAppBar()
+            AnimatedProgressBar(percent = progressPercent)
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                AnimatedVisibility(
+                    visible = errorMessage != null,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    errorMessage?.let { ErrorAlert(message = it) }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                ContextCard(
+                    loanNumber = loanNumber,
+                    onLoanNumberChange = onLoanNumberChange,
+                    submissionStatus = submissionStatus
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                if (isLoading) {
+                    SectionHeader("Device Identifiers", Icons.Outlined.Badge)
+                    SkeletonCard(rows = 2)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    SectionHeader("Hardware Details", Icons.Outlined.PhoneAndroid)
+                    SkeletonCard(rows = 2)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    SectionHeader("System Information", Icons.Outlined.Info)
+                    SkeletonCard(rows = 4)
+                } else if (data != null) {
+                    DeviceDataContent(data = data)
+                }
+
+                Spacer(modifier = Modifier.height(110.dp))
+            }
+        }
+
+        BottomActionBar(
+            modifier     = Modifier.align(Alignment.BottomCenter),
+            isSubmitting = isSubmitting,
+            isEnabled    = data != null && !isLoading && !isSubmitting,
+            onSubmit     = onSubmit,
+        )
+    }
+}
+
+@Composable
+private fun DeviceAppBar() {
+    Box(
+        modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(AppColors.BluePrimary, AppColors.BlueLight))).padding(18.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(38.dp).clip(CircleShape).background(AppColors.White.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.PhoneAndroid, null, tint = AppColors.White, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text("Device Registration", style = MaterialTheme.typography.titleMedium.copy(color = AppColors.White))
+                Text("Loan Application Portal", style = MaterialTheme.typography.bodySmall.copy(color = AppColors.White.copy(alpha = 0.70f)))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedProgressBar(percent: Int) {
+    val animated by animateFloatAsState(targetValue = percent / 100f, animationSpec = tween(600), label = "progress")
+    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(AppColors.BluePale)) {
+        Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(animated).background(Brush.horizontalGradient(listOf(AppColors.BlueLight, Color(0xFF42A5F5)))))
+    }
+}
+
+@Composable
+private fun ErrorAlert(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), 
+        colors = CardDefaults.cardColors(containerColor = AppColors.RedPale), 
+        border = BorderStroke(1.5.dp, Color(0xFFEF9A9A))
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.ErrorOutline, null, tint = AppColors.RedPrimary, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = message, 
+                style = MaterialTheme.typography.bodySmall.copy(color = AppColors.RedPrimary, fontWeight = FontWeight.Medium)
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeviceDataCollectionScreen(
-    loanNumber: String,
-    onSubmit: () -> Unit
-) {
-    val isLoading by DeviceDataCollectionState.isLoading
-    val isSubmitting by DeviceDataCollectionState.isSubmitting
-    val errorMessage by DeviceDataCollectionState.errorMessage
-    val data by DeviceDataCollectionState.displayData
-    val submissionStatus by DeviceDataCollectionState.submissionStatus
-    val scrollState = rememberScrollState()
+private fun ContextCard(loanNumber: String, onLoanNumberChange: (String) -> Unit, submissionStatus: String) {
+    var showDialog by remember { mutableStateOf(false) }
+    var editedLoanNumber by remember { mutableStateOf(loanNumber) }
+    val (statusColor, bgColor, statusText) = when (submissionStatus) {
+        "SUBMITTING" -> Triple(AppColors.BlueLight,    AppColors.BluePale,  "Submitting...")
+        "SUCCESSFUL" -> Triple(AppColors.GreenPrimary, AppColors.GreenPale, "Registered")
+        "ERROR"      -> Triple(AppColors.RedPrimary,   AppColors.RedPale,   "Error")
+        else         -> Triple(AppColors.AmberPrimary, AppColors.AmberPale, "Pending")
+    }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFAFAFA))) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF1976D2),
-                shadowElevation = 4.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PhoneAndroid,
-                            contentDescription = "Device",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Device Info",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            // Content
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(scrollState)
-                    .padding(16.dp)
-            ) {
-                errorMessage?.let { msg ->
-                    AlertCard(
-                        icon = Icons.Default.ErrorOutline,
-                        iconTint = Color(0xFFC62828),
-                        backgroundColor = Color(0xFFFFEBEE),
-                        borderColor = Color(0xFFF44336),
-                        message = msg
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (data != null) {
-                    DeviceDataContent(data = data!!, loanNumber = loanNumber, submissionStatus = submissionStatus)
-                }
-
-                Spacer(modifier = Modifier.height(100.dp))
-            }
-        }
-
-        // Bottom Action Bar
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            color = Color.White,
-            shadowElevation = 8.dp,
-            tonalElevation = 0.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp)
-            ) {
-                Button(
-                    onClick = onSubmit,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    enabled = data != null && !isLoading && !isSubmitting,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1976D2),
-                        disabledContainerColor = Color(0xFFBBDEFB)
-                    )
-                ) {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Registering...", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    } else {
-                        Text("Register", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                Text(
-                    text = "By submitting, you agree to our policies.",
-                    fontSize = 10.sp,
-                    color = Color(0xFF999999),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp)
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Edit Loan Number") },
+            text = {
+                OutlinedTextField(
+                    value = editedLoanNumber, 
+                    onValueChange = { editedLoanNumber = it }, 
+                    label = { Text("Enter Loan Number") }, 
+                    singleLine = true, 
+                    modifier = Modifier.fillMaxWidth()
                 )
+            },
+            confirmButton = {
+                TextButton(onClick = { if (editedLoanNumber.isNotBlank()) { onLoanNumberChange(editedLoanNumber); showDialog = false } }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) { Text("Cancel") }
             }
-        }
+        )
     }
-}
 
-@Composable
-private fun AlertCard(
-    icon: ImageVector,
-    iconTint: Color,
-    backgroundColor: Color,
-    borderColor: Color,
-    title: String? = null,
-    message: String
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        border = BorderStroke(1.5.dp, borderColor)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                title?.let {
-                    Text(
-                        text = it,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = iconTint
-                    )
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = AppColors.BluePale), border = BorderStroke(1.dp, Color(0xFFBFDBFE)), onClick = { showDialog = true }) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("LOAN NUMBER", style = MaterialTheme.typography.labelSmall.copy(color = AppColors.BlueLight))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("#$loanNumber", style = MaterialTheme.typography.headlineSmall.copy(color = AppColors.BluePrimary))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(Icons.Default.Edit, null, tint = AppColors.BlueLight.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                 }
-                Text(
-                    text = message,
-                    fontSize = 11.sp,
-                    color = iconTint,
-                    lineHeight = 16.sp
-                )
+            }
+            Surface(shape = RoundedCornerShape(20.dp), color = bgColor) {
+                Text(statusText, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall.copy(color = statusColor, fontWeight = FontWeight.Bold))
             }
         }
     }
 }
 
 @Composable
-private fun LoadingContent() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(56.dp),
-            strokeWidth = 3.dp,
-            color = Color(0xFF1976D2)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Collecting Device Info",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF333333)
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Please wait...",
-            fontSize = 12.sp,
-            color = Color(0xFF999999),
-            textAlign = TextAlign.Center
-        )
+private fun SectionHeader(title: String, icon: ImageVector) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp, start = 2.dp)) {
+        Icon(icon, null, tint = AppColors.BlueLight, modifier = Modifier.size(15.dp))
+        Spacer(modifier = Modifier.width(7.dp))
+        Text(title.uppercase(), style = MaterialTheme.typography.labelSmall.copy(color = AppColors.Gray700))
     }
 }
 
 @Composable
-private fun DeviceDataContent(data: DeviceRegistrationRequest, loanNumber: String, submissionStatus: String) {
+private fun SkeletonCard(rows: Int) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = AppColors.White)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            repeat(rows) { idx ->
+                if (idx > 0) HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = AppColors.Gray200)
+                Box(modifier = Modifier.fillMaxWidth().height(20.dp).background(AppColors.Gray200))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceDataContent(data: DeviceRegistrationRequest) {
     val di = data.deviceInfo ?: emptyMap()
     val ai = data.androidInfo ?: emptyMap()
     val ii = data.imeiInfo ?: emptyMap()
-    val si = data.storageInfo ?: emptyMap()
+    val brand = di.str("brand").ifBlank { di.str("manufacturer") }
+    
+    val imeiList = (ii["device_imeis"] as? List<*>)?.mapNotNull { it?.toString() }
+    val imeisDisplay = if (imeiList.isNullOrEmpty()) "N/A" else imeiList.joinToString(", ")
+    
+    SectionHeader("Device Identifiers", Icons.Outlined.Badge)
+    InfoCard(listOf(
+        InfoRow(Icons.Outlined.PhoneAndroid, "IMEI", imeisDisplay, true), 
+        InfoRow(Icons.Outlined.Numbers, "Serial", di.str("serial"), true)
+    ))
+    
+    Spacer(modifier = Modifier.height(22.dp))
+    SectionHeader("Hardware Details", Icons.Outlined.PhoneAndroid)
+    InfoCard(listOf(InfoRow(Icons.Outlined.LocalOffer, "Brand", brand), InfoRow(Icons.Outlined.Devices, "Model", di.str("model"))))
+    
+    Spacer(modifier = Modifier.height(22.dp))
+    SectionHeader("System Information", Icons.Outlined.Info)
+    InfoCard(listOf(
+        InfoRow(Icons.Outlined.Android, "Android", ai.str("version_release")),
+        InfoRow(Icons.Outlined.Fingerprint, "Fingerprint", ai.str("device_fingerprint"), true)
+    ))
+}
 
-    val manufacturer = (di["manufacturer"] as? String) ?: "N/A"
-    val model = (di["model"] as? String) ?: "N/A"
-    val serialNumber = (di["serial_number"] as? String) ?: (di["serial"] as? String) ?: "N/A"
-    val imeis = (ii["device_imeis"] as? List<*>)?.joinToString(", ") { it?.toString() ?: "" } ?: "N/A"
-    val osVersion = (ai["version_release"] as? String) ?: "N/A"
-    val sdkVersion = (ai["version_sdk_int"] as? Number)?.toString() ?: (ai["version_sdk_int"] as? String) ?: "N/A"
-    val totalStorage = (si["total_storage"] as? String) ?: "N/A"
-    val installedRam = (si["installed_ram"] as? String) ?: "N/A"
+private fun Map<String, Any?>.str(key: String): String = this[key]?.toString() ?: "N/A"
+private data class InfoRow(val icon: ImageVector, val label: String, val value: String, val mono: Boolean = false)
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        DataCard(
-            title = "CONTEXT",
-            icon = null
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Loan Application #$loanNumber",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1F2937),
-                    modifier = Modifier.weight(1f)
-                )
-
-                val (statusColor, statusBgColor, statusText) = when (submissionStatus) {
-                    "PENDING" -> Triple(Color(0xFFF57F17), Color(0xFFFFF9C4), "PENDING")
-                    "SUBMITTING" -> Triple(Color(0xFF1976D2), Color(0xFFE3F2FD), "SUBMITTING")
-                    "SUCCESSFUL" -> Triple(Color(0xFF2E7D32), Color(0xFFC8E6C9), "SUCCESSFUL")
-                    "ERROR" -> Triple(Color(0xFFC62828), Color(0xFFFFCDD2), "ERROR")
-                    else -> Triple(Color(0xFFF57F17), Color(0xFFFFF9C4), "PENDING")
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = statusBgColor
-                ) {
+@Composable
+private fun InfoCard(rows: List<InfoRow>) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.White), border = BorderStroke(1.dp, AppColors.Gray200)) {
+        Column {
+            rows.forEachIndexed { index, row ->
+                if (index > 0) HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = AppColors.Gray200)
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Icon(row.icon, null, tint = AppColors.BlueLight, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(row.label, style = MaterialTheme.typography.labelSmall.copy(color = AppColors.Gray600))
+                    }
                     Text(
-                        text = statusText,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = statusColor,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        letterSpacing = 0.5.sp
+                        text = row.value, 
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = AppColors.Gray900,
+                            letterSpacing = if (row.mono) (-0.3).sp else 0.sp
+                        ),
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        DataCard(
-            title = "Hardware Details",
-            icon = Icons.Default.PhoneAndroid
-        ) {
-            DataTable(
-                rows = listOf(
-                    "Manufacturer" to manufacturer,
-                    "Model" to model,
-                    "Serial Number" to serialNumber,
-                    "IMEI" to imeis
-                )
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        DataCard(
-            title = "System Health",
-            icon = Icons.Default.Settings
-        ) {
-            DataTable(
-                rows = listOf(
-                    "OS Version" to osVersion,
-                    "SDK Level" to "API $sdkVersion",
-                    "Total Storage" to totalStorage,
-                    "Installed RAM" to installedRam
-                )
-            )
-        }
     }
 }
 
 @Composable
-private fun DataCard(
-    title: String,
-    icon: ImageVector? = null,
-    content: @Composable () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            icon?.let {
-                Icon(
-                    imageVector = it,
-                    contentDescription = null,
-                    tint = Color(0xFF1976D2),
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text(
-                text = title,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (icon != null) Color(0xFF1F2937) else Color(0xFF999999),
-                letterSpacing = if (icon != null) 0.sp else 0.3.sp
-            )
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            color = Color.White,
-            shadowElevation = 1.dp
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun DataTable(rows: List<Pair<String, String>>) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        rows.forEachIndexed { index, (label, value) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+private fun BottomActionBar(modifier: Modifier, isSubmitting: Boolean, isEnabled: Boolean, onSubmit: () -> Unit) {
+    Surface(modifier = modifier.fillMaxWidth(), color = AppColors.White, shadowElevation = 12.dp) {
+        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Button(
+                onClick = onSubmit, 
+                enabled = isEnabled, 
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text(
-                    text = label,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF999999),
-                    modifier = Modifier.weight(0.4f)
-                )
-                Text(
-                    text = value,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1F2937),
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.weight(0.6f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AppColors.White, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Submitting...")
+                } else {
+                    Text("Register Device Now")
+                }
             }
-            if (index < rows.size - 1) {
-                HorizontalDivider(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Color(0xFFE5E7EB)
-                )
-            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("By continuing, you agree to our terms and conditions.", style = MaterialTheme.typography.labelSmall.copy(color = AppColors.Gray500))
         }
     }
 }

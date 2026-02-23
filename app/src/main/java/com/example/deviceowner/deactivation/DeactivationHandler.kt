@@ -81,22 +81,22 @@ class DeactivationHandler(
             try {
                 Log.d(TAG, "Sending confirmation (attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS)...")
                 
-                val confirmationData = if (success) {
-                    mapOf(
-                        "status" to "success",
-                        "message" to "Device Owner successfully removed and all restrictions cleared"
-                    )
+                val status = if (success) "success" else "failed"
+                val message = if (success) {
+                    "Device Owner successfully removed and all restrictions cleared"
                 } else {
-                    mapOf(
-                        "status" to "failed",
-                        "message" to "Device Owner removal failed: ${error ?: "Unknown error"}"
-                    )
+                    "Device Owner removal failed: ${error ?: "Unknown error"}"
                 }
                 
                 // Send to server
-                // This would use your API client to POST to /confirm-deactivation/
-                Log.i(TAG, "✅ Confirmation sent successfully")
-                return@repeat
+                val response = apiClient.confirmDeactivation(deviceId, status, message)
+                
+                if (response.isSuccessful) {
+                    Log.i(TAG, "✅ Confirmation sent successfully")
+                    return@repeat
+                } else {
+                    throw Exception("HTTP ${response.code()}: ${response.message()}")
+                }
                 
             } catch (e: Exception) {
                 Log.w(TAG, "⚠ Confirmation failed (attempt ${attempt + 1}): ${e.message}")

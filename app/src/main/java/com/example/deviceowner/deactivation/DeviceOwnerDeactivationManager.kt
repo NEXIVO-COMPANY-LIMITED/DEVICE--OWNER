@@ -178,7 +178,7 @@ class DeviceOwnerDeactivationManager(private val context: Context) {
                 
                 // Unhide app icon so user can see it as normal app and complete removal (uninstall)
                 try {
-                    DeviceOwnerManager(context).showAppIcon()
+                    com.example.deviceowner.security.mode.showAppIconInLauncher(context)
                     Log.d(TAG, "✓ App icon shown in launcher – user can see and remove app")
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not show app icon: ${e.message}")

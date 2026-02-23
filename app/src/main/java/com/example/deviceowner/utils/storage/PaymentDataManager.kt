@@ -49,7 +49,7 @@ class PaymentDataManager(private val context: Context) {
     private val sharedPreferences: SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     
-    private val gson = Gson()
+    private val gson = com.example.deviceowner.utils.gson.SafeGsonProvider.getGson()
 
     // ============================================================
     // NEXT PAYMENT INFORMATION
@@ -239,8 +239,9 @@ class PaymentDataManager(private val context: Context) {
     fun getPaymentHistory(): List<PaymentRecord> {
         return try {
             val json = sharedPreferences.getString(KEY_PAYMENT_HISTORY, null) ?: return emptyList()
-            val type = object : com.google.gson.reflect.TypeToken<List<PaymentRecord>>() {}.type
-            gson.fromJson(json, type) ?: emptyList()
+            com.example.deviceowner.utils.gson.SafeGsonProvider.fromJson(json) {
+                object : com.google.gson.reflect.TypeToken<List<PaymentRecord>>() {}.type
+            } ?: emptyList()
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error reading payment history: ${e.message}", e)
             emptyList()

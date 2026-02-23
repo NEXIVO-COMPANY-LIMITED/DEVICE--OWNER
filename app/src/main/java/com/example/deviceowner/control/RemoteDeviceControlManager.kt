@@ -11,12 +11,14 @@ import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.monitoring.SecurityMonitorService
 import com.example.deviceowner.services.lock.SoftLockOverlayService
 import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
 import com.example.deviceowner.data.local.database.entities.lock.LockStateRecordEntity
-import com.example.deviceowner.ui.activities.lock.HardLockActivity
-import com.example.deviceowner.utils.constants.UserManagerConstants
+import com.example.deviceowner.ui.activities.lock.payment.PaymentOverdueActivity
+import com.example.deviceowner.ui.activities.lock.payment.SoftLockReminderActivity
+import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
+import com.example.deviceowner.ui.activities.lock.system.DeactivationActivity
+import com.example.deviceowner.ui.activities.lock.system.HardLockGenericActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +26,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Remote lock control: hard lock (kiosk) vs soft lock (reminder).
+ * Remote lock control: manages specialized lock activities and enforcement.
+ * v5.0 - Enhanced Deactivation and Kiosk Mode Cleanup.
  */
 class RemoteDeviceControlManager(private val context: Context) {
 
@@ -36,6 +39,16 @@ class RemoteDeviceControlManager(private val context: Context) {
         const val LOCK_UNLOCKED = "unlocked"
         const val LOCK_SOFT = "soft_lock"
         const val LOCK_HARD = "hard_lock"
+        
+        const val TYPE_OVERDUE = "OVERDUE"
+        const val TYPE_TAMPER = "TAMPER"
+        const val TYPE_DEACTIVATION = "DEACTIVATION"
+        
+        private val ALLOWED_PACKAGES = arrayOf(
+            "com.android.settings",
+            "com.google.android.packageinstaller",
+            "com.android.packageinstaller"
+        )
     }
     
     private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
@@ -44,16 +57,20 @@ class RemoteDeviceControlManager(private val context: Context) {
     fun getLockState(): String = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .getString("state", LOCK_UNLOCKED) ?: LOCK_UNLOCKED
 
+    fun getLockType(): String = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .getString("lock_type", "") ?: ""
+
+    fun isHardLocked(): Boolean = getLockState() == LOCK_HARD
+    fun isSoftLocked(): Boolean = getLockState() == LOCK_SOFT
+    fun isLocked(): Boolean = getLockState() != LOCK_UNLOCKED
+
     fun getLockStateForBoot(): String {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try {
                 val devCtx = context.createDeviceProtectedStorageContext()
-                val state = devCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .getString("state", null)
-                if (state != null) return state
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not read lock state from device-protected: ${e.message}")
-            }
+                return devCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString("state", LOCK_UNLOCKED) ?: LOCK_UNLOCKED
+            } catch (_: Exception) { }
         }
         return getLockState()
     }
@@ -62,164 +79,181 @@ class RemoteDeviceControlManager(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try {
                 val devCtx = context.createDeviceProtectedStorageContext()
-                val reason = devCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .getString("reason", null)
-                if (reason != null) return reason
+                return devCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString("reason", "") ?: ""
             } catch (_: Exception) { }
         }
-        return getLockReason()
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("reason", "") ?: ""
     }
 
-    fun getLockTimestampForBoot(): Long {
+    fun getLockTypeForBoot(): String {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try {
                 val devCtx = context.createDeviceProtectedStorageContext()
-                val ts = devCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .getLong("lock_timestamp", 0L)
-                if (ts > 0L) return ts
+                return devCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString("lock_type", "") ?: ""
             } catch (_: Exception) { }
         }
-        return getLockTimestamp()
+        return getLockType()
     }
 
-    fun isHardLocked(): Boolean = getLockState() == LOCK_HARD
-    fun isLocked(): Boolean = getLockState() != LOCK_UNLOCKED
-    fun getLockReason(): String = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("reason", "") ?: ""
     fun getLockTimestamp(): Long = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("lock_timestamp", 0L)
 
     fun applyHardLock(
         reason: String,
+        lockType: String = TYPE_TAMPER,
         forceRestart: Boolean = false,
         forceFromServerOrMismatch: Boolean = false,
         tamperType: String? = null,
-        nextPaymentDate: String? = null,
-        organizationName: String? = null
+        nextPaymentDate: String? = null
     ) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-        Log.e(TAG, "🔒 APPLYING HARD LOCK: $reason")
+        Log.e(TAG, "🔒 APPLYING HARD LOCK ($lockType): $reason")
         
-        val skipSecurityRestrictions = prefs.getBoolean("skip_security_restrictions", false)
-        if (skipSecurityRestrictions && !forceFromServerOrMismatch) {
-            Log.w(TAG, "⚠️ Skipping hard lock during initial setup")
-            return
-        }
-        
-        if (!forceRestart && getLockState() == LOCK_HARD) {
-            // Even if already locked, ensure activity is visible
-            showHardLockActivity(reason, nextPaymentDate, organizationName)
-            return
-        }
-        
-        saveState(LOCK_HARD, reason)
-        saveHardLockStateToDeviceProtected(reason)
-        saveLockStateToDatabase(LOCK_HARD, reason, tamperType)
+        saveState(LOCK_HARD, reason, lockType)
+        saveHardLockStateToDeviceProtected(reason, lockType)
+        saveLockStateToDatabase(LOCK_HARD, reason, tamperType ?: if (lockType == TYPE_TAMPER) "SYSTEM_MODIFIED" else null)
 
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
-            Log.e(TAG, "❌ Not Device Owner")
-            return
-        }
-        
-        try {
-            dpm.setLockTaskPackages(admin, arrayOf(context.packageName))
-            dpm.setAutoTimeRequired(admin, true)
-            suspendAllOtherPackages(true)
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                dpm.setStatusBarDisabled(admin, true)
-                dpm.setKeyguardDisabledFeatures(admin, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_ALL)
-            }
-            
-            val restrictions = arrayOf(
-                UserManager.DISALLOW_SAFE_BOOT,
-                UserManager.DISALLOW_DEBUGGING_FEATURES,
-                UserManager.DISALLOW_USB_FILE_TRANSFER,
-                UserManager.DISALLOW_CONFIG_WIFI,
-                UserManager.DISALLOW_INSTALL_APPS,
-                UserManager.DISALLOW_UNINSTALL_APPS,
-                UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA
-            )
-            
-            for (restriction in restrictions) {
-                try { dpm.addUserRestriction(admin, restriction) } catch (_: Exception) {}
-            }
+        showLockActivity(reason, lockType, nextPaymentDate)
 
-            try {
-                Settings.Global.putInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0)
-                Settings.Global.putInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0)
-            } catch (_: Exception) {}
-            
-            showHardLockActivity(reason, nextPaymentDate, organizationName)
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error applying hard lock: ${e.message}")
-        }
-    }
-
-    private fun showHardLockActivity(reason: String, nextPaymentDate: String? = null, organizationName: String? = null) {
-        Handler(Looper.getMainLooper()).post {
-            // FIXED: REMOVED INCORRECT WindowManager FLAGS FROM INTENT
-            val lockIntent = Intent(context, HardLockActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                        Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
-                        Intent.FLAG_ACTIVITY_NO_ANIMATION
-                
-                putExtra("lock_reason", reason)
-                putExtra("lock_timestamp", getLockTimestamp())
-                nextPaymentDate?.let { putExtra("next_payment_date", it) }
-                organizationName?.let { putExtra("organization_name", it) }
-            }
-            try {
-                context.startActivity(lockIntent)
-                Log.i(TAG, "✅ HardLockActivity triggered")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to start HardLockActivity: ${e.message}")
+        ioScope.launch {
+            if (dpm.isDeviceOwnerApp(context.packageName)) {
+                try {
+                    val lockTaskPackages = arrayOf(context.packageName) + ALLOWED_PACKAGES
+                    dpm.setLockTaskPackages(admin, lockTaskPackages)
+                    suspendAllOtherPackages(true)
+                    
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        dpm.setStatusBarDisabled(admin, true)
+                        dpm.setKeyguardDisabledFeatures(admin, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_ALL)
+                    }
+                    applyRestrictions(reason)
+                } catch (e: Exception) {
+                    Log.e(TAG, "DPM apply error: ${e.message}")
+                }
             }
         }
     }
 
     fun unlockDevice() {
         Log.i(TAG, "🔓 UNLOCKING DEVICE")
-        saveState(LOCK_UNLOCKED, "")
-        saveHardLockStateToDeviceProtected("")
+        saveState(LOCK_UNLOCKED, "", "")
+        saveHardLockStateToDeviceProtected("", "")
         saveLockStateToDatabase(LOCK_UNLOCKED, "Device Unlocked", null)
 
-        if (dpm.isDeviceOwnerApp(context.packageName)) {
-            try {
-                suspendAllOtherPackages(false)
-                dpm.setLockTaskPackages(admin, emptyArray())
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    dpm.setStatusBarDisabled(admin, false)
-                    dpm.setKeyguardDisabledFeatures(admin, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE)
-                }
-                
-                val restrictions = arrayOf(
-                    UserManager.DISALLOW_SAFE_BOOT,
-                    UserManager.DISALLOW_DEBUGGING_FEATURES,
-                    UserManager.DISALLOW_USB_FILE_TRANSFER
-                )
-                for (restriction in restrictions) {
-                    try { dpm.clearUserRestriction(admin, restriction) } catch (_: Exception) {}
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error unlocking: ${e.message}")
+        ioScope.launch {
+            if (dpm.isDeviceOwnerApp(context.packageName)) {
+                clearAllPoliciesAndRestrictions()
             }
         }
     }
 
-    private fun saveState(state: String, reason: String) {
+    /**
+     * Critical cleanup for deactivation. Must be called while still Device Owner.
+     */
+    suspend fun clearAllPoliciesAndRestrictions() = withContext(Dispatchers.IO) {
+        if (!dpm.isDeviceOwnerApp(context.packageName)) return@withContext
+        
+        Log.w(TAG, "🛠 CLEANUP: Removing all policies and restrictions")
+        try {
+            // 1. Unsuspend all packages (Most important!)
+            suspendAllOtherPackages(false)
+            
+            // 2. Clear LockTask settings
+            dpm.setLockTaskPackages(admin, emptyArray())
+            
+            // 3. Reset UI features
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                dpm.setStatusBarDisabled(admin, false)
+                dpm.setKeyguardDisabledFeatures(admin, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE)
+            }
+            
+            // 4. Clear all user restrictions
+            val restrictions = arrayOf(
+                UserManager.DISALLOW_FACTORY_RESET,
+                UserManager.DISALLOW_SAFE_BOOT,
+                UserManager.DISALLOW_DEBUGGING_FEATURES,
+                UserManager.DISALLOW_USB_FILE_TRANSFER,
+                UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
+                UserManager.DISALLOW_UNINSTALL_APPS,
+                UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES,
+                UserManager.DISALLOW_ADD_USER,
+                UserManager.DISALLOW_REMOVE_USER,
+                UserManager.DISALLOW_CONFIG_WIFI,
+                UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS,
+                UserManager.DISALLOW_OUTGOING_CALLS,
+                UserManager.DISALLOW_SMS,
+                UserManager.DISALLOW_INSTALL_APPS
+            )
+            for (restriction in restrictions) {
+                try { dpm.clearUserRestriction(admin, restriction) } catch (_: Exception) {}
+            }
+            
+            Log.i(TAG, "✅ Cleanup complete")
+        } catch (e: Exception) {
+            Log.e(TAG, "Cleanup failed: ${e.message}")
+        }
+    }
+
+    private fun applyRestrictions(reason: String) {
+        val restrictions = mutableListOf(
+            UserManager.DISALLOW_SAFE_BOOT,
+            UserManager.DISALLOW_USB_FILE_TRANSFER,
+            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA
+        )
+        
+        if (!reason.contains("Developer", true) && !reason.contains("ADB", true)) {
+            restrictions.add(UserManager.DISALLOW_DEBUGGING_FEATURES)
+        }
+        
+        for (restriction in restrictions) {
+            try { dpm.addUserRestriction(admin, restriction) } catch (_: Exception) {}
+        }
+    }
+
+    fun showLockActivity(reason: String, lockType: String, nextPaymentDate: String?) {
+        Handler(Looper.getMainLooper()).post {
+            val activityClass = when (lockType) {
+                TYPE_OVERDUE -> PaymentOverdueActivity::class.java
+                TYPE_DEACTIVATION -> DeactivationActivity::class.java
+                TYPE_TAMPER -> SecurityViolationActivity::class.java
+                else -> HardLockGenericActivity::class.java
+            }
+            
+            val intent = Intent(context, activityClass).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("lock_reason", reason)
+                putExtra("lock_type", lockType)
+                putExtra("lock_timestamp", getLockTimestamp())
+                nextPaymentDate?.let { putExtra("next_payment_date", it) }
+            }
+            try { context.startActivity(intent) } catch (_: Exception) {}
+        }
+    }
+
+    fun applySoftLock(reason: String, nextPaymentDate: String? = null) {
+        saveState(LOCK_SOFT, reason, "REMINDER")
+        Handler(Looper.getMainLooper()).post {
+            val intent = Intent(context, SoftLockReminderActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("next_payment_date", nextPaymentDate)
+                putExtra("lock_reason", reason)
+            }
+            try { context.startActivity(intent) } catch (_: Exception) {}
+        }
+    }
+
+    private fun saveState(state: String, reason: String, lockType: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
             putString("state", state)
             putString("reason", reason)
-            if (state != LOCK_UNLOCKED) {
-                putLong("lock_timestamp", System.currentTimeMillis())
-            }
+            putString("lock_type", lockType)
+            if (state != LOCK_UNLOCKED) putLong("lock_timestamp", System.currentTimeMillis())
             apply()
         }
     }
 
-    private fun saveHardLockStateToDeviceProtected(reason: String) {
+    private fun saveHardLockStateToDeviceProtected(reason: String, lockType: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try {
                 val devCtx = context.createDeviceProtectedStorageContext()
@@ -227,17 +261,10 @@ class RemoteDeviceControlManager(private val context: Context) {
                 devCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
                     putString("state", state)
                     putString("reason", reason)
-                    if (state == LOCK_HARD) {
-                        putLong("lock_timestamp", System.currentTimeMillis())
-                        putBoolean("hard_lock_requested", true)
-                    } else {
-                        putBoolean("hard_lock_requested", false)
-                    }
+                    putString("lock_type", lockType)
                     apply()
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error saving to device-protected storage: ${e.message}")
-            }
+            } catch (_: Exception) {}
         }
     }
 
@@ -246,19 +273,10 @@ class RemoteDeviceControlManager(private val context: Context) {
             try {
                 val db = DeviceOwnerDatabase.getDatabase(context)
                 if (state == LOCK_HARD) {
-                    db.lockStateRecordDao().insert(
-                        LockStateRecordEntity(
-                            lockState = state,
-                            reason = reason,
-                            tamperType = tamperType,
-                            createdAt = System.currentTimeMillis()
-                        )
-                    )
+                    db.lockStateRecordDao().insert(LockStateRecordEntity(lockState = state, reason = reason, tamperType = tamperType, createdAt = System.currentTimeMillis()))
                 } else {
                     val latest = db.lockStateRecordDao().getLatestUnresolvedHardLock()
-                    latest?.let {
-                        db.lockStateRecordDao().update(it.copy(resolvedAt = System.currentTimeMillis()))
-                    }
+                    latest?.let { db.lockStateRecordDao().update(it.copy(resolvedAt = System.currentTimeMillis())) }
                 }
             } catch (_: Exception) {}
         }
@@ -268,73 +286,16 @@ class RemoteDeviceControlManager(private val context: Context) {
         if (!dpm.isDeviceOwnerApp(context.packageName)) return
         val packages = context.packageManager.getInstalledPackages(0)
             .map { it.packageName }
-            .filter { it != context.packageName && it != "com.android.settings" && it != "com.google.android.packageinstaller" }
-        
+            .filter { pkg -> pkg != context.packageName && !ALLOWED_PACKAGES.contains(pkg) }
         try {
-            val result = dpm.setPackagesSuspended(admin, packages.toTypedArray(), suspend)
-            Log.d(TAG, "Package suspension result: ${result.size} packages failed")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error suspending packages: ${e.message}")
-        }
-    }
-
-    fun applySoftLock(
-        reason: String,
-        triggerAction: String? = null,
-        nextPaymentDate: String? = null,
-        organizationName: String? = null
-    ) {
-        Log.w(TAG, "🔒 APPLYING SOFT LOCK: $reason (trigger: $triggerAction)")
-        
-        saveState(LOCK_SOFT, reason)
-        saveLockStateToDatabase(LOCK_SOFT, reason, null)
-        
-        try {
-            // Start soft lock overlay service
-            val intent = Intent(context, SoftLockOverlayService::class.java).apply {
-                putExtra("lock_reason", reason)
-                putExtra("trigger_action", triggerAction)
-                nextPaymentDate?.let { putExtra("next_payment_date", it) }
-                organizationName?.let { putExtra("organization_name", it) }
-            }
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-            
-            Log.i(TAG, "✅ Soft lock applied - device restricted but usable")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error applying soft lock: ${e.message}", e)
-        }
-    }
-
-    fun terminateDeviceOwnership() {
-        Log.e(TAG, "🔴 TERMINATING DEVICE OWNERSHIP")
-        
-        try {
-            if (!dpm.isDeviceOwnerApp(context.packageName)) {
-                Log.w(TAG, "Not device owner, cannot terminate")
-                return
-            }
-            
-            // Clear all restrictions and unlock
-            unlockDevice()
-            
-            // Clear device owner
-            dpm.clearDeviceOwnerApp(context.packageName)
-            
-            Log.i(TAG, "✅ Device ownership terminated successfully")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error terminating device ownership: ${e.message}", e)
-        }
+            dpm.setPackagesSuspended(admin, packages.toTypedArray(), suspend)
+        } catch (_: Exception) {}
     }
 
     fun checkAndEnforceLockStateFromBoot() {
         val state = getLockStateForBoot()
         if (state == LOCK_HARD) {
-            applyHardLock(getLockReasonForBoot(), forceRestart = true)
+            applyHardLock(reason = getLockReasonForBoot(), lockType = getLockTypeForBoot())
         }
     }
 }

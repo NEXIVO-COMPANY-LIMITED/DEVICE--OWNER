@@ -164,10 +164,16 @@ class StealthModeManager(private val context: Context) {
 /**
  * Hide app icon from launcher (optional, for complete invisibility)
  */
-fun hideAppIconFromLauncher(context: Context, launcherActivityClass: Class<*> = com.example.deviceowner.ui.activities.main.MainActivity::class.java) {
+fun hideAppIconFromLauncher(context: Context, launcherActivityClass: Class<*>? = null) {
+    val activityClass = launcherActivityClass ?: try {
+        Class.forName("com.example.deviceowner.ui.activities.main.MainActivity")
+    } catch (e: Exception) {
+        Log.e("StealthMode", "Could not find MainActivity: ${e.message}")
+        return
+    }
     try {
         val packageManager = context.packageManager
-        val componentName = ComponentName(context, launcherActivityClass)
+        val componentName = ComponentName(context, activityClass)
         packageManager.setComponentEnabledSetting(
             componentName,
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
@@ -182,10 +188,17 @@ fun hideAppIconFromLauncher(context: Context, launcherActivityClass: Class<*> = 
 /**
  * Show app icon in launcher (for testing)
  */
-fun showAppIconInLauncher(context: Context, launcherActivityClass: Class<*> = com.example.deviceowner.ui.activities.main.MainActivity::class.java) {
+fun showAppIconInLauncher(context: Context, launcherActivityClass: Class<*>? = null) {
+    val activityClass = launcherActivityClass ?: try {
+        Class.forName("com.example.deviceowner.ui.activities.main.MainActivity")
+    } catch (e: Exception) {
+        Log.e("StealthMode", "Could not find MainActivity: ${e.message}")
+        return
+    }
+    
     try {
         val packageManager = context.packageManager
-        val componentName = ComponentName(context, launcherActivityClass)
+        val componentName = ComponentName(context, activityClass)
         packageManager.setComponentEnabledSetting(
             componentName,
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED,

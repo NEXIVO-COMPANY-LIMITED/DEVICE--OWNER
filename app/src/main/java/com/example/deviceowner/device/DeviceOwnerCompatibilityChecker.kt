@@ -50,14 +50,24 @@ class DeviceOwnerCompatibilityChecker(private val context: Context) {
         val issues = mutableListOf<String>()
         val deviceInfo = getDeviceInfo()
 
-        Log.d(TAG, "=== Device Compatibility Check ===")
+        Log.d(TAG, "=== Device Compatibility Check (DISABLED) ===")
         Log.d(TAG, "Brand: ${deviceInfo.brand}")
         Log.d(TAG, "Model: ${deviceInfo.model}")
         Log.d(TAG, "Android Version: ${deviceInfo.androidVersion}")
         Log.d(TAG, "Manufacturer: ${deviceInfo.manufacturer}")
         Log.d(TAG, "Stock Android: ${deviceInfo.isStockAndroid}")
 
-        // Check 1: Android version must be 13 or higher
+        // ===== COMPATIBILITY CHECKS DISABLED PER USER REQUEST =====
+        /*
+        // Check 1: ONLY Google Pixel phones allowed
+        if (!isGooglePixel(deviceInfo.brand, deviceInfo.model, deviceInfo.manufacturer)) {
+            issues.add("Only Google Pixel phones are supported. Your device: ${deviceInfo.brand} ${deviceInfo.model}")
+            Log.w(TAG, "❌ Device brand check failed: Not a Google Pixel")
+        } else {
+            Log.d(TAG, "✓ Device is Google Pixel")
+        }
+
+        // Check 2: Android version must be 13 or higher
         if (deviceInfo.androidVersion < 13) {
             issues.add("Android version must be 13 or higher (current: ${deviceInfo.androidVersion})")
             Log.w(TAG, "❌ Android version check failed: ${deviceInfo.androidVersion}")
@@ -65,30 +75,54 @@ class DeviceOwnerCompatibilityChecker(private val context: Context) {
             Log.d(TAG, "✓ Android version check passed: ${deviceInfo.androidVersion}")
         }
 
-        // Check 2: Device must be stock Android or supported manufacturer
-        if (!deviceInfo.isStockAndroid && !isSupportedManufacturer(deviceInfo.manufacturer)) {
-            issues.add("Device must run stock Android or be from a supported manufacturer")
+        // Check 3: Must be stock Android (no custom ROM)
+        if (!deviceInfo.isStockAndroid) {
+            issues.add("Device must run stock Android (no custom ROM detected)")
             Log.w(TAG, "❌ Stock Android check failed")
         } else {
             Log.d(TAG, "✓ Stock Android check passed")
         }
-
-        // Check 3: Device brand validation (Pixel, Samsung, etc.)
-        if (!isValidDeviceBrand(deviceInfo.brand)) {
-            Log.w(TAG, "⚠ Warning: Unusual device brand detected: ${deviceInfo.brand}")
-            // This is a warning, not a failure
-        } else {
-            Log.d(TAG, "✓ Device brand check passed: ${deviceInfo.brand}")
-        }
-
-        val isCompatible = issues.isEmpty()
-        Log.d(TAG, "=== Compatibility Result: ${if (isCompatible) "COMPATIBLE ✓" else "NOT COMPATIBLE ❌"} ===")
+        */
+        // ===== END DISABLED CHECKS =====
+        
+        // Force compatibility to true regardless of findings
+        val isCompatible = true 
+        Log.d(TAG, "=== Compatibility Result: FORCED COMPATIBLE ✓ ===")
 
         return CompatibilityResult(
             isCompatible = isCompatible,
             deviceInfo = deviceInfo,
-            issues = issues
+            issues = emptyList() // Clear any issues
         )
+    }
+
+    private fun isGooglePixel(brand: String, model: String, manufacturer: String): Boolean {
+        // Must be Google manufacturer
+        if (!manufacturer.equals("Google", ignoreCase = true)) {
+            return false
+        }
+
+        // Must be Pixel model
+        val pixelModels = listOf(
+            "Pixel 6",
+            "Pixel 6a",
+            "Pixel 6 Pro",
+            "Pixel 7",
+            "Pixel 7a",
+            "Pixel 7 Pro",
+            "Pixel 8",
+            "Pixel 8a",
+            "Pixel 8 Pro",
+            "Pixel 9",
+            "Pixel 9a",
+            "Pixel 9 Pro",
+            "Pixel 9 Pro XL",
+            "Pixel 9 Pro Fold"
+        )
+
+        return pixelModels.any { 
+            model.contains(it, ignoreCase = true) 
+        }
     }
 
     private fun getDeviceInfo(): DeviceInfo {

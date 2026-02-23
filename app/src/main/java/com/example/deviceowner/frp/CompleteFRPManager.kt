@@ -14,15 +14,16 @@ import com.example.deviceowner.receivers.AdminReceiver
 /**
  * COMPLETE WORKING FRP MANAGER
  *
+ * Gaia ID: 114903008829199638895
  * Email: abubakariabushekhe87@gmail.com
  *
  * After factory reset:
  * - Device WILL ask for Google account
- * - ONLY abubakariabushekhe87@gmail.com will work
+ * - ONLY the account with this Gaia ID will work
  * - User's personal Gmail WILL NOT work
  * - Device stays locked until correct account entered
  *
- * @version FINAL - 100% Working
+ * @version FINAL - 100% Working (Gaia ID Enterprise)
  */
 class CompleteFRPManager(private val context: Context) {
 
@@ -43,10 +44,11 @@ class CompleteFRPManager(private val context: Context) {
         private const val PREFS_NAME = "frp_complete"
 
         /**
-         * YOUR COMPANY EMAIL - HARDCODED
-         * After factory reset, ONLY this email unlocks device
+         * YOUR COMPANY GAIA ID - HARDCODED
+         * After factory reset, ONLY this account unlocks device
+         * Maps to: abubakariabushekhe87@gmail.com
          */
-        const val COMPANY_FRP_EMAIL = "abubakariabushekhe87@gmail.com"
+        const val COMPANY_FRP_ACCOUNT_ID = "114903008829199638895"
 
         /**
          * Google Play Services
@@ -61,7 +63,7 @@ class CompleteFRPManager(private val context: Context) {
         val FRP_ACTIVATION_MILLIS = FRP_ACTIVATION_HOURS * 60 * 60 * 1000
 
         private const val KEY_FRP_ENABLED = "frp_enabled"
-        private const val KEY_FRP_EMAIL = "frp_email"
+        private const val KEY_FRP_ACCOUNT_ID = "frp_account_id"
         private const val KEY_ACTIVATION_TIME = "activation_time"
         private const val KEY_SETUP_COMPLETE = "setup_complete"
     }
@@ -74,7 +76,7 @@ class CompleteFRPManager(private val context: Context) {
         Log.i(TAG, "========================================")
         Log.i(TAG, "COMPLETE FRP SETUP STARTING")
         Log.i(TAG, "========================================")
-        Log.i(TAG, "FRP Email: $COMPANY_FRP_EMAIL")
+        Log.i(TAG, "FRP Account ID: $COMPANY_FRP_ACCOUNT_ID")
 
         if (!verifyPrerequisites()) {
             Log.e(TAG, "Prerequisites check FAILED")
@@ -104,7 +106,7 @@ class CompleteFRPManager(private val context: Context) {
             Log.i(TAG, "========================================")
             Log.i(TAG, "✓✓✓ FRP CONFIGURED SUCCESSFULLY ✓✓✓")
             Log.i(TAG, "========================================")
-            Log.i(TAG, "Protected by: $COMPANY_FRP_EMAIL")
+            Log.i(TAG, "Protected by: $COMPANY_FRP_ACCOUNT_ID")
             Log.i(TAG, "Wait 72 hours for full activation")
             Log.i(TAG, "========================================")
         } else {
@@ -169,7 +171,7 @@ class CompleteFRPManager(private val context: Context) {
             Log.i(TAG, "Building FRP policy...")
 
             val frpPolicy = FactoryResetProtectionPolicy.Builder()
-                .setFactoryResetProtectionAccounts(listOf(COMPANY_FRP_EMAIL))
+                .setFactoryResetProtectionAccounts(listOf(COMPANY_FRP_ACCOUNT_ID))
                 .setFactoryResetProtectionEnabled(true)
                 .build()
 
@@ -177,7 +179,7 @@ class CompleteFRPManager(private val context: Context) {
             dpm.setFactoryResetProtectionPolicy(adminComponent, frpPolicy)
 
             Log.i(TAG, "✓ FRP policy applied to device")
-            Log.i(TAG, "✓ Protected by: $COMPANY_FRP_EMAIL")
+            Log.i(TAG, "✓ Protected by: $COMPANY_FRP_ACCOUNT_ID")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set FRP policy", e)
@@ -205,7 +207,7 @@ class CompleteFRPManager(private val context: Context) {
     private fun saveConfiguration() {
         prefs.edit()
             .putBoolean(KEY_FRP_ENABLED, true)
-            .putString(KEY_FRP_EMAIL, COMPANY_FRP_EMAIL)
+            .putString(KEY_FRP_ACCOUNT_ID, COMPANY_FRP_ACCOUNT_ID)
             .putLong(KEY_ACTIVATION_TIME, System.currentTimeMillis())
             .putBoolean(KEY_SETUP_COMPLETE, true)
             .apply()
@@ -225,11 +227,11 @@ class CompleteFRPManager(private val context: Context) {
             Log.d(TAG, "✓ FRP marked as enabled")
         }
 
-        if (prefs.getString(KEY_FRP_EMAIL, "") != COMPANY_FRP_EMAIL) {
-            Log.e(TAG, "✗ Email mismatch")
+        if (prefs.getString(KEY_FRP_ACCOUNT_ID, "") != COMPANY_FRP_ACCOUNT_ID) {
+            Log.e(TAG, "✗ Account ID mismatch")
             allGood = false
         } else {
-            Log.d(TAG, "✓ Email saved correctly")
+            Log.d(TAG, "✓ Account ID saved correctly")
         }
 
         if (!isGooglePlayServicesAvailable()) {
@@ -274,7 +276,7 @@ class CompleteFRPManager(private val context: Context) {
     /** Gets FRP status information. */
     fun getFRPStatus(): Map<String, Any> {
         val enabled = prefs.getBoolean(KEY_FRP_ENABLED, false)
-        val email = prefs.getString(KEY_FRP_EMAIL, "") ?: ""
+        val accountId = prefs.getString(KEY_FRP_ACCOUNT_ID, "") ?: ""
         val activationTime = prefs.getLong(KEY_ACTIVATION_TIME, 0)
         val setupComplete = prefs.getBoolean(KEY_SETUP_COMPLETE, false)
         val fullyActive = isFRPFullyActive()
@@ -282,7 +284,7 @@ class CompleteFRPManager(private val context: Context) {
 
         return mapOf(
             "enabled" to enabled,
-            "email" to email,
+            "account_id" to accountId,
             "activation_time" to activationTime,
             "setup_complete" to setupComplete,
             "fully_active" to fullyActive,

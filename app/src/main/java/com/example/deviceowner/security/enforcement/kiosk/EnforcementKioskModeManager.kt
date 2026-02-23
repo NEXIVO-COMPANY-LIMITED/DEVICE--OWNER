@@ -9,15 +9,13 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.ui.activities.lock.HardLockActivity
+import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.job
 
 /**
  * Kiosk Mode Manager (enforcement)
@@ -171,7 +169,7 @@ class EnforcementKioskModeManager(private val context: Context) {
      */
     private fun bringKioskAppToForeground() {
         try {
-            val intent = Intent(context, HardLockActivity::class.java).apply {
+            val intent = Intent(context, SecurityViolationActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -188,7 +186,7 @@ class EnforcementKioskModeManager(private val context: Context) {
      */
     private fun launchKioskActivity() {
         try {
-            val intent = Intent(context, HardLockActivity::class.java).apply {
+            val intent = Intent(context, SecurityViolationActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_CLEAR_TASK or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP

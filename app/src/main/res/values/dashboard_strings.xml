@@ -12,8 +12,7 @@
     <string name="registration_status_label">Status:</string>
     <string name="registration_date_label">Registered:</string>
     <string name="loan_number_label">Loan:</string>
-    <string name="heartbeat_status_label">Heartbeat:</string>
-    
+
     <!-- Buttons -->
     <string name="continue_to_main">Continue to Main</string>
     

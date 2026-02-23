@@ -9,15 +9,16 @@ import com.example.deviceowner.data.repository.DeviceRegistrationRepository
 import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.example.deviceowner.ui.activities.data.DeviceDataCollectionActivity
 import com.example.deviceowner.ui.activities.provisioning.consent.DataPrivacyConsentActivity
+import com.example.deviceowner.ui.activities.main.DeviceDetailActivity
 import kotlinx.coroutines.launch
 
 /**
  * Registration Status Activity - Determines which activity to launch
  *
  * Flow:
- * 1. Check if device is already registered successfully in database
- * 2. If registered -> Launch RegistrationSuccessActivity (Shows success state and runs heartbeat)
- * 3. If not registered -> Launch DeviceRegistrationActivity (input loan number)
+ * 1. Check if device is already registered successfully
+ * 2. If registered -> Launch DeviceDetailActivity (Main dashboard)
+ * 3. If not registered -> Launch Registration Flow
  */
 class RegistrationStatusActivity : AppCompatActivity() {
 
@@ -31,91 +32,80 @@ class RegistrationStatusActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // CRITICAL: Check Device Owner status (for logging only; registration flow runs in both cases)
-        val deviceOwnerManager = com.example.deviceowner.device.DeviceOwnerManager(this)
-        val isDeviceOwner = deviceOwnerManager.isDeviceOwner()
-        if (!isDeviceOwner) {
-            Log.w(TAG, "⚠️ Not device owner yet – showing registration flow (loan number → device info → success)")
-        }
-
-        // CRITICAL: Keep keyboard and touch working – no lock/overlay during registration
+        // Ensure keyboard and touch working during registration
         val controlPrefs = getSharedPreferences("control_prefs", MODE_PRIVATE)
         controlPrefs.edit().putBoolean("skip_security_restrictions", true).apply()
-        getSharedPreferences("device_owner_prefs", MODE_PRIVATE).edit().putBoolean("skip_security_restrictions", true).apply()
-        com.example.deviceowner.services.lock.SoftLockOverlayService.stopOverlay(this)
-        Log.d(TAG, "🔓 skip_security_restrictions set – overlay stopped – keyboard and touch enabled for registration")
-
+        
         prefsManager = SharedPreferencesManager(this)
         registrationRepository = DeviceRegistrationRepository(this)
 
-        // Check registration status from database
         lifecycleScope.launch {
             try {
-                // Step 1: If user hasn't accepted privacy consent (first install), show consent screen first
+                // 1. Consent Check
                 if (!DataPrivacyConsentActivity.hasConsent(this@RegistrationStatusActivity)) {
-                    Log.d(TAG, "First install - showing Data Privacy Consent")
                     launchDataPrivacyConsent()
                     return@launch
                 }
 
-                // Step 2: If device is fully registered, go to success
-                val isRegistered = registrationRepository.isDeviceRegistered()
-                val deviceIdFromPrefs = getSharedPreferences("device_registration", MODE_PRIVATE)
-                    .getString("device_id", null)
+                // 2. Check registration status
+                var isRegistered = registrationRepository.isDeviceRegistered()
+                
+                // 3. Attempt restore if not found (prevents data loss on update)
+                if (!isRegistered) {
+                    if (registrationRepository.restoreRegistrationDataFromBackup()) {
+                        isRegistered = true
+                    }
+                }
 
-                Log.d(TAG, "Device ID from prefs: $deviceIdFromPrefs, isRegistered: $isRegistered")
-
-                if (isRegistered && !deviceIdFromPrefs.isNullOrEmpty()) {
-                    Log.d(TAG, "Device registered - launching RegistrationSuccessActivity")
-                    launchSuccessActivity()
+                // 4. If registered, go to the MAIN page (DeviceDetailActivity)
+                if (isRegistered) {
+                    Log.d(TAG, "Device registered - launching DeviceDetailActivity as main screen")
+                    launchMainDashboard()
                     return@launch
                 }
 
-                // Step 3: Check for in-progress registration (user entered loan number, closed app)
+                // 5. Resume in-progress
                 val inProgressLoanNumber = registrationRepository.getInProgressLoanNumber()
                 if (!inProgressLoanNumber.isNullOrEmpty()) {
-                    Log.d(TAG, "Resuming registration with saved loan number: $inProgressLoanNumber")
                     launchDataCollectionDirectly(inProgressLoanNumber)
                     return@launch
                 }
 
-                // Step 4: Fresh start - show loan number input
-                Log.d(TAG, "No in-progress registration - launching loan number input")
+                // 6. Fresh start
                 launchRegistrationFlow()
             } catch (e: Exception) {
-                Log.e(TAG, "Error checking registration status: ${e.message}", e)
+                Log.e(TAG, "Error: ${e.message}")
                 launchRegistrationFlow()
             }
         }
     }
 
     private fun launchDataPrivacyConsent() {
-        val intent = Intent(this, DataPrivacyConsentActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
+        startActivity(Intent(this, DataPrivacyConsentActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
         finish()
     }
 
-    private fun launchSuccessActivity() {
-        val intent = Intent(this, RegistrationSuccessActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
+    private fun launchMainDashboard() {
+        startActivity(Intent(this, DeviceDetailActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
         finish()
     }
 
     private fun launchRegistrationFlow() {
-        val intent = Intent(this, com.example.deviceowner.presentation.activities.DeviceRegistrationActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
+        startActivity(Intent(this, com.example.deviceowner.presentation.activities.DeviceRegistrationActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
         finish()
     }
 
-    /** Resume registration: go directly to DeviceDataCollectionActivity with saved loan number. */
     private fun launchDataCollectionDirectly(loanNumber: String) {
-        val intent = Intent(this, DeviceDataCollectionActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        intent.putExtra(DeviceDataCollectionActivity.EXTRA_LOAN_NUMBER, loanNumber)
-        startActivity(intent)
+        startActivity(Intent(this, DeviceDataCollectionActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(DeviceDataCollectionActivity.EXTRA_LOAN_NUMBER, loanNumber)
+        })
         finish()
     }
 }

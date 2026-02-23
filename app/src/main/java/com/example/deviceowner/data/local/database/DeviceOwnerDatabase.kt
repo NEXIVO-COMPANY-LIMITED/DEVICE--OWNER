@@ -8,46 +8,45 @@ import com.example.deviceowner.data.local.database.dao.device.CompleteDeviceRegi
 import com.example.deviceowner.data.local.database.dao.device.DeviceBaselineDao
 import com.example.deviceowner.data.local.database.dao.device.DeviceDataDao
 import com.example.deviceowner.data.local.database.dao.device.DeviceRegistrationDao
-import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatDao
-import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatHistoryDao
 import com.example.deviceowner.data.local.database.dao.lock.LockStateRecordDao
-import com.example.deviceowner.data.local.database.dao.offline.HeartbeatSyncDao
 import com.example.deviceowner.data.local.database.dao.offline.OfflineEventDao
+import com.example.deviceowner.data.local.database.dao.offline.HeartbeatSyncDao
+import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatResponseDao
 import com.example.deviceowner.data.local.database.dao.sim.SimChangeHistoryDao
 import com.example.deviceowner.data.local.database.dao.tamper.TamperDetectionDao
 import com.example.deviceowner.data.local.database.entities.device.CompleteDeviceRegistrationEntity
 import com.example.deviceowner.data.local.database.entities.device.DeviceBaselineEntity
 import com.example.deviceowner.data.local.database.entities.device.DeviceDataEntity
 import com.example.deviceowner.data.local.database.entities.device.DeviceRegistrationEntity
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatEntity
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
 import com.example.deviceowner.data.local.database.entities.lock.LockStateRecordEntity
-import com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity
 import com.example.deviceowner.data.local.database.entities.offline.OfflineEvent
+import com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity
+import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatResponseEntity
 import com.example.deviceowner.data.local.database.entities.sim.SimChangeHistoryEntity
 import com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity
+import com.example.deviceowner.data.local.database.entities.payment.InstallmentEntity
 
 /**
- * Primary operational database: offline queue, registration, heartbeat, and tamper sync.
+ * Primary operational database: offline queue, registration, and tamper sync.
  *
- * Role: Single source of truth for sync/queue. Used by [OfflineSyncWorker], heartbeat
- * offline logic, and tamper event persistence. [AppDatabase] is for optional analytics/history only.
+ * Role: Single source of truth for sync/queue. Used by [OfflineSyncWorker]
+ * and tamper event persistence. [AppDatabase] is for optional analytics/history only.
  */
 @Database(
     entities = [
         DeviceRegistrationEntity::class,
         CompleteDeviceRegistrationEntity::class,
         DeviceDataEntity::class,
-        HeartbeatEntity::class,
-        HeartbeatHistoryEntity::class,
         TamperDetectionEntity::class,
         DeviceBaselineEntity::class,
         OfflineEvent::class,
         HeartbeatSyncEntity::class,
+        HeartbeatResponseEntity::class,
         SimChangeHistoryEntity::class,
-        LockStateRecordEntity::class
+        LockStateRecordEntity::class,
+        InstallmentEntity::class
     ],
-    version = 12,
+    version = 14,
     exportSchema = false
 )
 abstract class DeviceOwnerDatabase : RoomDatabase() {
@@ -55,14 +54,14 @@ abstract class DeviceOwnerDatabase : RoomDatabase() {
     abstract fun deviceRegistrationDao(): DeviceRegistrationDao
     abstract fun completeDeviceRegistrationDao(): CompleteDeviceRegistrationDao
     abstract fun deviceDataDao(): DeviceDataDao
-    abstract fun heartbeatDao(): HeartbeatDao
-    abstract fun heartbeatHistoryDao(): HeartbeatHistoryDao
     abstract fun tamperDetectionDao(): TamperDetectionDao
     abstract fun deviceBaselineDao(): DeviceBaselineDao
     abstract fun offlineEventDao(): OfflineEventDao
     abstract fun heartbeatSyncDao(): HeartbeatSyncDao
+    abstract fun heartbeatResponseDao(): com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatResponseDao
     abstract fun simChangeHistoryDao(): SimChangeHistoryDao
     abstract fun lockStateRecordDao(): LockStateRecordDao
+    abstract fun installmentDao(): com.example.deviceowner.data.local.database.dao.InstallmentDao
 
     companion object {
         @Volatile

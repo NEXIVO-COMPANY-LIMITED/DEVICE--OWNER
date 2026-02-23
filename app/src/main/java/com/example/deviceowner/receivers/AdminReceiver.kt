@@ -174,6 +174,7 @@ class AdminReceiver : DeviceAdminReceiver() {
                 }
 
                 // Enterprise FRP: Factory Reset Protection with company account
+                /* 🔴 DISABLED: FRP NOT USED CURRENTLY
                 try {
                     val frpResult = FrpManager(context).setupFrpProtection()
                     if (frpResult.success) {
@@ -186,6 +187,7 @@ class AdminReceiver : DeviceAdminReceiver() {
                 } catch (e: Exception) {
                     Log.e(TAG, "FRP setup failed: ${e.message}", e)
                 }
+                */
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed during provisioning: ${e.message}", e)

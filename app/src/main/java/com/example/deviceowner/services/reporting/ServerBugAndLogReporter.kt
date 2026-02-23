@@ -3,27 +3,23 @@ package com.example.deviceowner.services.reporting
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.example.deviceowner.core.device.DeviceDataCollector
+import com.example.deviceowner.data.DeviceIdProvider
 import com.example.deviceowner.data.models.tech.BugReportRequest
 import com.example.deviceowner.data.models.tech.DeviceLogRequest
 import com.example.deviceowner.data.remote.ApiClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import kotlinx.coroutines.*
 import java.io.PrintWriter
 import java.io.StringWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
- * Posts bugs and logs to backend tech API. Useful for backend to see device issues and tamper.
- *
- * Endpoints (sponsa_backend):
- * - POST /api/tech/devicecategory/logs/ – device logs (LogType, Loglevel, message, device_id)
- * - POST /api/tech/devicecategory/bugs/ – bug reports (title, message, device, priority)
- *
- * Usage:
- * - Logs: setOnRemoteLogCallback in Application wires LogManager → postLog (Error/Warning).
- * - Bugs: postBug(title, message) or postException(throwable) from anywhere (e.g. catch blocks, "Report bug" UI).
- * - Init: ServerBugAndLogReporter.init(context) in Application.onCreate (already done).
+ * Posts bugs and logs to backend tech API with enriched device and company context.
+ * Follows the binding strategy from DEVICE_AND_COMPANY_INFO_FOR_LOGS.md
  */
 object ServerBugAndLogReporter {
 
@@ -32,176 +28,203 @@ object ServerBugAndLogReporter {
     private const val MAX_TITLE_LENGTH = 250
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
     private val apiClient by lazy { ApiClient() }
 
-    /**
-     * Call from Application.onCreate() so reporter can resolve device ID.
-     * Optional; posting works without init (uses UNREGISTERED device id).
-     */
     @Volatile
     private var appContext: Context? = null
+    private var cachedDeviceId: String? = null
+    private var dataCollector: DeviceDataCollector? = null
 
     fun init(context: Context) {
         appContext = context.applicationContext
-    }
-
-    private fun getDeviceId(): String {
-        val ctx = appContext ?: return "UNREGISTERED-${Build.MODEL ?: "unknown"}"
-        return try {
-            val id = com.example.deviceowner.utils.storage.SharedPreferencesManager(ctx).getDeviceIdForHeartbeat()
-                ?: ctx.getSharedPreferences("device_registration", Context.MODE_PRIVATE).getString("device_id", null)
-                ?: ctx.getSharedPreferences("device_data", Context.MODE_PRIVATE).getString("device_id_for_heartbeat", null)
-            id?.trim()?.takeIf { it.isNotEmpty() } ?: "UNREGISTERED-${Build.MANUFACTURER}-${Build.MODEL}"
-        } catch (e: Exception) {
-            "UNREGISTERED-${Build.MODEL ?: "unknown"}"
-        }
-    }
-
-    private fun getDeviceInfoString(): String {
-        val ctx = appContext
-        val deviceId = getDeviceId()
-        return if (ctx != null) {
-            "$deviceId | ${Build.MANUFACTURER} ${Build.MODEL} | Android ${Build.VERSION.SDK_INT}"
-        } else {
-            "$deviceId | ${Build.MANUFACTURER} ${Build.MODEL}"
-        }
-    }
-
-    /**
-     * Map app log category to backend LogType.
-     * Backend: heartbeat, registration, installation, authentication, data_sync, error, system, security, network, other
-     */
-    fun categoryToLogType(category: String): String {
-        return when (category) {
-            "DEVICE_REGISTRATION" -> "registration"
-            "HEARTBEAT" -> "heartbeat"
-            "API_CALLS" -> "system"
-            "SECURITY" -> "security"
-            "PROVISIONING" -> "installation"
-            "SYNC" -> "data_sync"
-            "ERRORS", "GENERAL" -> "error"
-            "DEVICE_OWNER", "DEVICE_INFO", "JSON_LOGS" -> "system"
-            else -> "other"
-        }
-    }
-
-    /**
-     * Map app log level to backend Loglevel: Normal, Warning, Error
-     */
-    fun levelToLoglevel(level: String): String {
-        return when (level.uppercase()) {
-            "ERROR" -> "Error"
-            "WARN", "WARNING" -> "Warning"
-            else -> "Normal"
-        }
-    }
-
-    /**
-     * Truncate string to avoid server rejection or huge payloads.
-     */
-    private fun truncate(s: String, maxLen: Int): String {
-        return if (s.length <= maxLen) s else s.take(maxLen - 3) + "..."
-    }
-
-    /**
-     * Post a log entry to the server. Fire-and-forget; never throws.
-     * Call from LogManager when level is Error or Warning (or any level if you want).
-     */
-    fun postLog(
-        logType: String,
-        logLevel: String,
-        message: String,
-        extraData: Map<String, Any?>? = null
-    ) {
+        dataCollector = DeviceDataCollector(appContext!!)
+        
+        // Proactively fetch and cache the device ID
         scope.launch {
-            try {
-                val deviceId = getDeviceId()
-                val body = DeviceLogRequest(
-                    deviceId = deviceId,
-                    logType = logType,
-                    message = truncate(message, MAX_MESSAGE_LENGTH),
-                    logLevel = logLevel,
-                    extraData = extraData
-                )
-                val response = apiClient.postDeviceLog(body)
-                if (response.isSuccessful) {
-                    Log.d(TAG, "Log posted to server: type=$logType level=$logLevel")
-                } else {
-                    Log.w(TAG, "Log post failed: HTTP ${response.code()} ${response.errorBody()?.string()?.take(200)}")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Log post error (non-fatal): ${e.message}")
+            cachedDeviceId = DeviceIdProvider.getDeviceId(appContext!!)
+            if (cachedDeviceId != null) {
+                Log.i(TAG, "Cached Device ID for bug reporting: $cachedDeviceId")
             }
         }
     }
 
+    private suspend fun getDeviceIdAsync(): String? {
+        if (cachedDeviceId != null) return cachedDeviceId
+        val ctx = appContext ?: return null
+        val deviceId = DeviceIdProvider.getDeviceId(ctx)
+        if (deviceId != null) {
+            cachedDeviceId = deviceId
+        }
+        return deviceId
+    }
+
     /**
-     * Post a bug report (e.g. uncaught exception) to the server. Fire-and-forget; never throws.
+     * Gathers a comprehensive context object for binding with logs.
      */
+    private suspend fun gatherBindingContext(): Map<String, Any?> {
+        val ctx = appContext ?: return emptyMap()
+        val prefs = SharedPreferencesManager(ctx)
+        
+        val deviceInfo = mutableMapOf<String, Any?>(
+            "serial_number" to (prefs.getSerialNumber() ?: Build.SERIAL),
+            "device_type" to (prefs.getDeviceType() ?: "phone"),
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+            "os_version" to Build.VERSION.RELEASE,
+            "sdk_version" to Build.VERSION.SDK_INT
+        )
+
+        val deviceStatus = mutableMapOf<String, Any?>(
+            "is_online" to true, // If we are sending a log, we are online
+            "installation_completed" to prefs.isRegistrationComplete(),
+            "loan_status" to (prefs.getRegistrationStatus() ?: "unknown")
+        )
+
+        val companyInfo = mutableMapOf<String, Any?>(
+            "company_name" to prefs.getOrganizationName(),
+            "company_code" to (prefs.getLoanNumber()?.take(5) ?: "unknown"),
+            "app_version" to getAppVersion()
+        )
+
+        return mapOf(
+            "device_info" to deviceInfo,
+            "device_status" to deviceStatus,
+            "company_info" to companyInfo,
+            "timestamp" to getCurrentTimestamp()
+        )
+    }
+
+    private fun getAppVersion(): String {
+        return try {
+            val pInfo = appContext?.packageManager?.getPackageInfo(appContext!!.packageName, 0)
+            pInfo?.versionName ?: "1.0.0"
+        } catch (e: Exception) { "1.0.0" }
+    }
+
+    private fun getCurrentTimestamp(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(Date())
+    }
+
+    fun postLog(
+        logType: String,
+        logLevel: String,
+        message: String,
+        extraData: Map<String, Any?>? = null,
+        explicitDeviceId: String? = null
+    ) {
+        scope.launch {
+            try {
+                val deviceId = explicitDeviceId ?: getDeviceIdAsync()
+                
+                // CRITICAL: Don't send logs if device not registered
+                if (deviceId.isNullOrBlank()) {
+                    Log.w(TAG, "⚠️ Cannot send log: device not registered (no device_id)")
+                    return@launch
+                }
+                
+                // CRITICAL: Don't send logs if device_id is locally generated
+                if (deviceId.startsWith("ANDROID-") || deviceId.startsWith("UNREGISTERED-")) {
+                    Log.w(TAG, "⚠️ Cannot send log: device_id is locally generated: $deviceId")
+                    return@launch
+                }
+                
+                Log.d(TAG, "📤 Sending log with device_id: $deviceId")
+                
+                // Merge context with provided extraData
+                val enrichedExtraData = gatherBindingContext().toMutableMap()
+                extraData?.let { enrichedExtraData.putAll(it) }
+
+                val body = DeviceLogRequest(
+                    deviceId = deviceId,
+                    logType = logType,
+                    message = if (message.length <= MAX_MESSAGE_LENGTH) message else message.take(MAX_MESSAGE_LENGTH - 3) + "...",
+                    logLevel = logLevel,
+                    extraData = enrichedExtraData
+                )
+                apiClient.postDeviceLog(body)
+                Log.i(TAG, "✅ Log sent successfully")
+            } catch (e: Exception) {
+                Log.w(TAG, "Log post error: ${e.message}")
+            }
+        }
+    }
+
     fun postBug(
         title: String,
         message: String,
         deviceInfo: String? = null,
         priority: String = "medium",
-        extraData: Map<String, Any?>? = null
+        extraData: Map<String, Any?>? = null,
+        explicitDeviceId: String? = null
     ) {
         scope.launch {
             try {
-                val device = deviceInfo ?: getDeviceInfoString()
-                val body = BugReportRequest(
-                    title = truncate(title, MAX_TITLE_LENGTH),
-                    message = truncate(message, MAX_MESSAGE_LENGTH),
-                    device = truncate(device, 500),
-                    priority = priority.lowercase().takeIf { it in setOf("low", "medium", "high", "critical") } ?: "medium",
-                    extraData = extraData
-                )
-                val response = apiClient.postBugReport(body)
-                if (response.isSuccessful) {
-                    Log.d(TAG, "Bug report posted to server: ${body.title}")
-                } else {
-                    Log.w(TAG, "Bug post failed: HTTP ${response.code()} ${response.errorBody()?.string()?.take(200)}")
+                val deviceId = explicitDeviceId ?: getDeviceIdAsync()
+                
+                // CRITICAL: Don't send bug reports if device not registered
+                if (deviceId.isNullOrBlank()) {
+                    Log.w(TAG, "⚠️ Cannot send bug report: device not registered (no device_id)")
+                    return@launch
                 }
+                
+                // CRITICAL: Don't send bug reports if device_id is locally generated
+                if (deviceId.startsWith("ANDROID-") || deviceId.startsWith("UNREGISTERED-")) {
+                    Log.w(TAG, "⚠️ Cannot send bug report: device_id is locally generated: $deviceId")
+                    return@launch
+                }
+                
+                Log.d(TAG, "📤 Sending bug report with device_id: $deviceId")
+                
+                val deviceDescriptor = deviceInfo ?: "$deviceId | ${Build.MANUFACTURER} ${Build.MODEL}"
+                
+                // Merge context with provided extraData
+                val enrichedExtraData = gatherBindingContext().toMutableMap()
+                extraData?.let { enrichedExtraData.putAll(it) }
+
+                val body = BugReportRequest(
+                    title = if (title.length <= MAX_TITLE_LENGTH) title else title.take(MAX_TITLE_LENGTH - 3) + "...",
+                    message = if (message.length <= MAX_MESSAGE_LENGTH) message else message.take(MAX_MESSAGE_LENGTH - 3) + "...",
+                    device = deviceDescriptor,
+                    priority = priority.lowercase(),
+                    extraData = enrichedExtraData
+                )
+                apiClient.postBugReport(body)
+                Log.i(TAG, "✅ Bug report sent successfully")
             } catch (e: Exception) {
-                Log.w(TAG, "Bug post error (non-fatal): ${e.message}")
+                Log.w(TAG, "Bug post error: ${e.message}")
             }
         }
     }
 
-    /**
-     * Post an exception as a bug report. Stack trace is included in message and extra_data.
-     * Never throws.
-     */
     fun postException(
         throwable: Throwable,
-        contextMessage: String? = null
+        contextMessage: String? = null,
+        explicitDeviceId: String? = null
     ) {
         scope.launch {
             try {
                 val title = throwable.javaClass.simpleName
                 val sw = StringWriter()
                 throwable.printStackTrace(PrintWriter(sw))
-                val stackTrace = sw.toString()
-                val message = buildString {
-                    if (!contextMessage.isNullOrBlank()) append(contextMessage).append("\n\n")
-                    append(throwable.message ?: "No message")
-                    append("\n\nStack trace:\n")
-                    append(truncate(stackTrace, MAX_MESSAGE_LENGTH - 200))
-                }
-                val extra = mapOf<String, Any?>(
-                    "exception_class" to throwable.javaClass.name,
-                    "thread" to (Thread.currentThread().name ?: "unknown")
+
+                val message = if (!contextMessage.isNullOrBlank()) "$contextMessage: ${throwable.message}" else (throwable.message ?: "No message")
+                
+                val errorDetails = mapOf(
+                    "exception" to throwable.javaClass.name,
+                    "stacktrace" to sw.toString()
                 )
+
                 postBug(
                     title = title,
                     message = message,
-                    deviceInfo = getDeviceInfoString(),
-                    priority = "high",  // Django: low, medium, high, critical (lowercase)
-                    extraData = extra
+                    deviceInfo = null,
+                    priority = "high",
+                    extraData = mapOf("error_details" to errorDetails),
+                    explicitDeviceId = explicitDeviceId
                 )
-            } catch (e: Exception) {
-                Log.w(TAG, "postException failed (non-fatal): ${e.message}")
-            }
+            } catch (e: Exception) {}
         }
     }
 }

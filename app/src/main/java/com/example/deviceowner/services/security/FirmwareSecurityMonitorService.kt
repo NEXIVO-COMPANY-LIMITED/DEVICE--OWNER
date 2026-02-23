@@ -56,6 +56,7 @@ class FirmwareSecurityMonitorService : Service() {
         }
         scope.launch { monitorSecurityViolations() }
         scope.launch { periodicStatusCheck() }
+        scope.launch { periodicTamperCheck() }  // ✅ Added tamper detection
         return START_STICKY
     }
 
@@ -114,6 +115,33 @@ class FirmwareSecurityMonitorService : Service() {
         }
     }
 
+    /**
+     * Periodic tamper detection check.
+     * Runs every 5 minutes to detect security violations like:
+     * - Bootloader unlocked
+     * - Root/Jailbreak
+     * - Developer mode
+     * - USB debugging
+     * - Custom ROM
+     * - System modifications
+     * - Outdated security patch
+     * - Unknown sources
+     * - ADB enabled
+     * - Mock location
+     */
+    private suspend fun periodicTamperCheck() {
+        while (scope.isActive) {
+            try {
+                Log.d(TAG, "🔍 Running periodic tamper detection check...")
+                TamperDetectionService.checkAndReportTampering(this@FirmwareSecurityMonitorService)
+                delay(5 * 60 * 1000)  // Check every 5 minutes
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in periodic tamper check", e)
+                delay(10 * 60 * 1000)  // Retry after 10 minutes on error
+            }
+        }
+    }
+
     private fun handleViolation(v: FirmwareSecurity.Violation) {
         Log.w(TAG, "Violation: ${v.type} severity=${v.severity} details=${v.details}")
         val status = FirmwareSecurity.checkSecurityStatus()
@@ -124,18 +152,18 @@ class FirmwareSecurityMonitorService : Service() {
 
     private fun handleExcessiveViolations(count: Long) {
         Log.e(TAG, "EXCESSIVE VIOLATIONS DETECTED: $count")
-        
+
         scope.launch {
             try {
                 // Trigger enhanced security measures
                 val enhancedSecurity = com.example.deviceowner.security.enforcement.policy.EnhancedSecurityManager(this@FirmwareSecurityMonitorService)
                 enhancedSecurity.apply100PercentPerfectSecurity()
-                
+
                 // Trigger hard lock as last resort
                 triggerHardLock()
-                
+
                 Log.i(TAG, "Enhanced security measures applied due to excessive violations")
-                
+
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle excessive violations", e)
             }
@@ -171,7 +199,7 @@ class FirmwareSecurityMonitorService : Service() {
                         Log.w(TAG, "Unknown critical violation type: ${v.type}")
                     }
                 }
-                
+
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle critical violation", e)
             }
@@ -196,15 +224,15 @@ class FirmwareSecurityMonitorService : Service() {
     private fun triggerHardLock() {
         try {
             Log.e(TAG, "TRIGGERING HARD LOCK DUE TO CRITICAL SECURITY VIOLATION")
-            
-            val intent = Intent(this, com.example.deviceowner.ui.activities.lock.HardLockActivity::class.java)
+
+            val intent = Intent(this, com.example.deviceowner.ui.activities.lock.system.HardLockGenericActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             intent.putExtra("lock_reason", "FIRMWARE_SECURITY_VIOLATION")
             intent.putExtra("lock_timestamp", System.currentTimeMillis())
             startActivity(intent)
-            
+
             Log.i(TAG, "Hard lock triggered successfully")
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "FAILED TO TRIGGER HARD LOCK - CRITICAL ERROR", e)
         }

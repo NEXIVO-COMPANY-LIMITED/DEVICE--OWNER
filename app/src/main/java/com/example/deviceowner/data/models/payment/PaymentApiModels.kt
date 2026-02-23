@@ -1,14 +1,35 @@
 package com.example.deviceowner.data.models.payment
 
+import com.google.gson.annotations.SerializedName
+
 /**
- * DEPRECATED: This file is kept for reference only.
- * 
- * All payment information is now obtained from the heartbeat response:
- * - next_payment.date_time
- * - next_payment.unlock_password
- * 
- * The old API endpoint "GET /loans/{loan_number}/next_payment_date" has been removed.
- * Use HeartbeatResponse.getNextPaymentDateTime() and getUnlockPassword() instead.
- * 
- * See: HeartbeatLockCoordinationService for payment processing
+ * Models for Payment and Installment APIs
  */
+
+data class Installment(
+    @SerializedName("id") val id: Int,
+    @SerializedName("installment_number") val installmentNumber: Int,
+    @SerializedName("due_date") val dueDate: String,
+    @SerializedName("amount_due") val amountDue: Double,
+    @SerializedName("amount_paid") val amountPaid: Double,
+    @SerializedName("status") val status: String
+)
+
+data class InstallmentResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("installments") val installments: List<Installment>
+)
+
+data class PaymentRequest(
+    @SerializedName("loan_number") val loanNumber: String,
+    @SerializedName("phone_number") val phoneNumber: String,
+    @SerializedName("amount") val amount: Double
+)
+
+data class PaymentResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("payment_reference") val paymentReference: String?,
+    @SerializedName("payment_gateway_url") val paymentGatewayUrl: String?,
+    @SerializedName("message") val message: String?
+)

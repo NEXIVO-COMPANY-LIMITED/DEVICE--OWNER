@@ -185,6 +185,29 @@ class ApiClient {
             throw IllegalArgumentException("deviceId cannot be blank or unknown for heartbeat")
         }
         
+        // Log full request data for debugging HTTP 500 errors
+        Log.d("ApiClient", "📋 HEARTBEAT REQUEST DATA:")
+        Log.d("ApiClient", "   Serial: ${heartbeatData.serialNumber}")
+        Log.d("ApiClient", "   Model: ${heartbeatData.model}")
+        Log.d("ApiClient", "   Manufacturer: ${heartbeatData.manufacturer}")
+        Log.d("ApiClient", "   Android ID: ${heartbeatData.androidId}")
+        Log.d("ApiClient", "   IMEIs: ${heartbeatData.deviceImeis}")
+        Log.d("ApiClient", "   RAM: ${heartbeatData.installedRam}")
+        Log.d("ApiClient", "   Storage: ${heartbeatData.totalStorage}")
+        Log.d("ApiClient", "   Lat/Long: ${heartbeatData.latitude}/${heartbeatData.longitude}")
+        Log.d("ApiClient", "   Rooted: ${heartbeatData.isDeviceRooted}")
+        Log.d("ApiClient", "   USB Debug: ${heartbeatData.isUsbDebuggingEnabled}")
+        Log.d("ApiClient", "   Dev Mode: ${heartbeatData.isDeveloperModeEnabled}")
+        Log.d("ApiClient", "   Bootloader: ${heartbeatData.isBootloaderUnlocked}")
+        Log.d("ApiClient", "   Custom ROM: ${heartbeatData.isCustomRom}")
+        Log.d("ApiClient", "   SDK: ${heartbeatData.sdkVersion}")
+        Log.d("ApiClient", "   OS: ${heartbeatData.osVersion}")
+        Log.d("ApiClient", "   Security Patch: ${heartbeatData.securityPatchLevel}")
+        Log.d("ApiClient", "   Battery: ${heartbeatData.batteryLevel}")
+        Log.d("ApiClient", "   Language: ${heartbeatData.language}")
+        Log.d("ApiClient", "   Fingerprint: ${heartbeatData.deviceFingerprint}")
+        Log.d("ApiClient", "   Bootloader: ${heartbeatData.bootloader}")
+        
         return try {
             val response = apiService.sendHeartbeat(deviceId, heartbeatData)
             if (response.isSuccessful) {
@@ -193,7 +216,14 @@ class ApiClient {
                 val errorBodyStr = response.errorBody()?.string() ?: "(no body)"
                 Log.e("ApiClient", "❌ Heartbeat FAILED: HTTP ${response.code()} ${response.message()}")
                 Log.e("ApiClient", "   Error body: $errorBodyStr")
-                Log.e("ApiClient", "   Possible causes: 404=device not found in DB, 400=invalid payload, 401/403=API key issue")
+                when (response.code()) {
+                    400 -> Log.e("ApiClient", "   Cause: Invalid payload - check field formats")
+                    401 -> Log.e("ApiClient", "   Cause: Unauthorized - check API key")
+                    403 -> Log.e("ApiClient", "   Cause: Forbidden - check API key permissions")
+                    404 -> Log.e("ApiClient", "   Cause: Device not found in DB - verify device_id")
+                    500 -> Log.e("ApiClient", "   Cause: Server error - check backend logs")
+                    else -> Log.e("ApiClient", "   Cause: HTTP ${response.code()}")
+                }
             }
             response
         } catch (e: java.net.UnknownHostException) {
@@ -292,6 +322,45 @@ class ApiClient {
             response
         } catch (e: Exception) {
             Log.e("ApiClient", "❌ Post tamper event failed: ${e.message}", e)
+            throw e
+        }
+    }
+
+    suspend fun getDeviceInstallments(deviceId: String): Response<com.example.deviceowner.data.models.payment.InstallmentsResponse> {
+        return try {
+            apiService.getDeviceInstallments(deviceId)
+        } catch (e: Exception) {
+            Log.e("ApiClient", "❌ Get device installments failed: ${e.message}", e)
+            throw e
+        }
+    }
+
+    suspend fun confirmDeactivation(deviceId: String, status: String, message: String): Response<Map<String, Any>> {
+        Log.d("ApiClient", "🔍 Deactivation Confirmation: device=$deviceId, status=$status")
+        Log.d("ApiClient", "   URL: ${AppConfig.BASE_URL}api/devices/$deviceId/confirm-deactivation/")
+        Log.d("ApiClient", "   X-Device-Api-Key: ${if (AppConfig.DEVICE_API_KEY.isNotEmpty()) "***present" else "EMPTY"}")
+        
+        if (deviceId.isBlank() || deviceId.equals("unknown", ignoreCase = true)) {
+            Log.e("ApiClient", "❌ Deactivation confirmation ABORTED: deviceId is blank or unknown")
+            throw IllegalArgumentException("deviceId cannot be blank or unknown for deactivation confirmation")
+        }
+        
+        return try {
+            val confirmationData = mapOf(
+                "status" to status,
+                "message" to message
+            )
+            val response = apiService.confirmDeactivation(deviceId, confirmationData)
+            if (response.isSuccessful) {
+                Log.d("ApiClient", "✅ Deactivation confirmation SUCCESS: HTTP ${response.code()}")
+            } else {
+                val errorBodyStr = response.errorBody()?.string() ?: "(no body)"
+                Log.e("ApiClient", "❌ Deactivation confirmation FAILED: HTTP ${response.code()} ${response.message()}")
+                Log.e("ApiClient", "   Error body: $errorBodyStr")
+            }
+            response
+        } catch (e: Exception) {
+            Log.e("ApiClient", "❌ Deactivation confirmation failed: ${e.javaClass.simpleName} - ${e.message}", e)
             throw e
         }
     }

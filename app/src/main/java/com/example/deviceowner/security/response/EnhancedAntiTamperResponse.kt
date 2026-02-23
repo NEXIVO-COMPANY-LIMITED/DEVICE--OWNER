@@ -11,16 +11,13 @@ import com.example.deviceowner.device.DeviceOwnerManager
 import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
 import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.google.gson.Gson
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 
 /**
- * Enhanced Anti-Tamper Response System
- * - On tamper: always apply hard lock (offline or online), then send tamper event to server (or queue if offline).
- * - No tamper: normal flow (heartbeat only).
+ * Enhanced Anti-Tamper Response System - PROPER IMPLEMENTATION
+ * - On tamper: applies local hard lock IMMEDIATELY (Offline-ready).
+ * - Notifies Django server in background (Fire-and-forget).
+ * - Queues events if offline.
  */
 class EnhancedAntiTamperResponse(private val context: Context) {
     
@@ -34,56 +31,54 @@ class EnhancedAntiTamperResponse(private val context: Context) {
     
     /**
      * Respond to tamper: always hard lock (offline or online), then send tamper event automatically.
-     * @param extraData Optional (e.g. lock_applied_on_device, tamper_source) for backend/logs
      */
     fun respondToTamper(tamperType: String, severity: String, description: String, extraData: Map<String, Any?>? = null) {
-        Log.e(TAG, "🚨 TAMPER DETECTED: $tamperType (Severity: $severity)")
-        Log.e(TAG, "Description: $description")
+        Log.e(TAG, "🚨 SECURITY VIOLATION DETECTED: $tamperType (Severity: $severity)")
         
         scope.launch {
             try {
-                when (severity) {
-                    "CRITICAL" -> respondWithHardLockAndNotify(tamperType, "CRITICAL", description, extraData)
-                    "HIGH" -> respondWithHardLockAndNotify(tamperType, "HIGH", description, extraData)
-                    "MEDIUM" -> respondWithHardLockAndNotify(tamperType, "MEDIUM", description, extraData)
-                    else -> respondWithHardLockAndNotify(tamperType, "LOW", description, extraData)
+                // Determine severity normalized for reporting
+                val finalSeverity = when (severity.uppercase()) {
+                    "CRITICAL", "HIGH", "MEDIUM" -> severity.uppercase()
+                    else -> "LOW"
                 }
+                respondWithHardLockAndNotify(tamperType, finalSeverity, description, extraData)
             } catch (e: Exception) {
-                Log.e(TAG, "Error responding to tamper", e)
+                Log.e(TAG, "Critical error in tamper response chain", e)
             }
         }
     }
     
     /**
-     * Apply hard lock IMMEDIATELY on device - no wait for server.
-     * Server notification is fire-and-forget in background.
-     * Device blocks user and applies kiosk mode locally first.
+     * 1. IMMEDIATE LOCAL LOCK - Does not wait for server response.
+     * 2. BACKGROUND NOTIFICATION - Fire-and-forget reporting.
      */
     private suspend fun respondWithHardLockAndNotify(tamperType: String, severity: String, description: String, extraData: Map<String, Any?>? = null) {
         Log.e(TAG, "═══════════════════════════════════════════════════════")
-        Log.e(TAG, "🚨 TAMPER ($severity) - APPLYING HARD LOCK IMMEDIATELY (no server wait)")
+        Log.e(TAG, "🚨 TAMPER RESPONSE: APPLYING INSTANT LOCKDOWN")
         Log.e(TAG, "═══════════════════════════════════════════════════════")
 
-        // Step 1: IMMEDIATE local block - kiosk mode, hard lock (do NOT wait for server)
+        // STEP 1: IMMEDIATE LOCAL LOCK (SCORCHED EARTH POLICY)
+        // forceRestart = true ensures the lock activity is brought to front immediately
         val reason = "TAMPER: $tamperType - $description"
-        controlManager.applyHardLock(reason, forceRestart = false, forceFromServerOrMismatch = true, tamperType = tamperType)
+        controlManager.applyHardLock(reason, forceRestart = true, forceFromServerOrMismatch = true, tamperType = tamperType)
+        
+        // Apply all critical restrictions to prevent any user bypass
         deviceOwnerManager.applyAllCriticalRestrictions()
         deviceOwnerManager.applyRestrictions()
 
-        Log.e(TAG, "✅ Device blocked locally - kiosk mode applied. User cannot proceed.")
+        Log.i(TAG, "✅ Device locked locally via Kiosk Mode (Tamper: $tamperType)")
 
-        // Step 2: Send tamper to server in background (fire-and-forget, never blocks)
+        // STEP 2: BACKGROUND NOTIFICATION (OFFLINE PERSISTENT)
         val enrichedExtra = (extraData?.toMutableMap() ?: mutableMapOf()).apply {
             putIfAbsent("lock_applied_on_device", "hard")
             putIfAbsent("lock_type", "hard")
+            putIfAbsent("reported_from", "EnhancedAntiTamperResponse")
         }
+        
         scope.launch { notifyRemoteServer(tamperType, severity, description, enrichedExtra) }
     }
     
-    /**
-     * Notify remote server about tamper event. Uses device_id from registration prefs.
-     * On failure or offline, persists to OfflineEvent for sync when network is available.
-     */
     private suspend fun notifyRemoteServer(
         tamperType: String,
         severity: String,
@@ -95,75 +90,56 @@ class EnhancedAntiTamperResponse(private val context: Context) {
                 val deviceId = SharedPreferencesManager(context).getDeviceIdForHeartbeat()
                     ?: SharedPreferencesManager(context).getDeviceId()
                     ?: context.getSharedPreferences("device_registration", Context.MODE_PRIVATE).getString("device_id", null)
-                    ?: context.getSharedPreferences("device_data", Context.MODE_PRIVATE).getString("device_id_for_heartbeat", null)
+                
                 val request = TamperEventRequest.forDjango(tamperType, description, extraData)
+                
                 if (!deviceId.isNullOrBlank()) {
                     val response = ApiClient().postTamperEvent(deviceId, request)
                     if (response.isSuccessful) {
-                        Log.d(TAG, "Tamper event sent to server: $tamperType -> tamper_type=${request.tamperType}")
-                        ServerBugAndLogReporter.postLog(
-                            "security",
-                            "Error",
-                            "TAMPER: $tamperType ($severity) - $description",
-                            mapOf("tamper_type" to request.tamperType, "severity" to request.severity)
-                        )
+                        Log.d(TAG, "✅ Tamper report delivered to Django: $tamperType")
+                        ServerBugAndLogReporter.postLog("security", "Tamper", "Delivered: $tamperType")
                         return@withContext
                     }
                 }
-                // Offline or no device_id or API failed: persist for later sync
-                val db = DeviceOwnerDatabase.getDatabase(context)
-                db.offlineEventDao().insertEvent(
-                    OfflineEvent(
-                        eventType = "TAMPER_SIGNAL",
-                        jsonData = Gson().toJson(request),
-                        timestamp = System.currentTimeMillis()
-                    )
-                )
-                Log.d(TAG, "Tamper event persisted for offline sync: $tamperType")
+                
+                // IF OFFLINE OR API FAILED: Persistence
+                queueOfflineTamperEvent(request)
+                
             } catch (e: Exception) {
-                Log.e(TAG, "Error notifying remote server", e)
-                try {
-                    val request = TamperEventRequest.forDjango(tamperType, description, extraData)
-                    DeviceOwnerDatabase.getDatabase(context).offlineEventDao().insertEvent(
-                        OfflineEvent(eventType = "TAMPER_SIGNAL", jsonData = Gson().toJson(request))
-                    )
-                } catch (e2: Exception) {
-                    Log.e(TAG, "Failed to persist tamper for offline sync", e2)
-                }
-            }
-        }
-    }
-    
-    /**
-     * Send tamper event to backend only (no hard lock). Use when lock was already applied (e.g. PackageRemovalReceiver).
-     * @param extraData Optional data (e.g. original_sim_serial, new_sim_serial for SIM_CHANGE)
-     */
-    fun sendTamperToBackendOnly(
-        tamperType: String,
-        severity: String,
-        description: String,
-        extraData: Map<String, Any?>? = null
-    ) {
-        scope.launch {
-            try {
-                notifyRemoteServer(tamperType, severity, description, extraData)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending tamper to backend", e)
+                Log.e(TAG, "Network reporting failed, queuing for offline sync", e)
+                val request = TamperEventRequest.forDjango(tamperType, description, extraData)
+                queueOfflineTamperEvent(request)
             }
         }
     }
 
-    /**
-     * Auto-recover from tamper (setup-only – no keyboard block)
-     */
+    private suspend fun queueOfflineTamperEvent(request: TamperEventRequest) {
+        try {
+            val db = DeviceOwnerDatabase.getDatabase(context)
+            db.offlineEventDao().insertEvent(
+                OfflineEvent(
+                    eventType = "TAMPER_SIGNAL",
+                    jsonData = Gson().toJson(request),
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+            Log.w(TAG, "💾 Tamper event queued for offline sync: ${request.tamperType}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to persist offline tamper event", e)
+        }
+    }
+    
+    fun sendTamperToBackendOnly(tamperType: String, severity: String, description: String, extraData: Map<String, Any?>? = null) {
+        scope.launch { notifyRemoteServer(tamperType, severity, description, extraData) }
+    }
+
     fun autoRecover() {
         scope.launch {
             try {
-                Log.d(TAG, "🔄 Starting auto-recovery (setup-only)...")
+                Log.d(TAG, "🔄 Auto-recovery (re-enforcing restrictions)...")
                 deviceOwnerManager.applyRestrictionsForSetupOnly()
-                Log.d(TAG, "✅ Auto-recovery completed – keyboard/touch stay enabled")
             } catch (e: Exception) {
-                Log.e(TAG, "Error during auto-recovery", e)
+                Log.e(TAG, "Recovery failed", e)
             }
         }
     }

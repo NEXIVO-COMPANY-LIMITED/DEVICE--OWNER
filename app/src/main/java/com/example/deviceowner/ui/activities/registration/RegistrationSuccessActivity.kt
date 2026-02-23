@@ -2,31 +2,24 @@ package com.example.deviceowner.ui.activities.registration
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -36,479 +29,274 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.core.SilentDeviceOwnerManager
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.mode.CompleteSilentMode
-import kotlinx.coroutines.delay
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.ExistingWorkPolicy
-import androidx.work.WorkManager
+import com.example.deviceowner.ui.activities.main.DeviceDetailActivity
 import com.example.deviceowner.services.heartbeat.HeartbeatWorker
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.delay
 
-/**
- * Enhanced Registration Success Activity with premium UI.
- * Shows success confirmation with animated elements and status information.
- * Starts background services for device monitoring and heartbeat.
- */
 class RegistrationSuccessActivity : ComponentActivity() {
 
-    private val handler = Handler(Looper.getMainLooper())
-    /** True if device_id was present and services (heartbeat, etc.) were started. False if device_id missing (UI can show warning). */
-    private var setupComplete = false
+    companion object {
+        const val EXTRA_DEVICE_ID = "device_id"
+        private const val TAG = "RegistrationSuccess"
+    }
+
+    private var deviceIdState = mutableStateOf("")
+    private var securityActive = mutableStateOf(false)
+    private var updateActive = mutableStateOf(false)
+    private var heartbeatActive = mutableStateOf(false)
+
+    override fun attachBaseContext(newBase: Context) {
+        val configuration = Configuration(newBase.resources.configuration)
+        configuration.fontScale = 1.0f
+        val context = newBase.createConfigurationContext(configuration)
+        super.attachBaseContext(context)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Start monitoring immediately in the background (saves device_id, starts SecurityMonitorService/heartbeat)
-        startMonitoring()
+        val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: ""
+        deviceIdState.value = deviceId
 
         setContent {
             DeviceOwnerTheme {
-                RegistrationSuccessScreen(setupComplete = setupComplete)
+                RegistrationSuccessScreen(
+                    deviceId = deviceIdState.value,
+                    securityActive = securityActive.value,
+                    updateActive = updateActive.value,
+                    heartbeatActive = heartbeatActive.value,
+                    onFinish = { navigateToMain() }
+                )
             }
+        }
+
+        if (deviceId.isNotEmpty()) {
+            startMonitoringServices(deviceId)
         }
     }
 
-    private fun startMonitoring() {
-        // device_id was saved by DeviceDataCollectionActivity from server registration response – same id is used for heartbeat
-        val prefs = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
-        val deviceId = prefs.getString("device_id", null)
-
-        // 0. CLEANUP: Remove WiFi network configured during registration
-        try {
-            cleanupRegistrationWiFi()
-            Log.i("RegistrationSuccess", "✅ Registration WiFi network removed")
-        } catch (e: Exception) {
-            Log.e("RegistrationSuccess", "Error cleaning up WiFi: ${e.message}")
+    private fun navigateToMain() {
+        val intent = Intent(this, DeviceDetailActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
+        startActivity(intent)
+        finish()
+    }
 
-        // 1. Store device_id_for_heartbeat FIRST (before starting services) – this id is used by SecurityMonitorService/HeartbeatService for POST .../data/
-        if (!deviceId.isNullOrBlank()) {
-            // Save server-returned device_id to all locations so heartbeat sends with this exact device_id
-            getSharedPreferences("device_data", Context.MODE_PRIVATE).edit()
-                .putString("device_id_for_heartbeat", deviceId).apply()
-            com.example.deviceowner.utils.storage.SharedPreferencesManager(this).setDeviceIdForHeartbeat(deviceId)
-            getSharedPreferences("device_registration", Context.MODE_PRIVATE).edit()
-                .putString("device_id", deviceId).apply()
-
-            Log.i("RegistrationSuccess", "✅ device_id for heartbeat saved (from registration): $deviceId")
-            Log.i("RegistrationSuccess", "   - device_data.device_id_for_heartbeat")
-            Log.i("RegistrationSuccess", "   - device_owner_prefs.device_id_for_heartbeat")
-            Log.i("RegistrationSuccess", "   - device_registration.device_id")
-        } else {
-            Log.e("RegistrationSuccess", "❌ ERROR: device_id is null or blank!")
-            Log.e("RegistrationSuccess", "   Cannot start heartbeat without device_id")
-            return
-        }
-
-        // 2. Start foreground service (heartbeat will read device_id_for_heartbeat)
-        try {
-            com.example.deviceowner.monitoring.SecurityMonitorService.startService(this)
-            Log.i("RegistrationSuccess", "✅ SecurityMonitorService started")
-        } catch (e: Exception) {
-            Log.e("RegistrationSuccess", "Error starting SecurityMonitorService: ${e.message}")
-        }
-
-        // 2b. Initialize heartbeat using the new initializer
-        if (deviceId != null) {
-            val initSuccess = com.example.deviceowner.services.heartbeat.HeartbeatInitializer.initializeHeartbeatAfterRegistration(this, deviceId)
-            if (initSuccess) {
-                Log.i("RegistrationSuccess", "✅ Heartbeat initialization successful")
-                Log.i("RegistrationSuccess", "   First heartbeat will send immediately, then every 30 seconds")
-
-                // Verify heartbeat is running (diagnostic)
-                val diagnostic = com.example.deviceowner.services.heartbeat.HeartbeatInitializer.diagnoseHeartbeat(this)
-                Log.d("RegistrationSuccess", diagnostic)
-            } else {
-                Log.e("RegistrationSuccess", "❌ Heartbeat initialization failed")
-                Log.e("RegistrationSuccess", "   Attempting recovery...")
-                // Retry after 2 seconds
-                handler.postDelayed({
-                    com.example.deviceowner.monitoring.SecurityMonitorService.startService(this)
-                }, 2000L)
-            }
-        }
-
-        // 3. Apply device restrictions (silent – no user messages)
-        try {
-            val deviceOwnerManager = DeviceOwnerManager(this)
-            if (deviceOwnerManager.isDeviceOwner()) {
-                deviceOwnerManager.applyRestrictionsForSetupOnly()
-                SilentDeviceOwnerManager(this).applySilentRestrictions()
-                CompleteSilentMode(this).enableCompleteSilentMode()
-                Log.d("RegistrationSuccess", "🔒 Silent restrictions applied – no messages to user")
-            }
-        } catch (e: Exception) {
-            Log.e("RegistrationSuccess", "Error applying restrictions: ${e.message}")
-        }
-
-        // 4. Clear skip security restrictions flag
-        try {
-            getSharedPreferences("control_prefs", Context.MODE_PRIVATE).edit()
-                .putBoolean("skip_security_restrictions", false)
-                .putBoolean("registration_flow_complete", true).apply()
-            Log.i("RegistrationSuccess", "🔒 Security restrictions enabled")
-        } catch (e: Exception) {
-            Log.e("RegistrationSuccess", "Error clearing skip flag: ${e.message}")
-        }
-
-        // 5. Enable heartbeat in preferences (SecurityMonitorService will handle periodic sending)
-        if (!deviceId.isNullOrBlank()) {
+    private fun startMonitoringServices(deviceId: String) {
+        Thread {
             try {
-                com.example.deviceowner.utils.storage.SharedPreferencesManager(this).setHeartbeatEnabled(true)
-                Log.i("RegistrationSuccess", "✅ Heartbeat enabled - SecurityMonitorService will send every 30 seconds")
-                Log.i("RegistrationSuccess", "   First heartbeat will be sent immediately, then every 30s")
+                Log.i(TAG, "")
+                Log.i(TAG, "╔════════════════════════════════════════╗")
+                Log.i(TAG, "║ 🔄 STARTING SERVICE INITIALIZATION")
+                Log.i(TAG, "║ Device: $deviceId")
+                Log.i(TAG, "╚════════════════════════════════════════╝")
+                
+                // 1. Core ID Sync
+                Log.i(TAG, "1️⃣ Saving device ID...")
+                com.example.deviceowner.data.DeviceIdProvider.saveDeviceId(this, deviceId)
+                
+                // Verify device ID was saved correctly
+                val savedId = com.example.deviceowner.data.DeviceIdProvider.getDeviceId(this)
+                if (savedId != deviceId) {
+                    Log.e(TAG, "❌ CRITICAL: Device ID not saved correctly!")
+                    Log.e(TAG, "   Expected: $deviceId")
+                    Log.e(TAG, "   Got: $savedId")
+                    return@Thread
+                }
+                Log.i(TAG, "✅ Device ID saved and verified: $savedId")
+                Thread.sleep(500)
+                
+                // 2. Security Layer
+                Log.i(TAG, "2️⃣ Starting security monitor service...")
+                val serviceIntent = Intent(this, com.example.deviceowner.monitoring.SecurityMonitorService::class.java).apply {
+                    putExtra(com.example.deviceowner.monitoring.SecurityMonitorService.EXTRA_DEVICE_ID, deviceId)
+                }
+                startService(serviceIntent)
+                runOnUiThread { securityActive.value = true }
+                Log.i(TAG, "✅ Security monitor service started")
+                Thread.sleep(500)
+
+                // 3. Heartbeat System (✅ NEW - 10-second interval)
+                Log.i(TAG, "3️⃣ Starting Heartbeat service (10-second interval)...")
+                com.example.deviceowner.services.heartbeat.HeartbeatService.start(this, deviceId)
+                runOnUiThread { heartbeatActive.value = true }
+                Log.i(TAG, "✅ Heartbeat service started - will send every 10 seconds")
+                Thread.sleep(500)
+
+                // 4. Update Layer
+                Log.i(TAG, "4️⃣ Initializing update system...")
+                runOnUiThread { updateActive.value = true }
+                Log.i(TAG, "✅ Update system initialized")
+                
+                Log.i(TAG, "")
+                Log.i(TAG, "╔════════════════════════════════════════╗")
+                Log.i(TAG, "║ ✅✅✅ ALL SYSTEMS INITIALIZED")
+                Log.i(TAG, "║ Device: $deviceId")
+                Log.i(TAG, "║ Heartbeat: Every 10 seconds")
+                Log.i(TAG, "╚════════════════════════════════════════╝")
+
             } catch (e: Exception) {
-                Log.e("RegistrationSuccess", "Error enabling heartbeat: ${e.message}", e)
+                Log.e(TAG, "❌ Initialization failed: ${e.message}", e)
             }
-        }
-
-        setupComplete = true
-    }
-
-    private fun cleanupRegistrationWiFi() {
-        try {
-            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-            val prefs = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
-
-            val registrationWiFiSSID = prefs.getString("registration_wifi_ssid", null)
-            val provisioningWiFiSSID = prefs.getString("provisioning_wifi_ssid", null)
-            val wifiSSIDsToRemove = listOfNotNull(registrationWiFiSSID, provisioningWiFiSSID).distinct()
-
-            if (wifiSSIDsToRemove.isEmpty()) return
-
-            val configuredNetworks = wifiManager.configuredNetworks
-            configuredNetworks?.forEach { network ->
-                val networkSSID = network.SSID?.replace("\"", "") ?: ""
-                if (wifiSSIDsToRemove.any { it.equals(networkSSID, ignoreCase = true) }) {
-                    wifiManager.removeNetwork(network.networkId)
-                    Log.i("RegistrationSuccess", "✅ WiFi network removed: $networkSSID")
-                }
-            }
-
-            wifiManager.saveConfiguration()
-            prefs.edit()
-                .remove("registration_wifi_ssid")
-                .remove("registration_wifi_password")
-                .remove("provisioning_wifi_ssid")
-                .apply()
-        } catch (e: Exception) {
-            Log.e("RegistrationSuccess", "Error cleaning up WiFi: ${e.message}", e)
-        }
+        }.start()
     }
 }
 
 @Composable
-private fun RegistrationSuccessScreen(setupComplete: Boolean = true) {
-    val scale = remember { Animatable(0f) }
-    val alpha = remember { Animatable(0f) }
-    var showContent by remember { mutableStateOf(false) }
+private fun RegistrationSuccessScreen(
+    deviceId: String,
+    securityActive: Boolean,
+    updateActive: Boolean,
+    heartbeatActive: Boolean,
+    onFinish: () -> Unit
+) {
+    val gradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9))
+    )
 
-    LaunchedEffect(Unit) {
-        // Animate icon
-        scale.animateTo(
-            targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        )
-        // Fade in content
-        delay(200)
-        showContent = true
-        alpha.animateTo(1f, animationSpec = tween(600))
-        Log.i("RegistrationSuccess", "✅ Registration complete - app remains visible")
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        // Main Content - Single page, no card wrapper
+    Box(modifier = Modifier.fillMaxSize().background(gradient)) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+            modifier = Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
-            // Success Icon with Pulse Effect
-            SuccessIcon(scale = scale.value)
+            Spacer(modifier = Modifier.height(60.dp))
+            
+            AnimatedSuccessHeader()
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            // Title
-            AnimatedVisibility(
-                visible = showContent,
-                enter = fadeIn(animationSpec = tween(600)) +
-                        slideInVertically(initialOffsetY = { it / 4 })
-            ) {
-                Text(
-                    text = "Registration Successful",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A),
-                    textAlign = TextAlign.Center,
-                    letterSpacing = (-0.3).sp,
-                    modifier = Modifier.alpha(alpha.value)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Subtitle
-            AnimatedVisibility(
-                visible = showContent,
-                enter = fadeIn(animationSpec = tween(600, delayMillis = 200))
-            ) {
-                Text(
-                    text = "Your device is now registered and managed by PAYO",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF64748B),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Warning when device_id was missing and services could not start
-            if (!setupComplete) {
-                AnimatedVisibility(
-                    visible = showContent,
-                    enter = fadeIn(animationSpec = tween(600, delayMillis = 300))
-                ) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFFEF3C7)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = Color(0xFFB45309)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Setup incomplete: device ID missing. Heartbeat may not run. Contact support.",
-                                fontSize = 12.sp,
-                                color = Color(0xFF92400E)
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // Status Badge
-            AnimatedVisibility(
-                visible = showContent,
-                enter = fadeIn(animationSpec = tween(600, delayMillis = 400))
-            ) {
-                StatusBadge(active = setupComplete)
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Info Section - Compact
-            InfoSection(visible = showContent, setupComplete = setupComplete)
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Footer
-            AnimatedVisibility(
-                visible = showContent,
-                enter = fadeIn(animationSpec = tween(600, delayMillis = 1000))
-            ) {
-                FooterSection()
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuccessIcon(scale: Float) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-
-    Box(
-        modifier = Modifier
-            .size(72.dp)
-            .scale(scale),
-        contentAlignment = Alignment.Center
-    ) {
-        // Pulse Ring
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .scale(pulseScale)
-                .background(Color(0xFFDCFCE7), CircleShape)
-                .alpha(0.3f)
-        )
-
-        // Main Circle
-        Surface(
-            modifier = Modifier.size(72.dp),
-            shape = CircleShape,
-            color = Color(0xFFDCFCE7)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Success",
-                    modifier = Modifier.size(36.dp),
-                    tint = Color(0xFF16A34A)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatusBadge(active: Boolean = true) {
-    val infiniteTransition = rememberInfiniteTransition(label = "blink")
-    val blinkAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "blink"
-    )
-
-    val (bgColor, dotColor, textColor, label) = when (active) {
-        true -> Quad(Color(0xFFDCFCE7), Color(0xFF16A34A), Color(0xFF15803D), "Active & Monitored")
-        false -> Quad(Color(0xFFFEF3C7), Color(0xFFB45309), Color(0xFF92400E), "Setup incomplete")
-    }
-
-    Surface(
-        shape = RoundedCornerShape(100.dp),
-        color = bgColor
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .background(dotColor, CircleShape)
-                    .alpha(blinkAlpha)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = textColor
+                "Device Protected",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+            )
+            
+            Text(
+                "Your enterprise security profile is active.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Device Info Card
+            InfoCard(deviceId)
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Real-time Service Checklist
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ChecklistItem("Security Monitoring", securityActive)
+                ChecklistItem("Device Heartbeat", heartbeatActive)
+                ChecklistItem("Auto-Update System", updateActive)
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = onFinish,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                enabled = securityActive && updateActive && heartbeatActive
+            ) {
+                Text("Finish Setup", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun AnimatedSuccessHeader() {
+    val infiniteTransition = rememberInfiniteTransition()
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp).scale(scale)) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = CircleShape,
+            color = Color(0xFFDCFCE7),
+            shadowElevation = 4.dp
+        ) {
+            Icon(
+                Icons.Default.Shield,
+                null,
+                modifier = Modifier.size(48.dp).padding(20.dp),
+                tint = Color(0xFF16A34A)
             )
         }
     }
 }
 
-private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
-
 @Composable
-private fun InfoSection(visible: Boolean, setupComplete: Boolean = true) {
-    val infoItems = listOf(
-        InfoItem(Icons.Default.CheckCircle, "Security monitoring is active"),
-        InfoItem(Icons.Default.Schedule, if (setupComplete) "Heartbeat service running" else "Heartbeat may not be running (device ID missing)"),
-        InfoItem(Icons.Default.Lock, "Device policies applied"),
-        InfoItem(Icons.Default.Description, "Device data synchronized")
-    )
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        infoItems.forEachIndexed { index, item ->
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(400, delayMillis = 600 + (index * 100))) +
-                        slideInVertically(
-                            initialOffsetY = { it / 2 },
-                            animationSpec = tween(400, delayMillis = 600 + (index * 100))
-                        )
-            ) {
-                InfoCard(item = item)
-            }
-            if (index < infoItems.size - 1) {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
+private fun InfoCard(deviceId: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
+        border = CardDefaults.outlinedCardBorder()
+    ) {
+        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("DEVICE IDENTIFIER", style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                deviceId.ifEmpty { "Registering..." },
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                ),
+                color = Color(0xFF1E293B)
+            )
         }
     }
 }
 
 @Composable
-private fun InfoCard(item: InfoItem) {
+private fun ChecklistItem(label: String, active: Boolean) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 0.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val color = if (active) Color(0xFF16A34A) else Color(0xFF94A3B8)
+        
         Icon(
-            imageVector = item.icon,
+            imageVector = if (active) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
             contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = Color(0xFF16A34A)
+            tint = color,
+            modifier = Modifier.size(24.dp)
         )
+        
         Spacer(modifier = Modifier.width(12.dp))
+        
         Text(
-            text = item.text,
-            fontSize = 12.sp,
-            color = Color(0xFF64748B),
-            modifier = Modifier.weight(1f)
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (active) Color(0xFF1E293B) else Color(0xFF64748B),
+            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal
         )
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        if (!active) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFF3B82F6))
+        }
     }
 }
-
-@Composable
-private fun FooterSection() {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        HorizontalDivider(
-            modifier = Modifier.fillMaxWidth(),
-            color = Color(0xFFE2E8F0)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Device is remotely managed for security and compliance",
-            fontSize = 11.sp,
-            color = Color(0xFF94A3B8),
-            textAlign = TextAlign.Center,
-            lineHeight = 16.sp
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "POWERED BY PAYO",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1976D2),
-            letterSpacing = 0.3.sp
-        )
-    }
-}
-
-private data class InfoItem(
-    val icon: ImageVector,
-    val text: String
-)

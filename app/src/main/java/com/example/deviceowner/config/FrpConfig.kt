@@ -31,6 +31,7 @@ object FrpConfig {
      * ✅ Never share account credentials via email/chat
      * 
      * ACCOUNT ID: 114903008829199638895
+     * EMAIL: abubakariabushekhe87@gmail.com
      * STATUS: ✅ ACTIVE AND CONFIGURED
      * PROTECTION: ✅ ENTERPRISE-GRADE
      */
@@ -169,7 +170,7 @@ object FrpConfig {
     // VALIDATION FUNCTIONS
     // ========================================
 
-    /** Validates account ID format (21 digits) */
+    /** Validates account ID format (21 digits - Gaia ID) */
     fun isValidAccountId(accountId: String): Boolean {
         return accountId.length == ACCOUNT_ID_LENGTH && accountId.all { it.isDigit() }
     }

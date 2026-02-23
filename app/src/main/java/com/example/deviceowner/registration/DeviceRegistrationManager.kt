@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.lifecycleScope
 import com.example.deviceowner.data.remote.api.InstallationStatusService
+import com.example.deviceowner.device.DeviceOwnerManager
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 /**
  * Manages device registration and installation status reporting
@@ -19,21 +19,38 @@ class DeviceRegistrationManager(private val context: Context) {
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_REGISTRATION_COMPLETE = "registration_complete"
         private const val KEY_INSTALLATION_STATUS_SENT = "installation_status_sent"
+        private const val KEY_PROVISIONING_WIFI_SSID = "provisioning_wifi_ssid"
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val installationStatusService = InstallationStatusService(context)
 
     /**
-     * Get device ID from registration (server-assigned). Must use Django-returned device_id
-     * for installation status, heartbeat, tamper - never generate locally.
+     * Get device ID from server registration response.
+     * CRITICAL: Must be called ONLY after successful device registration.
+     * Returns null if device is not registered yet.
+     * 
+     * Device ID is server-assigned (e.g., DEV-E324C72EDEC2)
+     * Never generates locally - registration must complete first.
      */
-    fun getOrGenerateDeviceId(): String {
+    fun getServerDeviceId(): String? {
         val deviceId = com.example.deviceowner.utils.storage.SharedPreferencesManager(context).getDeviceIdForHeartbeat()
             ?: prefs.getString(KEY_DEVICE_ID, null)
             ?: context.getSharedPreferences("device_data", Context.MODE_PRIVATE).getString("device_id_for_heartbeat", null)
-        if (!deviceId.isNullOrBlank()) return deviceId
-        return "ANDROID-${UUID.randomUUID().toString().take(12).uppercase()}"
+        
+        if (deviceId.isNullOrBlank()) {
+            Log.w(TAG, "⚠️ Device ID not found - device must be registered first")
+            return null
+        }
+        
+        // Validate it's server-assigned
+        if (deviceId.startsWith("ANDROID-") || deviceId.startsWith("UNREGISTERED-")) {
+            Log.e(TAG, "❌ ERROR: Found locally generated device ID: $deviceId")
+            Log.e(TAG, "   This should never happen - device ID must come from server registration")
+            return null
+        }
+        
+        return deviceId
     }
 
     /**
@@ -77,7 +94,13 @@ class DeviceRegistrationManager(private val context: Context) {
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
     ) {
-        val deviceId = getOrGenerateDeviceId()
+        val deviceId = getServerDeviceId()
+        
+        if (deviceId.isNullOrBlank()) {
+            Log.e(TAG, "❌ Cannot send installation status: Device not registered yet")
+            onFailure("Device must be registered first")
+            return
+        }
         
         // Check if already sent
         if (hasInstallationStatusBeenSent()) {
@@ -103,6 +126,7 @@ class DeviceRegistrationManager(private val context: Context) {
 
                     if (success) {
                         markInstallationStatusSent()
+                        cleanupProvisioningWiFi()
                         Log.d(TAG, "✓ Installation status sent successfully")
                         onSuccess()
                     } else {
@@ -129,7 +153,13 @@ class DeviceRegistrationManager(private val context: Context) {
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
     ) {
-        val deviceId = getOrGenerateDeviceId()
+        val deviceId = getServerDeviceId()
+        
+        if (deviceId.isNullOrBlank()) {
+            Log.e(TAG, "❌ Cannot send installation status: Device not registered yet")
+            onFailure("Device must be registered first")
+            return
+        }
         
         if (hasInstallationStatusBeenSent()) {
             Log.d(TAG, "Installation status already sent for device: $deviceId")
@@ -148,6 +178,7 @@ class DeviceRegistrationManager(private val context: Context) {
 
                 if (success) {
                     markInstallationStatusSent()
+                    cleanupProvisioningWiFi()
                     Log.d(TAG, "✓ Installation status sent successfully")
                     onSuccess()
                 } else {
@@ -158,6 +189,29 @@ class DeviceRegistrationManager(private val context: Context) {
                 Log.e(TAG, "Exception during installation status send: ${e.message}", e)
                 onFailure(e.message ?: "Unknown error")
             }
+        }
+    }
+
+    /**
+     * Forgets the WiFi network that was used during provisioning.
+     * This enhances security by removing sensitive credentials after setup.
+     */
+    private fun cleanupProvisioningWiFi() {
+        try {
+            val provisioningSsid = prefs.getString(KEY_PROVISIONING_WIFI_SSID, null)
+            if (!provisioningSsid.isNullOrBlank()) {
+                Log.i(TAG, "🧹 Cleaning up provisioning WiFi: $provisioningSsid")
+                val dom = DeviceOwnerManager(context)
+                dom.forgetWiFiNetwork(provisioningSsid)
+                
+                // Clear the saved SSID from prefs to prevent repeated attempts
+                prefs.edit().remove(KEY_PROVISIONING_WIFI_SSID).apply()
+                Log.d(TAG, "Provisioning SSID reference cleared from preferences")
+            } else {
+                Log.d(TAG, "No provisioning WiFi SSID found to clean up")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during WiFi cleanup: ${e.message}")
         }
     }
 
@@ -173,7 +227,7 @@ class DeviceRegistrationManager(private val context: Context) {
      * Get registration status summary
      */
     fun getRegistrationStatus(): String {
-        val deviceId = getOrGenerateDeviceId()
+        val deviceId = getServerDeviceId() ?: "NOT_REGISTERED"
         val isComplete = isRegistrationComplete()
         val statusSent = hasInstallationStatusBeenSent()
         

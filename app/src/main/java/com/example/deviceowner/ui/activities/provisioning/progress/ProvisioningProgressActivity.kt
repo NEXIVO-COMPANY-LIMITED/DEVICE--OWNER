@@ -9,19 +9,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.deviceowner.R
 import com.example.deviceowner.device.DeviceOwnerCompatibilityChecker
-import com.example.deviceowner.ui.activities.provisioning.compatibility.CompatibilityFailureActivity
-import com.example.deviceowner.ui.activities.provisioning.compatibility.CompatibilitySuccessActivity
+import com.example.deviceowner.ui.activities.provisioning.compatibility.screens.CompatibilitySuccessActivity
+import com.example.deviceowner.ui.activities.provisioning.compatibility.screens.CompatibilityFailureActivity
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Activity to show initialization progress and automatically proceed to registration.
- * Includes device compatibility check during initialization.
  */
 class ProvisioningProgressActivity : AppCompatActivity() {
 
-    private lateinit var progressBar: LinearProgressIndicator
     private lateinit var tvCurrentService: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,8 +44,6 @@ class ProvisioningProgressActivity : AppCompatActivity() {
                 updateStatus("Checking device compatibility...")
                 val compatibilityChecker = DeviceOwnerCompatibilityChecker(this@ProvisioningProgressActivity)
                 val compatibilityResult = compatibilityChecker.checkCompatibility()
-                Log.d("ProvisioningProgress", "Compatibility check result: ${compatibilityResult.isCompatible}")
-                Log.d("ProvisioningProgress", "Device Info: ${compatibilityResult.deviceInfo}")
                 delay(1500)
 
                 if (compatibilityResult.isCompatible) {
@@ -60,7 +56,9 @@ class ProvisioningProgressActivity : AppCompatActivity() {
                 Log.e("ProvisioningProgress", "Initialization failed", e)
                 updateStatus("Error: ${e.message}")
                 delay(2000)
-                navigateToCompatibilityFailure(null)
+                // Fallback attempt to proceed
+                startActivity(Intent(this@ProvisioningProgressActivity, CompatibilitySuccessActivity::class.java))
+                finish()
             }
         }
     }
@@ -80,15 +78,12 @@ class ProvisioningProgressActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun navigateToCompatibilityFailure(result: DeviceOwnerCompatibilityChecker.CompatibilityResult?) {
+    private fun navigateToCompatibilityFailure(result: DeviceOwnerCompatibilityChecker.CompatibilityResult) {
         val intent = Intent(this, CompatibilityFailureActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            if (result != null) {
-                putExtra("issues", result.issues.toTypedArray())
-                putExtra("device_brand", result.deviceInfo.brand)
-                putExtra("device_model", result.deviceInfo.model)
-                putExtra("android_version", result.deviceInfo.androidVersion)
-            }
+            putExtra("issues", result.issues.toTypedArray())
+            putExtra("device_brand", result.deviceInfo.brand)
+            putExtra("device_model", result.deviceInfo.model)
         }
         startActivity(intent)
         finish()

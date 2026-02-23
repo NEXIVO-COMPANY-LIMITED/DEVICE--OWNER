@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import com.example.deviceowner.ui.activities.provisioning.compatibility.DeviceCompatibilityCheckActivity
 
 /**
  * Activity to handle Android 12+ provisioning mode selection
@@ -36,7 +35,7 @@ class ProvisioningModeActivity : Activity() {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "=========================================")
         Log.d(TAG, "ProvisioningModeActivity created")
-        Log.d(TAG, "Android version: ${Build.VERSION.SDK_INT} (S = ${Build.VERSION_CODES.S})")
+        Log.d(TAG, "Android version: ${Build.VERSION.SDK_INT}")
         Log.d(TAG, "=========================================")
 
         // CRITICAL: Check device compatibility BEFORE provisioning
@@ -46,12 +45,6 @@ class ProvisioningModeActivity : Activity() {
 
         if (!isCompatible) {
             Log.e(TAG, "❌ Device is NOT compatible - blocking provisioning")
-            val issues = validator.getCompatibilityIssues()
-            Log.e(TAG, "Compatibility issues: $issues")
-
-            // Launch compatibility check activity to show error
-            val intent = Intent(this, DeviceCompatibilityCheckActivity::class.java)
-            startActivity(intent)
             setResult(Activity.RESULT_CANCELED)
             finish()
             return
@@ -91,7 +84,6 @@ class ProvisioningModeActivity : Activity() {
     private fun handleGetProvisioningMode() {
         val action = intent.action
         Log.d(TAG, "Handling intent action: $action")
-        Log.d(TAG, "Intent extras: ${intent.extras?.keySet()}")
 
         try {
             if (ACTION_GET_PROVISIONING_MODE == action) {
@@ -106,7 +98,6 @@ class ProvisioningModeActivity : Activity() {
                         PROVISIONING_MODE_FULLY_MANAGED_DEVICE
                     } else {
                         Log.w(TAG, "⚠ Fully managed device mode NOT allowed. Allowed modes: $allowedModes")
-                        Log.w(TAG, "Using first allowed mode: ${allowedModes[0]}")
                         allowedModes[0] // Use first allowed mode
                     }
                 } else {
@@ -117,7 +108,6 @@ class ProvisioningModeActivity : Activity() {
 
                 Log.d(TAG, "=========================================")
                 Log.d(TAG, "Returning provisioning mode: $provisioningMode")
-                Log.d(TAG, "Mode: ${if (provisioningMode == PROVISIONING_MODE_FULLY_MANAGED_DEVICE) "Fully Managed Device" else "Managed Profile"}")
                 Log.d(TAG, "=========================================")
 
                 // Set result with provisioning mode

@@ -88,7 +88,23 @@ object LockScreenStrategy {
             )
         }
 
-        // PRIORITY 2: Security violation (hard lock with kiosk mode)
+        // PRIORITY 2: IMEI/Management Status Lock (from backend)
+        if (response.managementStatus?.lowercase() == "locked") {
+            Log.e(TAG, "🚨 IMEI/Management Status Lock detected - showing hard lock screen with KIOSK MODE")
+            return LockScreenState(
+                type = LockScreenType.HARD_LOCK_SECURITY,
+                nextPaymentDate = null,
+                unlockPassword = null,
+                shopName = response.content?.shop,
+                reason = response.getLockReason(),
+                daysUntilDue = null,
+                hoursUntilDue = null,
+                minutesUntilDue = null,
+                enableKioskMode = true  // ENABLE KIOSK MODE FOR IMEI CHANGES
+            )
+        }
+
+        // PRIORITY 3: Security violation (hard lock with kiosk mode)
         // Check for data mismatch, tampering, or security issues
         if (response.hasHighSeverityMismatches() ||
             (response.isDeviceLocked() && response.getLockReason().contains("Security", ignoreCase = true))) {
@@ -106,7 +122,7 @@ object LockScreenStrategy {
             )
         }
 
-        // PRIORITY 3: Payment-based lock (check next_payment date)
+        // PRIORITY 4: Payment-based lock (check next_payment date)
         if (response.hasNextPayment()) {
             val nextPaymentDate = response.getNextPaymentDateTime()
             val unlockPassword = response.getUnlockPassword()

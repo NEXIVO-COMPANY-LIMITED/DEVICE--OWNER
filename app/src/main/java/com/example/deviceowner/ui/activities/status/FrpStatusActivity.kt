@@ -27,7 +27,10 @@ import com.example.deviceowner.core.frp.manager.FrpStatus
 /**
  * FRP Status Activity - Enterprise Factory Reset Protection status dashboard.
  * Shows activation countdown, account info, and Google Play Services status.
+ * 
+ * NOTE: FRP code is currently not in use. Commenting out for future reference.
  */
+/*
 class FrpStatusActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +41,10 @@ class FrpStatusActivity : ComponentActivity() {
         }
     }
 }
+*/
 
+/*
+// NOTE: FRP code is currently not in use. Commenting out for future reference.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FrpStatusScreen() {
@@ -120,7 +126,10 @@ fun FrpStatusScreen() {
         }
     }
 }
+*/
 
+/*
+// NOTE: FRP code is currently not in use. Commenting out for future reference.
 @Composable
 private fun StatusCard(
     title: String,
@@ -167,3 +176,4 @@ private fun StatusCard(
         }
     }
 }
+*/

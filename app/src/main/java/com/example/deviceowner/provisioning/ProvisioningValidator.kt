@@ -28,8 +28,12 @@ class ProvisioningValidator(private val context: Context) {
      * Returns true if device is compatible, false if incompatible
      */
     fun validateBeforeProvisioning(): Boolean {
-        Log.d(TAG, "🔍 Validating device for Device Owner provisioning...")
+        Log.d(TAG, "🔍 Validating device for Device Owner provisioning (SKIPPED FOR COMPATIBILITY)...")
         
+        // COMPATIBILITY CHECK SKIPPED: Always returning true to allow all devices
+        return true
+        
+        /* Original logic commented out
         val result = compatibilityChecker.checkCompatibility()
         
         // Save validation result
@@ -47,39 +51,35 @@ class ProvisioningValidator(private val context: Context) {
             Log.e(TAG, "Issues: ${result.issues.joinToString(", ")}")
             return false
         }
+        */
     }
     
     /**
      * Check if device was already validated
      */
     fun wasValidated(): Boolean {
-        return prefs.getBoolean(KEY_COMPATIBILITY_CHECKED, false)
+        return true // Always return true
     }
     
     /**
      * Check if device is compatible (from cached result)
      */
     fun isCompatible(): Boolean {
-        return prefs.getBoolean(KEY_IS_COMPATIBLE, false)
+        return true // Always return true
     }
     
     /**
      * Get compatibility issues (from cached result)
      */
     fun getCompatibilityIssues(): List<String> {
-        val issuesString = prefs.getString(KEY_COMPATIBILITY_ISSUES, "") ?: ""
-        return if (issuesString.isEmpty()) {
-            emptyList()
-        } else {
-            issuesString.split("|")
-        }
+        return emptyList() // Always return empty list
     }
     
     /**
      * Get full compatibility report
      */
     fun getCompatibilityReport(): String {
-        return compatibilityChecker.checkCompatibility().details
+        return "Compatibility Check Disabled"
     }
     
     /**

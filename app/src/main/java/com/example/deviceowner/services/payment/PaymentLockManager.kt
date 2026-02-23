@@ -8,6 +8,7 @@ import com.example.deviceowner.ui.screens.lock.LockScreenType
 import com.example.deviceowner.utils.storage.PaymentDataManager
 import com.example.deviceowner.utils.storage.SharedPreferencesManager
 import com.example.deviceowner.control.HardLockManager
+import com.example.deviceowner.control.RemoteDeviceControlManager
 import com.example.deviceowner.services.lock.SoftLockOverlayService
 import java.time.ZonedDateTime
 
@@ -40,6 +41,7 @@ class PaymentLockManager(private val context: Context) {
     private val paymentDataManager = PaymentDataManager(context)
     private val sharedPreferencesManager = SharedPreferencesManager(context)
     private val hardLockManager = HardLockManager(context)
+    private val remoteControl = RemoteDeviceControlManager(context)
 
     /**
      * Process payment status and apply appropriate lock/unlock
@@ -113,7 +115,8 @@ class PaymentLockManager(private val context: Context) {
      */
     private fun handleUnlocked() {
         try {
-            // Clear lock state
+            // Clear lock state via RemoteDeviceControlManager to ensure full system unlock
+            remoteControl.unlockDevice()
             hardLockManager.clearLockState()
             Log.d(TAG, "✅ Device unlocked - lock state cleared")
         } catch (e: Exception) {
@@ -140,9 +143,11 @@ class PaymentLockManager(private val context: Context) {
             val countdown = LockScreenStrategy.formatCountdown(daysUntil, hoursUntil, minutesUntil)
 
             val reminderMessage = """
-                Payment Reminder
-                Due: $formattedDate
-                Time remaining: $countdown
+                Attention: Your upcoming payment installment is due soon.
+                To maintain uninterrupted device service, please ensure your payment is completed.
+
+                Due On: $formattedDate
+                Time Remaining: $countdown
             """.trimIndent()
 
             // Show soft lock overlay (yellow background, dismissible)
@@ -229,7 +234,8 @@ class PaymentLockManager(private val context: Context) {
 
             if (isCorrect) {
                 Log.i(TAG, "✅ Offline unlock password verified - CORRECT")
-                // Clear lock state after successful unlock
+                // Clear lock state after successful unlock using RemoteDeviceControlManager
+                remoteControl.unlockDevice()
                 hardLockManager.clearLockState()
                 clearOfflineUnlockPassword()
             } else {
@@ -253,7 +259,13 @@ class PaymentLockManager(private val context: Context) {
      */
     private fun saveOfflineUnlockPassword(password: String) {
         try {
-            sharedPreferencesManager.saveUnlockPassword(password)
+            sharedPreferencesManager.saveHeartbeatResponse(
+                nextPaymentDate = null,
+                unlockPassword = password,
+                serverTime = null,
+                isLocked = false,
+                lockReason = null
+            )
             Log.d(TAG, "💾 Offline unlock password saved")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error saving offline password: ${e.message}", e)
@@ -280,7 +292,13 @@ class PaymentLockManager(private val context: Context) {
     private fun clearOfflineUnlockPassword() {
         try {
             // Clear by saving empty string
-            sharedPreferencesManager.saveUnlockPassword("")
+            sharedPreferencesManager.saveHeartbeatResponse(
+                nextPaymentDate = null,
+                unlockPassword = "",
+                serverTime = null,
+                isLocked = false,
+                lockReason = null
+            )
             Log.d(TAG, "🗑️ Offline unlock password cleared")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error clearing offline password: ${e.message}", e)

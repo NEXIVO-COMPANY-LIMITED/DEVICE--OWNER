@@ -19,8 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,14 +42,21 @@ import java.util.*
 
 /**
  * Persistent Soft Lock Overlay Service
- * Creates a fullscreen overlay for payment reminders (1 day before due).
- * Data from heartbeat: next_payment.date_time, organization name.
- * User can dismiss after acknowledging the message.
+ * Creates a fullscreen overlay for security reminders (Payment or SIM Change).
+ * Data from heartbeat or local detectors.
  */
 class SoftLockOverlayService : Service() {
 
     companion object {
         private const val TAG = "SoftLockOverlay"
+
+        fun start(context: Context, message: String) {
+            startOverlay(context, message)
+        }
+
+        fun stop(context: Context) {
+            stopOverlay(context)
+        }
 
         fun startOverlay(
             context: Context,
@@ -97,7 +105,7 @@ class SoftLockOverlayService : Service() {
 
         when (intent?.action) {
             "START_OVERLAY" -> {
-                val reason = intent.getStringExtra("lock_reason") ?: "Payment required"
+                val reason = intent.getStringExtra("lock_reason") ?: "Security alert"
                 val triggerAction = intent.getStringExtra("trigger_action") ?: ""
                 val nextPaymentDate = intent.getStringExtra("next_payment_date")
                 val organizationName = intent.getStringExtra("organization_name")
@@ -111,40 +119,40 @@ class SoftLockOverlayService : Service() {
 
     private fun startForegroundService() {
         try {
-            val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channelId = "soft_lock_channel"
+            val channelId = "soft_lock_channel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-
                 val channel = android.app.NotificationChannel(
                     channelId,
-                    "Device Security Lock",
-                    android.app.NotificationManager.IMPORTANCE_HIGH
+                    "Device Security Status",
+                    android.app.NotificationManager.IMPORTANCE_LOW
                 ).apply {
-                    description = "Payment reminder notifications"
+                    description = "Security monitoring status"
                     setSound(null, null)
                     enableVibration(false)
                 }
                 notificationManager.createNotificationChannel(channel)
+            }
 
+            val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 android.app.Notification.Builder(this, channelId)
-                    .setContentTitle("Payment Reminder Active")
-                    .setContentText("Please review payment notification")
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle("Security Monitor Active")
+                    .setContentText("Device is protected by organization policy")
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
                     .setOngoing(true)
                     .build()
             } else {
                 @Suppress("DEPRECATION")
                 android.app.Notification.Builder(this)
-                    .setContentTitle("Payment Reminder Active")
-                    .setContentText("Please review payment notification")
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle("Security Monitor Active")
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
                     .setOngoing(true)
                     .build()
             }
 
             startForeground(1001, notification)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start foreground service: ${e.message}", e)
+            Log.e(TAG, "Failed to start foreground notification: ${e.message}")
         }
     }
 
@@ -154,12 +162,15 @@ class SoftLockOverlayService : Service() {
         nextPaymentDate: String?,
         organizationName: String?
     ) {
-        if (isOverlayActive) return
+        if (isOverlayActive) {
+            Log.d(TAG, "Overlay already active, updating content...")
+            stopOverlay() 
+        }
 
         val skipSecurityRestrictions = getSharedPreferences("control_prefs", Context.MODE_PRIVATE)
             .getBoolean("skip_security_restrictions", false)
         if (skipSecurityRestrictions) {
-            Log.d(TAG, "Skipping overlay during registration")
+            Log.d(TAG, "Skipping overlay during initial setup/registration")
             return
         }
 
@@ -167,16 +178,17 @@ class SoftLockOverlayService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                 !android.provider.Settings.canDrawOverlays(this)
             ) {
-                Log.w(TAG, "Overlay permission not granted")
+                Log.w(TAG, "SYSTEM_ALERT_WINDOW permission missing")
                 return
             }
 
             val prefs = SharedPreferencesManager(this)
             val orgName = organizationName?.takeIf { it.isNotBlank() }
-                ?: prefs.getOrganizationName()
-            val deviceId = prefs.getDeviceIdForHeartbeat() ?: Build.SERIAL.take(8).ifEmpty { "N/A" }
+                ?: prefs.getOrganizationName()?.ifBlank { "PAYO" } ?: "PAYO"
+            val deviceId = prefs.getDeviceIdForHeartbeat() ?: "Device Managed"
 
             val lockType = SoftLockType.fromTriggerAction(triggerAction, reason)
+            
             overlayView = ComposeView(this).apply {
                 setContent {
                     DeviceOwnerTheme {
@@ -205,20 +217,23 @@ class SoftLockOverlayService : Service() {
                 }
 
                 flags = android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN or
                     android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 
                 format = android.graphics.PixelFormat.TRANSLUCENT
                 gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
             }
 
             windowManager?.addView(overlayView, layoutParams)
             isOverlayActive = true
-            Log.d(TAG, "Soft lock overlay started: $reason (next_payment=$nextPaymentDate)")
+            Log.d(TAG, "Soft lock overlay started for type: ${lockType.name}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create overlay: ${e.message}", e)
+            Log.e(TAG, "Failed to create overlay view: ${e.message}", e)
         }
     }
 
@@ -234,9 +249,9 @@ class SoftLockOverlayService : Service() {
 
         val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
-            startActivity(Intent.createChooser(intent, "Contact support"))
+            startActivity(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "Could not open support contact", e)
+            Log.e(TAG, "Could not open support contact: ${e.message}")
         }
     }
 
@@ -246,8 +261,11 @@ class SoftLockOverlayService : Service() {
                 windowManager?.removeView(overlayView)
                 overlayView = null
                 isOverlayActive = false
-                Log.d(TAG, "Soft lock overlay stopped")
+                Log.d(TAG, "Soft lock overlay removed")
             }
+            
+            getSharedPreferences("control_prefs", Context.MODE_PRIVATE).edit()
+                .putString("state", "unlocked").apply()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -258,7 +276,7 @@ class SoftLockOverlayService : Service() {
 
             stopSelf()
         } catch (e: Exception) {
-            Log.e(TAG, "Error stopping overlay: ${e.message}", e)
+            Log.e(TAG, "Error during overlay removal: ${e.message}")
         }
     }
 
@@ -266,14 +284,10 @@ class SoftLockOverlayService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            if (isOverlayActive && overlayView != null) {
+        if (isOverlayActive) {
+            try {
                 windowManager?.removeView(overlayView)
-                overlayView = null
-                isOverlayActive = false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error cleaning up overlay: ${e.message}")
+            } catch (_: Exception) {}
         }
     }
 }
@@ -328,54 +342,62 @@ fun SoftLockOverlayScreen(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 550.dp)
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 500.dp)
                 ) {
-                    StatusBadge()
+                    StatusBadge(lockType)
                     Spacer(modifier = Modifier.height(24.dp))
-                    PaymentIcon(pulseAlpha = pulseAlpha)
+                    LockIcon(lockType = lockType, pulseAlpha = pulseAlpha)
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Text(
-                        text = "Payment Reminder",
-                        fontSize = 28.sp,
+                        text = lockType.title,
+                        fontSize = 26.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFFF57C00),
+                        color = lockType.color,
                         textAlign = TextAlign.Center,
                         letterSpacing = (-0.5).sp
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Your next payment is due soon. Please make a payment before the due date to continue using this device without restrictions.",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        text = if (lockType == SoftLockType.PAYMENT_REMINDER && reason.contains("Payment Reminder")) "Payment Reminder" else lockType.primaryMessage,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
                         color = Color(0xFF212121),
-                        textAlign = TextAlign.Center,
-                        lineHeight = 26.sp
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    WarningCard()
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // FIX: Use the 'reason' parameter if it contains detailed info, otherwise fallback to default warning
+                    val displayMessage = if (reason.isNotBlank() && reason.length > 10 && !reason.equals("Security alert", true)) {
+                        reason
+                    } else {
+                        lockType.warningMessage
+                    }
+
                     Text(
-                        text = "Contact $organizationName support or make a payment now to avoid device restrictions.",
-                        fontSize = 14.sp,
-                        color = Color(0xFF666666),
+                        text = displayMessage,
+                        fontSize = 16.sp,
+                        color = Color(0xFF424242),
                         textAlign = TextAlign.Center,
-                        lineHeight = 20.sp
+                        lineHeight = 24.sp
                     )
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    WarningCard(lockType)
                     Spacer(modifier = Modifier.height(20.dp))
 
                     InfoSection(
+                        lockType = lockType,
                         nextPaymentDate = nextPaymentDate,
                         organizationName = organizationName,
                         deviceId = deviceId
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     ActionButtons(
+                        lockType = lockType,
                         isProcessing = isProcessing,
                         onAcknowledge = {
                             isProcessing = true
@@ -383,7 +405,8 @@ fun SoftLockOverlayScreen(
                         },
                         onContactSupport = onContactSupport
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
                     FooterSection(organizationName = organizationName)
                 }
             }
@@ -392,71 +415,46 @@ fun SoftLockOverlayScreen(
 }
 
 @Composable
-private fun StatusBadge() {
-    val infiniteTransition = rememberInfiniteTransition(label = "blink")
-    val blinkAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "blinkAlpha"
-    )
-
+private fun StatusBadge(lockType: SoftLockType) {
     Surface(
         shape = RoundedCornerShape(100.dp),
-        color = Color(0xFFF57C00).copy(alpha = 0.1f)
+        color = lockType.color.copy(alpha = 0.1f)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(Color(0xFFF57C00), CircleShape)
-                    .alpha(blinkAlpha)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
+            Box(modifier = Modifier.size(8.dp).background(lockType.color, CircleShape))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Payment Due Soon",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFF57C00)
+                text = "Security Notification",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = lockType.color
             )
         }
     }
 }
 
 @Composable
-private fun PaymentIcon(pulseAlpha: Float) {
-    Box(
-        modifier = Modifier.size(80.dp),
-        contentAlignment = Alignment.Center
-    ) {
+private fun LockIcon(lockType: SoftLockType, pulseAlpha: Float) {
+    Box(contentAlignment = Alignment.Center) {
         Surface(
-            modifier = Modifier
-                .size(96.dp)
-                .alpha(pulseAlpha * 0.3f),
+            modifier = Modifier.size(90.dp).alpha(pulseAlpha * 0.2f),
             shape = CircleShape,
-            color = Color(0xFFF57C00).copy(alpha = 0.2f)
+            color = lockType.color
         ) {}
         Surface(
-            modifier = Modifier
-                .size(80.dp)
-                .alpha(pulseAlpha)
-                .shadow(8.dp, CircleShape),
+            modifier = Modifier.size(70.dp).shadow(10.dp, CircleShape),
             shape = CircleShape,
-            color = Color(0xFFF57C00)
+            color = lockType.color
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Default.CreditCard,
-                    contentDescription = "Payment",
+                    imageVector = lockType.icon,
+                    contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(36.dp)
                 )
             }
         }
@@ -464,149 +462,90 @@ private fun PaymentIcon(pulseAlpha: Float) {
 }
 
 @Composable
-private fun WarningCard() {
+private fun WarningCard(lockType: SoftLockType) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFF57C00).copy(alpha = 0.08f),
-        border = androidx.compose.foundation.BorderStroke(0.dp, Color(0xFFF57C00))
+        color = lockType.color.copy(alpha = 0.05f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, lockType.color.copy(alpha = 0.2f))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .fillMaxHeight()
-                    .background(Color(0xFFF57C00))
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Device access may be limited until payment is received. Some features and apps may be temporarily restricted.",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF666666),
-                lineHeight = 22.sp
-            )
-        }
+        Text(
+            text = lockType.actionAdvice,
+            fontSize = 14.sp,
+            color = Color(0xFF616161),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(16.dp),
+            lineHeight = 20.sp
+        )
     }
 }
 
 @Composable
 private fun InfoSection(
+    lockType: SoftLockType,
     nextPaymentDate: String?,
     organizationName: String,
     deviceId: String
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFF9FAFB),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5E7EB))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            InfoRow("Account Status", "Payment Due Soon", isWarning = true)
-            InfoRow("Managed By", organizationName)
-            InfoRow("Next Payment Due", nextPaymentDate ?: "—")
-            InfoRow("Lock Time", SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.getDefault()).format(Date()))
-            InfoRow("Device ID", deviceId, showDivider = false)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        InfoRow("Status", if (lockType == SoftLockType.SIM_CHANGE) "Tamper Alert" else "Payment Pending", isAlert = true, color = lockType.color)
+        InfoRow("Organization", organizationName)
+        if (lockType == SoftLockType.PAYMENT_REMINDER) {
+            InfoRow("Due Date", nextPaymentDate ?: "Check App")
         }
+        InfoRow("Device ID", deviceId.take(12), showDivider = false)
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String, isWarning: Boolean = false, showDivider: Boolean = true) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+private fun InfoRow(label: String, value: String, isAlert: Boolean = false, color: Color = Color.Gray, showDivider: Boolean = true) {
+    Column {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF999999)
-            )
+            Text(label, fontSize = 13.sp, color = Color(0xFF757575))
             Text(
                 text = value,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isWarning) Color(0xFFF57C00) else Color(0xFF212121)
+                fontWeight = FontWeight.Bold,
+                color = if (isAlert) color else Color(0xFF212121)
             )
         }
-        if (showDivider) HorizontalDivider(color = Color(0xFFE5E7EB))
+        if (showDivider) HorizontalDivider(color = Color(0xFFEEEEEE))
     }
 }
 
 @Composable
 private fun ActionButtons(
+    lockType: SoftLockType,
     isProcessing: Boolean,
     onAcknowledge: () -> Unit,
     onContactSupport: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(
             onClick = onAcknowledge,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
+            modifier = Modifier.fillMaxWidth().height(56.dp),
             enabled = !isProcessing,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFF57C00),
-                disabledContainerColor = Color(0xFFF57C00).copy(alpha = 0.6f)
-            ),
-            shape = RoundedCornerShape(14.dp),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 6.dp,
-                pressedElevation = 2.dp
-            )
+            colors = ButtonDefaults.buttonColors(containerColor = lockType.color),
+            shape = RoundedCornerShape(14.dp)
         ) {
             if (isProcessing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text("Processing...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
             } else {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text("I UNDERSTAND", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(lockType.buttonText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         OutlinedButton(
             onClick = onContactSupport,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF57C00)),
-            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFF57C00)),
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            border = androidx.compose.foundation.BorderStroke(2.dp, lockType.color),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = lockType.color),
             shape = RoundedCornerShape(14.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Email,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(10.dp))
             Text("CONTACT SUPPORT", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
@@ -615,26 +554,14 @@ private fun ActionButtons(
 
 @Composable
 private fun FooterSection(organizationName: String) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        HorizontalDivider(color = Color(0xFFE5E7EB))
-        Spacer(modifier = Modifier.height(16.dp))
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = "This device is managed by $organizationName. All activity is monitored and logged. Make payment before the due date to restore full access to device features.",
-            fontSize = 12.sp,
-            color = Color(0xFF999999),
-            textAlign = TextAlign.Center,
-            lineHeight = 18.sp
+            text = "This device is protected by Nexivo Security for $organizationName",
+            fontSize = 11.sp,
+            color = Color(0xFF9E9E9E),
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "POWERED BY $organizationName",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color(0xFFF57C00),
-            letterSpacing = 1.sp
-        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFFE0E0E0), modifier = Modifier.size(20.dp))
     }
 }
