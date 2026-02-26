@@ -14,7 +14,7 @@ import com.microspace.payo.core.frp.manager.FrpManager
 import com.microspace.payo.core.frp.manager.FrpPolicyManager
 import com.microspace.payo.device.DeviceOwnerManager
 import com.microspace.payo.security.mode.CompleteSilentMode
-import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
+
 import com.microspace.payo.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -165,14 +165,7 @@ class AdminReceiver : DeviceAdminReceiver() {
                     Log.e(TAG, "Silent mode failed: ${e.message}", e)
                 }
 
-                // SIM Change Detection: Save original SIM at provisioning time
-                try {
-                    val simDetector = SIMChangeDetector(context)
-                    simDetector.initialize()
-                    Log.i(TAG, "✅ SIM change detection initialized - original SIM saved")
-                } catch (e: Exception) {
-                    Log.e(TAG, "SIM detection init failed: ${e.message}", e)
-                }
+
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed during provisioning: ${e.message}", e)

@@ -12,6 +12,7 @@ import com.microspace.payo.data.local.database.entities.heartbeat.HeartbeatHisto
 import com.microspace.payo.data.local.database.converters.JsonConverters
 import com.microspace.payo.security.crypto.DatabasePassphraseManager
 import net.sqlcipher.database.SupportFactory
+import net.sqlcipher.database.SQLiteDatabase
 
 /**
  * Room Database for optional analytics and history (secondary store).
@@ -47,8 +48,9 @@ abstract class AppDatabase : RoomDatabase() {
         }
         
         private fun buildDatabase(context: Context): AppDatabase {
-            val passphrase = DatabasePassphraseManager(context).getPassphrase()
-            val factory = SupportFactory(passphrase)
+            val passphrase = DatabasePassphraseManager.getPassphrase(context)
+            // SQLCipher's SupportFactory expects the byte array from the passphrase string
+            val factory = SupportFactory(SQLiteDatabase.getBytes(passphrase.toCharArray()))
 
             return Room.databaseBuilder(
                 context.applicationContext,

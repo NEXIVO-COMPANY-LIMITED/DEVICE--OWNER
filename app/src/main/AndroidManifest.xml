@@ -223,11 +223,11 @@
         <receiver android:name=".receivers.DeactivationReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.DEACTIVATE_DEVICE" /></intent-filter></receiver>
 
         <!-- Services -->
-        <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync|systemExemption" />
+        <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync|systemExempted" />
         <service android:name=".services.remote.RemoteManagementService" android:foregroundServiceType="dataSync" />
-        <service android:name=".services.lock.SoftLockOverlayService" android:foregroundServiceType="systemExemption" />
-        <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="systemExemption" />
-        <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="systemExemption" />
+        <service android:name=".services.lock.SoftLockOverlayService" android:foregroundServiceType="systemExempted" />
+        <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="systemExempted" />
+        <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="systemExempted" />
         <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="dataSync" />
 
         <provider

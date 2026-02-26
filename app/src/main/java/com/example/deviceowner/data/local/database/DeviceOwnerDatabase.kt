@@ -29,6 +29,7 @@ import com.microspace.payo.data.local.database.entities.payment.InstallmentEntit
 import com.microspace.payo.data.local.database.entities.audit.SyncAuditEntity
 import com.microspace.payo.security.crypto.DatabasePassphraseManager
 import net.sqlcipher.database.SupportFactory
+import net.sqlcipher.database.SQLiteDatabase
 
 /**
  * Primary operational database: offline queue, registration, and tamper sync.
@@ -75,8 +76,8 @@ abstract class DeviceOwnerDatabase : RoomDatabase() {
         
         fun getDatabase(context: Context): DeviceOwnerDatabase {
             return INSTANCE ?: synchronized(this) {
-                val passphrase = DatabasePassphraseManager(context).getPassphrase()
-                val factory = SupportFactory(passphrase)
+                val passphrase = DatabasePassphraseManager.getPassphrase(context)
+                val factory = SupportFactory(SQLiteDatabase.getBytes(passphrase.toCharArray()))
                 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,

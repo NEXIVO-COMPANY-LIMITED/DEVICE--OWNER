@@ -15,7 +15,7 @@ import androidx.work.WorkManager
 import com.microspace.payo.data.DeviceIdProvider
 import com.microspace.payo.device.DeviceOwnerManager
 import com.microspace.payo.security.mode.CompleteSilentMode
-import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
+
 import com.microspace.payo.services.data.LocalDataServerService
 import com.microspace.payo.services.heartbeat.HeartbeatWorker
 import com.microspace.payo.services.reporting.ServerBugAndLogReporter
@@ -68,14 +68,11 @@ class DeviceOwnerApplication : Application() {
             UpdateScheduler.schedulePeriodicChecks(this)
         }
 
-        // Initialize Monitoring Service and SIM detection if registered
+        // Initialize Monitoring Service if registered
         val regPrefs = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
         val serverDeviceId = regPrefs.getString("device_id", null)
         if (!serverDeviceId.isNullOrEmpty()) {
             com.microspace.payo.monitoring.SecurityMonitorService.startService(this)
-            if (DeviceOwnerManager(this).isDeviceOwner()) {
-                SIMChangeDetector(this).initialize()
-            }
             // ✅ START PERIODIC HEARTBEAT WORKER
             HeartbeatWorker.enqueue(this)
         }

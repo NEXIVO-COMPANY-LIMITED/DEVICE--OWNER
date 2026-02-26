@@ -33,14 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
-import com.microspace.payo.security.monitoring.sim.SIMStatus
 import com.microspace.payo.ui.theme.DeviceOwnerTheme
 import kotlinx.coroutines.delay
 
 class SIMChangeOverlayActivity : ComponentActivity() {
-
-    private lateinit var simDetector: SIMChangeDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,12 +54,9 @@ class SIMChangeOverlayActivity : ComponentActivity() {
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        simDetector = SIMChangeDetector(this)
-
         setContent {
             DeviceOwnerTheme {
                 SIMChangeOverlayScreen(
-                    simStatus = simDetector.getSIMStatus(),
                     onDismiss = { finish() }
                 )
             }
@@ -73,7 +66,6 @@ class SIMChangeOverlayActivity : ComponentActivity() {
 
 @Composable
 fun SIMChangeOverlayScreen(
-    simStatus: SIMStatus,
     onDismiss: () -> Unit
 ) {
     var countdown by remember { mutableStateOf(15) }
@@ -107,8 +99,8 @@ fun SIMChangeOverlayScreen(
                     }
 
                     Spacer(Modifier.height(32.dp))
-                    Text("SIM CARD CHANGED", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = 2.sp)
-                    Text("Unauthorized SIM detected", fontSize = 15.sp, color = Color.White.copy(0.6f), modifier = Modifier.padding(top = 8.dp))
+                    Text("SECURITY ALERT", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = 2.sp)
+                    Text("Unauthorized change detected", fontSize = 15.sp, color = Color.White.copy(0.6f), modifier = Modifier.padding(top = 8.dp))
 
                     Spacer(Modifier.height(40.dp))
                     
@@ -116,16 +108,12 @@ fun SIMChangeOverlayScreen(
                         Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("SECURITY NOTICE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(0.5f), letterSpacing = 1.5.sp)
                             Spacer(Modifier.height(16.dp))
-                            SIMInfoRow("REGISTERED", simStatus.originalSIM.operatorName, Icons.Default.CheckCircle, Color(0xFF4CAF50))
-                            Spacer(Modifier.height(16.dp))
-                            Icon(Icons.Default.SwapVert, null, tint = Color.White.copy(0.3f))
-                            Spacer(Modifier.height(16.dp))
-                            SIMInfoRow("UNAUTHORIZED", simStatus.currentSIM.operatorName, Icons.Default.Error, Color(0xFFE94560))
+                            Text("This event has been logged and reported to the server.", fontSize = 13.sp, color = Color.White.copy(0.7f), textAlign = TextAlign.Center)
                         }
                     }
 
                     Spacer(Modifier.height(40.dp))
-                    Text("This event has been logged and reported.", fontSize = 12.sp, color = Color.White.copy(0.5f), textAlign = TextAlign.Center)
+                    Text("This alert will close automatically.", fontSize = 12.sp, color = Color.White.copy(0.5f), textAlign = TextAlign.Center)
                     
                     Spacer(Modifier.height(24.dp))
                     Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)) {
@@ -134,16 +122,5 @@ fun SIMChangeOverlayScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SIMInfoRow(label: String, value: String, icon: ImageVector, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Column {
-            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = color, letterSpacing = 1.sp)
-            Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        }
-        Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
     }
 }

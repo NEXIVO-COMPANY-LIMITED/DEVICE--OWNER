@@ -10,7 +10,7 @@ import com.microspace.payo.core.SilentDeviceOwnerManager
 import com.microspace.payo.data.DeviceIdProvider
 import com.microspace.payo.device.DeviceOwnerManager
 import com.microspace.payo.security.mode.CompleteSilentMode
-import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
+
 import com.microspace.payo.security.monitoring.tamper.TamperBootChecker
 import com.microspace.payo.services.heartbeat.HeartbeatService
 import com.microspace.payo.services.heartbeat.HeartbeatWorker
@@ -105,7 +105,6 @@ class BootReceiver : BroadcastReceiver() {
                 try {
                     TamperBootChecker.runTamperCheck(context)
                     CompleteSilentMode(context).enableCompleteSilentMode()
-                    SIMChangeDetector(context).apply { initialize(); checkForSIMChange() }
                     EnhancedSecurityManager(context).verifyFactoryResetBlocked()
                     SilentDeviceOwnerManager(context).verifySilentRestrictionsIntact()
                 } catch (e: Exception) {

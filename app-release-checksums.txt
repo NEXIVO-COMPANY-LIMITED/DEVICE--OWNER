@@ -1,15 +1,15 @@
 ﻿APK Build Information
 =====================
-Build Date: 2026-02-25 17:31:44
+Build Date: 2026-02-26 17:47:08
 APK File: app\build\outputs\apk\release\app-release.apk
-File Size: 3.98 MB
+File Size: 16.39 MB
 
 Checksums:
 ----------
-SHA256 (Hex): DCE1D4087DE6455F93A5FD74928D20FA88A88996FA75381A167023B4C3430B23
-SHA256 (Base64URL): 3OHUCH3mRV-Tpf10ko0g-oioiZb6dTgaFnAjtMNDCyM
-SHA1:   1E8E764717BAFEC41CD5F000109B6A7EC85CC85D
-MD5:    88C7A8B06B4C1757EE8C2944D68C29BB
+SHA256 (Hex): DF0EC81FCE24CB34E9F4502FAB224E5667E8D47D954348E0B95BBB2D9BB545D4
+SHA256 (Base64URL): 3w7IH84kyzTp9FAvqyJOVmfo1H2VQ0jguVu7LZu1RdQ
+SHA1:   66E3BC3A481CF436A07BF3A2FFEEB0227858C01F
+MD5:    2EFA6DA3DB7DAAC9CF9752A5B037013F
 
 Installation Command:
 adb install -r app\build\outputs\apk\release\app-release.apk
@@ -19,4 +19,4 @@ Verification Command:
 
 For Device Owner Provisioning:
 Add this to provisioning-config.json:
-"android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "3OHUCH3mRV-Tpf10ko0g-oioiZb6dTgaFnAjtMNDCyM"
+"android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "3w7IH84kyzTp9FAvqyJOVmfo1H2VQ0jguVu7LZu1RdQ"
