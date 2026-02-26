@@ -1,10 +1,10 @@
-package com.example.deviceowner.registration
+package com.microspace.payo.registration
 
 import android.content.Context
 import android.util.Log
-import androidx.lifecycle.lifecycleScope
-import com.example.deviceowner.data.remote.api.InstallationStatusService
-import com.example.deviceowner.device.DeviceOwnerManager
+import com.microspace.payo.data.remote.api.InstallationStatusService
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.launch
 
 /**
@@ -19,22 +19,17 @@ class DeviceRegistrationManager(private val context: Context) {
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_REGISTRATION_COMPLETE = "registration_complete"
         private const val KEY_INSTALLATION_STATUS_SENT = "installation_status_sent"
-        private const val KEY_PROVISIONING_WIFI_SSID = "provisioning_wifi_ssid"
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val installationStatusService = InstallationStatusService(context)
+    private val sharedPrefsManager = SharedPreferencesManager(context)
 
     /**
      * Get device ID from server registration response.
-     * CRITICAL: Must be called ONLY after successful device registration.
-     * Returns null if device is not registered yet.
-     * 
-     * Device ID is server-assigned (e.g., DEV-E324C72EDEC2)
-     * Never generates locally - registration must complete first.
      */
     fun getServerDeviceId(): String? {
-        val deviceId = com.example.deviceowner.utils.storage.SharedPreferencesManager(context).getDeviceIdForHeartbeat()
+        val deviceId = sharedPrefsManager.getDeviceId()
             ?: prefs.getString(KEY_DEVICE_ID, null)
             ?: context.getSharedPreferences("device_data", Context.MODE_PRIVATE).getString("device_id_for_heartbeat", null)
         
@@ -46,7 +41,6 @@ class DeviceRegistrationManager(private val context: Context) {
         // Validate it's server-assigned
         if (deviceId.startsWith("ANDROID-") || deviceId.startsWith("UNREGISTERED-")) {
             Log.e(TAG, "❌ ERROR: Found locally generated device ID: $deviceId")
-            Log.e(TAG, "   This should never happen - device ID must come from server registration")
             return null
         }
         
@@ -58,6 +52,7 @@ class DeviceRegistrationManager(private val context: Context) {
      */
     fun markRegistrationComplete() {
         prefs.edit().putBoolean(KEY_REGISTRATION_COMPLETE, true).apply()
+        sharedPrefsManager.setRegistrationCompleted(true)
         Log.d(TAG, "Device registration marked as complete")
     }
 
@@ -65,7 +60,7 @@ class DeviceRegistrationManager(private val context: Context) {
      * Check if device registration is complete
      */
     fun isRegistrationComplete(): Boolean {
-        return prefs.getBoolean(KEY_REGISTRATION_COMPLETE, false)
+        return prefs.getBoolean(KEY_REGISTRATION_COMPLETE, false) || sharedPrefsManager.isRegistrationCompleted()
     }
 
     /**
@@ -86,9 +81,6 @@ class DeviceRegistrationManager(private val context: Context) {
     /**
      * Send installation status to backend
      * Should be called after successful device registration
-     * 
-     * @param onSuccess Callback when installation status is sent successfully
-     * @param onFailure Callback when sending fails
      */
     fun sendInstallationStatus(
         onSuccess: () -> Unit = {},
@@ -102,51 +94,42 @@ class DeviceRegistrationManager(private val context: Context) {
             return
         }
         
-        // Check if already sent
         if (hasInstallationStatusBeenSent()) {
             Log.d(TAG, "Installation status already sent for device: $deviceId")
+            cleanupProvisioningWiFi() // Ensure WiFi is cleaned up even if status was already sent
             onSuccess()
             return
         }
 
         Log.d(TAG, "Sending installation status for device: $deviceId")
         
-        // This should be called from a coroutine context
-        // If you have access to lifecycleScope, use it
-        try {
-            // For now, we'll create a simple coroutine scope
-            kotlinx.coroutines.GlobalScope.launch {
-                try {
-                    val success = installationStatusService.sendInstallationStatusWithRetry(
-                        deviceId = deviceId,
-                        completed = true,
-                        reason = "Device Owner activated successfully",
-                        maxRetries = 3
-                    )
+        kotlinx.coroutines.GlobalScope.launch {
+            try {
+                val success = installationStatusService.sendInstallationStatusWithRetry(
+                    deviceId = deviceId,
+                    completed = true,
+                    reason = "Device Owner activated successfully",
+                    maxRetries = 3
+                )
 
-                    if (success) {
-                        markInstallationStatusSent()
-                        cleanupProvisioningWiFi()
-                        Log.d(TAG, "✓ Installation status sent successfully")
-                        onSuccess()
-                    } else {
-                        Log.e(TAG, "✗ Failed to send installation status")
-                        onFailure("Failed to send installation status after retries")
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Exception during installation status send: ${e.message}", e)
-                    onFailure(e.message ?: "Unknown error")
+                if (success) {
+                    markInstallationStatusSent()
+                    cleanupProvisioningWiFi()
+                    Log.d(TAG, "✓ Installation status sent successfully and WiFi cleanup initiated")
+                    onSuccess()
+                } else {
+                    Log.e(TAG, "✗ Failed to send installation status")
+                    onFailure("Failed to send installation status after retries")
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during installation status send: ${e.message}", e)
+                onFailure(e.message ?: "Unknown error")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error launching coroutine: ${e.message}", e)
-            onFailure(e.message ?: "Failed to launch coroutine")
         }
     }
 
     /**
      * Send installation status with lifecycle scope (preferred method)
-     * Use this when you have access to lifecycleScope
      */
     fun sendInstallationStatusWithLifecycle(
         lifecycleScope: androidx.lifecycle.LifecycleCoroutineScope,
@@ -163,6 +146,7 @@ class DeviceRegistrationManager(private val context: Context) {
         
         if (hasInstallationStatusBeenSent()) {
             Log.d(TAG, "Installation status already sent for device: $deviceId")
+            cleanupProvisioningWiFi()
             onSuccess()
             return
         }
@@ -179,7 +163,7 @@ class DeviceRegistrationManager(private val context: Context) {
                 if (success) {
                     markInstallationStatusSent()
                     cleanupProvisioningWiFi()
-                    Log.d(TAG, "✓ Installation status sent successfully")
+                    Log.d(TAG, "✓ Installation status sent successfully and WiFi cleanup initiated")
                     onSuccess()
                 } else {
                     Log.e(TAG, "✗ Failed to send installation status")
@@ -194,19 +178,19 @@ class DeviceRegistrationManager(private val context: Context) {
 
     /**
      * Forgets the WiFi network that was used during provisioning.
-     * This enhances security by removing sensitive credentials after setup.
+     * Uses improved persistent storage from SharedPreferencesManager.
      */
-    private fun cleanupProvisioningWiFi() {
+    fun cleanupProvisioningWiFi() {
         try {
-            val provisioningSsid = prefs.getString(KEY_PROVISIONING_WIFI_SSID, null)
+            val provisioningSsid = sharedPrefsManager.getProvisioningWifiSsid()
             if (!provisioningSsid.isNullOrBlank()) {
                 Log.i(TAG, "🧹 Cleaning up provisioning WiFi: $provisioningSsid")
                 val dom = DeviceOwnerManager(context)
                 dom.forgetWiFiNetwork(provisioningSsid)
                 
-                // Clear the saved SSID from prefs to prevent repeated attempts
-                prefs.edit().remove(KEY_PROVISIONING_WIFI_SSID).apply()
-                Log.d(TAG, "Provisioning SSID reference cleared from preferences")
+                // Clear the saved SSID from persistent storage
+                sharedPrefsManager.clearProvisioningWifiSsid()
+                Log.d(TAG, "Provisioning SSID reference cleared from storage")
             } else {
                 Log.d(TAG, "No provisioning WiFi SSID found to clean up")
             }
@@ -220,6 +204,7 @@ class DeviceRegistrationManager(private val context: Context) {
      */
     fun resetRegistrationState() {
         prefs.edit().clear().apply()
+        sharedPrefsManager.setRegistrationCompleted(false)
         Log.d(TAG, "Registration state reset")
     }
 

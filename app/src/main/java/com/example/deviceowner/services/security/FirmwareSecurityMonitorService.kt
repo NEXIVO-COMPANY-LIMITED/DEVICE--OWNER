@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.security
+package com.microspace.payo.services.security
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,7 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.deviceowner.security.firmware.FirmwareSecurity
+import com.microspace.payo.security.firmware.FirmwareSecurity
 import kotlinx.coroutines.*
 
 /**
@@ -156,7 +156,7 @@ class FirmwareSecurityMonitorService : Service() {
         scope.launch {
             try {
                 // Trigger enhanced security measures
-                val enhancedSecurity = com.example.deviceowner.security.enforcement.policy.EnhancedSecurityManager(this@FirmwareSecurityMonitorService)
+                val enhancedSecurity = com.microspace.payo.security.enforcement.policy.EnhancedSecurityManager(this@FirmwareSecurityMonitorService)
                 enhancedSecurity.apply100PercentPerfectSecurity()
 
                 // Trigger hard lock as last resort
@@ -192,7 +192,7 @@ class FirmwareSecurityMonitorService : Service() {
                     "ADB_ROOT_ATTEMPT" -> {
                         Log.e(TAG, "ADB root access attempt detected")
                         // Apply enhanced restrictions but don't hard lock yet
-                        val enhancedSecurity = com.example.deviceowner.security.enforcement.policy.EnhancedSecurityManager(this@FirmwareSecurityMonitorService)
+                        val enhancedSecurity = com.microspace.payo.security.enforcement.policy.EnhancedSecurityManager(this@FirmwareSecurityMonitorService)
                         enhancedSecurity.apply100PercentPerfectSecurity()
                     }
                     else -> {
@@ -225,7 +225,7 @@ class FirmwareSecurityMonitorService : Service() {
         try {
             Log.e(TAG, "TRIGGERING HARD LOCK DUE TO CRITICAL SECURITY VIOLATION")
 
-            val intent = Intent(this, com.example.deviceowner.ui.activities.lock.system.HardLockGenericActivity::class.java)
+            val intent = Intent(this, com.microspace.payo.ui.activities.lock.system.HardLockGenericActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             intent.putExtra("lock_reason", "FIRMWARE_SECURITY_VIOLATION")
             intent.putExtra("lock_timestamp", System.currentTimeMillis())

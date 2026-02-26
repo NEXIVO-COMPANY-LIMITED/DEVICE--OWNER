@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.models.tamper
+package com.microspace.payo.data.models.tamper
 
 import com.google.gson.annotations.SerializedName
 

@@ -1,7 +1,7 @@
-package com.example.deviceowner.data.local.database.dao.heartbeat
+package com.microspace.payo.data.local.database.dao.heartbeat
 
 import androidx.room.*
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
+import com.microspace.payo.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

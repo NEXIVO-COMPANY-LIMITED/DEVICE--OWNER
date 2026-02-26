@@ -1,10 +1,10 @@
-package com.example.deviceowner.receivers
+package com.microspace.payo.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.monitoring.SecurityMonitorService
+import com.microspace.payo.monitoring.SecurityMonitorService
 
 /**
  * Receiver to wake up the app and send a heartbeat even when device is sleeping (Doze mode).

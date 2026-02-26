@@ -1,14 +1,14 @@
-package com.example.deviceowner.services.reporting
+package com.microspace.payo.services.reporting
 
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.core.device.DeviceDataCollector
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.data.models.tech.BugReportRequest
-import com.example.deviceowner.data.models.tech.DeviceLogRequest
-import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import com.microspace.payo.core.device.DeviceDataCollector
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.data.models.tech.BugReportRequest
+import com.microspace.payo.data.models.tech.DeviceLogRequest
+import com.microspace.payo.data.remote.ApiClient
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.*
 import java.io.PrintWriter
 import java.io.StringWriter

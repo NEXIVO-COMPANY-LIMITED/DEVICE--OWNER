@@ -1,15 +1,15 @@
-package com.example.deviceowner.core.sync
+package com.microspace.payo.core.sync
 
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.data.remote.ApiService
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.offline.OfflineEvent
-import com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity
-import com.example.deviceowner.data.remote.models.*
+import com.microspace.payo.data.remote.ApiClient
+import com.microspace.payo.data.remote.ApiService
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.offline.OfflineEvent
+import com.microspace.payo.data.local.database.entities.tamper.TamperDetectionEntity
+import com.microspace.payo.data.remote.models.*
 import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

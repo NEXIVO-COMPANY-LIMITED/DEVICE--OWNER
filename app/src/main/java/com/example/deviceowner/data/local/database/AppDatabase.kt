@@ -1,15 +1,17 @@
-package com.example.deviceowner.data.local.database
+package com.microspace.payo.data.local.database
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.deviceowner.data.local.database.dao.device.DeviceDataDao
-import com.example.deviceowner.data.local.database.dao.heartbeat.HeartbeatHistoryDao
-import com.example.deviceowner.data.local.database.entities.device.DeviceDataEntity
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
-import com.example.deviceowner.data.local.database.converters.JsonConverters
+import com.microspace.payo.data.local.database.dao.device.DeviceDataDao
+import com.microspace.payo.data.local.database.dao.heartbeat.HeartbeatHistoryDao
+import com.microspace.payo.data.local.database.entities.device.DeviceDataEntity
+import com.microspace.payo.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
+import com.microspace.payo.data.local.database.converters.JsonConverters
+import com.microspace.payo.security.crypto.DatabasePassphraseManager
+import net.sqlcipher.database.SupportFactory
 
 /**
  * Room Database for optional analytics and history (secondary store).
@@ -45,11 +47,15 @@ abstract class AppDatabase : RoomDatabase() {
         }
         
         private fun buildDatabase(context: Context): AppDatabase {
+            val passphrase = DatabasePassphraseManager(context).getPassphrase()
+            val factory = SupportFactory(passphrase)
+
             return Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
+                .openHelperFactory(factory)
                 .fallbackToDestructiveMigration()
                 .build()
         }

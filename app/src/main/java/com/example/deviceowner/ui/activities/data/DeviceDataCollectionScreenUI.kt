@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.data
+package com.microspace.payo.ui.activities.data
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
-import com.example.deviceowner.ui.components.ErrorMessageCard
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.ui.components.ErrorMessageCard
 
 /**
  * Device data collection screen with editable loan number

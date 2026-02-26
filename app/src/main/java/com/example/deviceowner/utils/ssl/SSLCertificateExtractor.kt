@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils.ssl
+package com.microspace.payo.utils.ssl
 
 import android.util.Base64
 import android.util.Log

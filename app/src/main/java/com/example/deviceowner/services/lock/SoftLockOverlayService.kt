@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.lock
+package com.microspace.payo.services.lock
 
 import android.app.Service
 import android.content.Context
@@ -34,9 +34,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.data.models.lock.SoftLockType
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import com.microspace.payo.data.models.lock.SoftLockType
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import java.text.SimpleDateFormat
 import java.util.*
 

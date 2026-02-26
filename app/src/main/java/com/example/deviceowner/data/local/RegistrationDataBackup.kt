@@ -1,17 +1,19 @@
-package com.example.deviceowner.data.local
+package com.microspace.payo.data.local
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.device.CompleteDeviceRegistrationEntity
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.device.CompleteDeviceRegistrationEntity
+import com.microspace.payo.security.crypto.FileEncryptionManager
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Handles backup and restore of device registration data
+ * Handles encrypted backup and restore of device registration data
  * Ensures registration data persists even after app reinstallation
+ * All backups are encrypted using AES-256-GCM
  */
 class RegistrationDataBackup(private val context: Context) {
     
@@ -24,10 +26,12 @@ class RegistrationDataBackup(private val context: Context) {
     private val gson = Gson()
     private val database = DeviceOwnerDatabase.getDatabase(context)
     private val dao = database.completeDeviceRegistrationDao()
+    private val fileEncryption = FileEncryptionManager(context)
     
     /**
-     * Backup registration data to local storage
+     * Backup registration data to local storage with encryption
      * Called after successful registration
+     * Data is encrypted using AES-256-GCM before writing to disk
      */
     suspend fun backupRegistrationData() = withContext(Dispatchers.IO) {
         try {
@@ -39,11 +43,13 @@ class RegistrationDataBackup(private val context: Context) {
                 // Create backup directory if it doesn't exist
                 backupFile.parentFile?.mkdirs()
                 
-                // Convert entity to JSON and save
+                // Convert entity to JSON
                 val jsonData = gson.toJson(registrationData)
-                backupFile.writeText(jsonData)
                 
-                Log.d(TAG, "Registration data backed up successfully")
+                // Encrypt and write to file
+                fileEncryption.writeEncryptedData(backupFile, jsonData.toByteArray(Charsets.UTF_8))
+                
+                Log.d(TAG, "✅ Registration data backed up successfully (encrypted)")
                 Log.d(TAG, "Backup file: ${backupFile.absolutePath}")
                 Log.d(TAG, "Device ID: ${registrationData.deviceId}")
                 Log.d(TAG, "Loan Number: ${registrationData.loanNumber}")
@@ -62,6 +68,7 @@ class RegistrationDataBackup(private val context: Context) {
     /**
      * Restore registration data from backup
      * Called during app startup if no local registration exists
+     * Data is decrypted using AES-256-GCM before parsing
      */
     suspend fun restoreRegistrationData(): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -72,8 +79,9 @@ class RegistrationDataBackup(private val context: Context) {
                 return@withContext false
             }
             
-            // Read backup file
-            val jsonData = backupFile.readText()
+            // Read and decrypt backup file
+            val decryptedBytes = fileEncryption.readEncryptedData(backupFile)
+            val jsonData = String(decryptedBytes, Charsets.UTF_8)
             val restoredData = gson.fromJson(jsonData, CompleteDeviceRegistrationEntity::class.java)
             
             if (restoredData != null) {
@@ -195,13 +203,15 @@ class RegistrationDataBackup(private val context: Context) {
     
     /**
      * Export backup data as JSON string (for debugging/support)
+     * Decrypts the backup before exporting
      */
     suspend fun exportBackupAsJson(): String? = withContext(Dispatchers.IO) {
         try {
             val backupFile = getBackupFile()
             
             if (backupFile.exists()) {
-                return@withContext backupFile.readText()
+                val decryptedBytes = fileEncryption.readEncryptedData(backupFile)
+                return@withContext String(decryptedBytes, Charsets.UTF_8)
             } else {
                 Log.w(TAG, "No backup file to export")
                 return@withContext null

@@ -1,9 +1,9 @@
-package com.example.deviceowner
+package com.microspace.payo
 
 import android.content.Context
-import com.example.deviceowner.overlay.OverlayController
-import com.example.deviceowner.overlay.OverlayData
-import com.example.deviceowner.overlay.OverlayType
+import com.microspace.payo.overlay.OverlayController
+import com.microspace.payo.overlay.OverlayData
+import com.microspace.payo.overlay.OverlayType
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith

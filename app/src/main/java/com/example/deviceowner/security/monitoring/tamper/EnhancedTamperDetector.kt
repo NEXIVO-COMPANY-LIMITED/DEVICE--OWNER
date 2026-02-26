@@ -1,12 +1,12 @@
-package com.example.deviceowner.security.monitoring.tamper
+package com.microspace.payo.security.monitoring.tamper
 
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity
-import com.example.deviceowner.security.response.EnhancedAntiTamperResponse
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.tamper.TamperDetectionEntity
+import com.microspace.payo.security.response.EnhancedAntiTamperResponse
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger

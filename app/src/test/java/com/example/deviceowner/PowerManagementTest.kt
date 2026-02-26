@@ -1,9 +1,9 @@
-package com.example.deviceowner
+package com.microspace.payo
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.deviceowner.managers.power.PowerManagementManager
-import com.example.deviceowner.managers.power.PowerLossMonitor
+import com.microspace.payo.managers.power.PowerManagementManager
+import com.microspace.payo.managers.power.PowerLossMonitor
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith

@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.deviceowner"
+    namespace = "com.microspace.payo"
     compileSdk = 35
 
     // Load keystore properties
@@ -31,11 +31,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.deviceowner"
+        applicationId = "com.microspace.payo"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -139,6 +139,7 @@ dependencies {
     
     implementation(libs.playservices.location)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.sqlcipher)
     implementation(libs.coil.compose)
     
     testImplementation(libs.junit)

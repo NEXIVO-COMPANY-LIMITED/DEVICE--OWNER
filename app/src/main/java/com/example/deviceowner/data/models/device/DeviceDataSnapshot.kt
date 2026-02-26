@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.models.device
+package com.microspace.payo.data.models.device
 
 import com.google.gson.annotations.SerializedName
 

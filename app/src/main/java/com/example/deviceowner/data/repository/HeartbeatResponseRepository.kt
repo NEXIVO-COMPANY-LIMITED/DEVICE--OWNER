@@ -1,10 +1,10 @@
-package com.example.deviceowner.data.repository
+package com.microspace.payo.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatResponseEntity
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.heartbeat.HeartbeatResponseEntity
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

@@ -1,11 +1,11 @@
-package com.example.deviceowner.data.local.repository
+package com.microspace.payo.data.local.repository
 
 import android.util.Log
-import com.example.deviceowner.data.local.database.AppDatabase
-import com.example.deviceowner.data.local.database.entities.device.DeviceDataEntity
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
-import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.data.local.database.AppDatabase
+import com.microspace.payo.data.local.database.entities.device.DeviceDataEntity
+import com.microspace.payo.data.local.database.entities.heartbeat.HeartbeatHistoryEntity
+import com.microspace.payo.data.models.heartbeat.HeartbeatRequest
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 

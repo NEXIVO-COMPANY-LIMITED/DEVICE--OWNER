@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.provisioning.policy
+package com.microspace.payo.ui.activities.provisioning.policy
 
 import android.app.Activity
 import android.os.Build
@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
 import kotlinx.coroutines.delay
 
 /**

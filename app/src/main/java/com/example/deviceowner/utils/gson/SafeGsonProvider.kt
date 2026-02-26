@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils.gson
+package com.microspace.payo.utils.gson
 
 import android.util.Log
 import com.google.gson.Gson

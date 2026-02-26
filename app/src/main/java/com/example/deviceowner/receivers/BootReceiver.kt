@@ -1,30 +1,30 @@
-package com.example.deviceowner.receivers
+package com.microspace.payo.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.core.SilentDeviceOwnerManager
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.mode.CompleteSilentMode
-import com.example.deviceowner.security.monitoring.sim.SIMChangeDetector
-import com.example.deviceowner.security.monitoring.tamper.TamperBootChecker
-import com.example.deviceowner.services.heartbeat.HeartbeatService
-import com.example.deviceowner.services.heartbeat.HeartbeatWorker
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
-import com.example.deviceowner.security.enforcement.adb.AdbBlocker
-import com.example.deviceowner.security.enforcement.bootloader.BootloaderLockEnforcer
-import com.example.deviceowner.security.enforcement.input.PowerButtonBlocker
-import com.example.deviceowner.security.enforcement.monitor.EnhancedSecurityMonitor
-import com.example.deviceowner.security.enforcement.policy.EnhancedSecurityManager
-import com.example.deviceowner.update.scheduler.UpdateScheduler
-import com.example.deviceowner.ui.activities.lock.payment.PaymentOverdueActivity
-import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
-import com.example.deviceowner.ui.activities.lock.system.DeactivationActivity
-import com.example.deviceowner.ui.activities.lock.system.HardLockGenericActivity
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.core.SilentDeviceOwnerManager
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.security.mode.CompleteSilentMode
+import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
+import com.microspace.payo.security.monitoring.tamper.TamperBootChecker
+import com.microspace.payo.services.heartbeat.HeartbeatService
+import com.microspace.payo.services.heartbeat.HeartbeatWorker
+import com.microspace.payo.utils.storage.SharedPreferencesManager
+import com.microspace.payo.security.enforcement.adb.AdbBlocker
+import com.microspace.payo.security.enforcement.bootloader.BootloaderLockEnforcer
+import com.microspace.payo.security.enforcement.input.PowerButtonBlocker
+import com.microspace.payo.security.enforcement.monitor.EnhancedSecurityMonitor
+import com.microspace.payo.security.enforcement.policy.EnhancedSecurityManager
+import com.microspace.payo.update.scheduler.UpdateScheduler
+import com.microspace.payo.ui.activities.lock.payment.PaymentOverdueActivity
+import com.microspace.payo.ui.activities.lock.security.SecurityViolationActivity
+import com.microspace.payo.ui.activities.lock.system.DeactivationActivity
+import com.microspace.payo.ui.activities.lock.system.HardLockGenericActivity
 import kotlinx.coroutines.*
 
 /**
@@ -176,16 +176,16 @@ class BootReceiver : BroadcastReceiver() {
                 HeartbeatService.start(appContext, deviceId)
                 
                 // 2. Monitoring Services
-                com.example.deviceowner.monitoring.SecurityMonitorService.startService(appContext, deviceId)
-                com.example.deviceowner.services.remote.RemoteManagementService.startService(appContext, deviceId)
-                com.example.deviceowner.services.security.FirmwareSecurityMonitorService.startService(appContext)
+                com.microspace.payo.monitoring.SecurityMonitorService.startService(appContext, deviceId)
+                com.microspace.payo.services.remote.RemoteManagementService.startService(appContext, deviceId)
+                com.microspace.payo.services.security.FirmwareSecurityMonitorService.startService(appContext)
                 
                 // 3. Data Worker (Backup periodic task)
                 HeartbeatWorker.enqueue(appContext)
 
                 // 4. Soft Lock Monitor (if applicable)
                 if (RemoteDeviceControlManager(appContext).getLockStateForBoot() == RemoteDeviceControlManager.LOCK_SOFT) {
-                    com.example.deviceowner.services.lock.SoftLockMonitorService.startMonitoring(appContext)
+                    com.microspace.payo.services.lock.SoftLockMonitorService.startMonitoring(appContext)
                 }
             } else {
                 Log.e(TAG, "Cannot start services: Device ID is null")

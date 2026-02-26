@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.lock
+package com.microspace.payo.services.lock
 
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -8,7 +8,7 @@ import android.content.IntentFilter
 import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.microspace.payo.control.RemoteDeviceControlManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

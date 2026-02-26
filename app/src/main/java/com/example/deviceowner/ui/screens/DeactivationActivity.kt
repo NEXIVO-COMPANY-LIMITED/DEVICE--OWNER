@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.screens
+package com.microspace.payo.ui.screens
 
 import android.content.Context
 import android.os.Bundle
@@ -7,7 +7,7 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -63,7 +63,7 @@ class DeactivationActivity : AppCompatActivity() {
             setContent {
                 DeviceOwnerTheme {
                     // Placeholder - use the lock activity version instead
-                    com.example.deviceowner.ui.activities.lock.system.DeactivationScreen(
+                    com.microspace.payo.ui.activities.lock.system.DeactivationScreen(
                         onDeactivationComplete = { finish() }
                     )
                 }

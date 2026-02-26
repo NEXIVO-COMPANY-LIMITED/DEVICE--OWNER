@@ -1,7 +1,7 @@
-package com.example.deviceowner.data.local.database.dao.tamper
+package com.microspace.payo.data.local.database.dao.tamper
 
 import androidx.room.*
-import com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity
+import com.microspace.payo.data.local.database.entities.tamper.TamperDetectionEntity
 
 @Dao
 interface TamperDetectionDao {

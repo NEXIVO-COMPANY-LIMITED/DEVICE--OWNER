@@ -1,12 +1,12 @@
-package com.example.deviceowner.receivers
+package com.microspace.payo.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.response.EnhancedAntiTamperResponse
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.security.response.EnhancedAntiTamperResponse
 
 /**
  * Package Removal Receiver

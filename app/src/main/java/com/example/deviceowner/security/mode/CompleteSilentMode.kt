@@ -1,11 +1,11 @@
-package com.example.deviceowner.security.mode
+package com.microspace.payo.security.mode
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * COMPLETE SILENT MODE

@@ -1,4 +1,4 @@
-package com.example.deviceowner.kiosk
+package com.microspace.payo.kiosk
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -6,8 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
+import com.microspace.payo.receivers.AdminReceiver
+import com.microspace.payo.ui.activities.lock.security.SecurityViolationActivity
 
 /**
  * Kiosk Mode Manager

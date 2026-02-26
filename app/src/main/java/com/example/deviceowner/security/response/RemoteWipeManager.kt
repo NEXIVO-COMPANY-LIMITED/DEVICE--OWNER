@@ -1,11 +1,11 @@
-package com.example.deviceowner.security.response
+package com.microspace.payo.security.response
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * Remote Wipe Manager

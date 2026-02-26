@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.screens.lock
+package com.microspace.payo.ui.screens.lock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.remote.api
+package com.microspace.payo.data.remote.api
 
 import java.io.IOException
 

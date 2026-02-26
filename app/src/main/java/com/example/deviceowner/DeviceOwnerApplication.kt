@@ -1,4 +1,4 @@
-package com.example.deviceowner
+package com.microspace.payo
 
 import android.app.Activity
 import android.app.Application
@@ -12,15 +12,15 @@ import android.util.Log
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.mode.CompleteSilentMode
-import com.example.deviceowner.security.monitoring.sim.SIMChangeDetector
-import com.example.deviceowner.services.data.LocalDataServerService
-import com.example.deviceowner.services.heartbeat.HeartbeatWorker
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
-import com.example.deviceowner.services.sync.OfflineSyncWorker
-import com.example.deviceowner.update.scheduler.UpdateScheduler
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.security.mode.CompleteSilentMode
+import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
+import com.microspace.payo.services.data.LocalDataServerService
+import com.microspace.payo.services.heartbeat.HeartbeatWorker
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.services.sync.OfflineSyncWorker
+import com.microspace.payo.update.scheduler.UpdateScheduler
 
 class DeviceOwnerApplication : Application() {
 
@@ -72,7 +72,7 @@ class DeviceOwnerApplication : Application() {
         val regPrefs = getSharedPreferences("device_registration", Context.MODE_PRIVATE)
         val serverDeviceId = regPrefs.getString("device_id", null)
         if (!serverDeviceId.isNullOrEmpty()) {
-            com.example.deviceowner.monitoring.SecurityMonitorService.startService(this)
+            com.microspace.payo.monitoring.SecurityMonitorService.startService(this)
             if (DeviceOwnerManager(this).isDeviceOwner()) {
                 SIMChangeDetector(this).initialize()
             }

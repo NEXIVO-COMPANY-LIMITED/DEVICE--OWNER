@@ -1,11 +1,11 @@
-package com.example.deviceowner.update.receiver
+package com.microspace.payo.update.receiver
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.util.Log
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
 import java.io.File
 import java.io.FileInputStream
 
@@ -109,7 +109,7 @@ class UpdateReceiver : BroadcastReceiver() {
                 session.fsync(out)
             }
             
-            val intent = Intent("com.example.deviceowner.ROLLBACK_COMPLETE")
+            val intent = Intent("com.microspace.payo.ROLLBACK_COMPLETE")
             val intentSender = android.app.PendingIntent.getBroadcast(
                 context, 0, intent, 
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE

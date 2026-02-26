@@ -1,9 +1,9 @@
-package com.example.deviceowner.data.local.database.converters
+package com.microspace.payo.data.local.database.converters
 
 import android.util.Log
 import androidx.room.TypeConverter
 import com.google.gson.Gson
-import com.example.deviceowner.utils.gson.SafeGsonProvider
+import com.microspace.payo.utils.gson.SafeGsonProvider
 
 /**
  * JSON Type Converters for Room Database

@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils.ui
+package com.microspace.payo.utils.ui
 
 import android.content.Context
 import android.graphics.Color

@@ -1,8 +1,8 @@
-package com.example.deviceowner.deactivation
+package com.microspace.payo.deactivation
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.remote.ApiClient
+import com.microspace.payo.data.remote.ApiClient
 import kotlinx.coroutines.*
 
 /**

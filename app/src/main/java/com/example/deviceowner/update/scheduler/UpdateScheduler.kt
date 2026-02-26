@@ -1,4 +1,4 @@
-package com.example.deviceowner.update.scheduler
+package com.microspace.payo.update.scheduler
 
 import android.content.Context
 import android.util.Log
@@ -6,8 +6,8 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.example.deviceowner.update.config.UpdateConfig
-import com.example.deviceowner.update.worker.UpdateCheckWorker
+import com.microspace.payo.update.config.UpdateConfig
+import com.microspace.payo.update.worker.UpdateCheckWorker
 import java.util.concurrent.TimeUnit
 
 /**

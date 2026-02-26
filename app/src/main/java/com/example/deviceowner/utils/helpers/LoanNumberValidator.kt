@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils.helpers
+package com.microspace.payo.utils.helpers
 
 object LoanNumberValidator {
     

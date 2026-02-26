@@ -1,8 +1,8 @@
-package com.example.deviceowner.provisioning
+package com.microspace.payo.provisioning
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.device.DeviceOwnerCompatibilityChecker
+import com.microspace.payo.device.DeviceOwnerCompatibilityChecker
 
 /**
  * Provisioning Validator

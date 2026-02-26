@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.local.database.entities.sim
+package com.microspace.payo.data.local.database.entities.sim
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity

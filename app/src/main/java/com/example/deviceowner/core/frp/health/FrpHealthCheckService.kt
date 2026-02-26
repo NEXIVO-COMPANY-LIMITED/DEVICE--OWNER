@@ -1,4 +1,4 @@
-package com.example.deviceowner.core.frp.health
+package com.microspace.payo.core.frp.health
 
 import android.app.Service
 import android.content.Intent
@@ -12,8 +12,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import com.example.deviceowner.config.FrpConfig
-import com.example.deviceowner.core.frp.verification.FrpVerificationService
+import com.microspace.payo.config.FrpConfig
+import com.microspace.payo.core.frp.verification.FrpVerificationService
 import java.util.concurrent.TimeUnit
 
 /**

@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils.constants
+package com.microspace.payo.utils.constants
 
 import android.os.UserManager
 

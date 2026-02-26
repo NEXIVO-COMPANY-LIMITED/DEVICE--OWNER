@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.local.database.entities.lock
+package com.microspace.payo.data.local.database.entities.lock
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

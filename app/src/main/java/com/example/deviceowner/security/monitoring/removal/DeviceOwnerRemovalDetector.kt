@@ -1,4 +1,4 @@
-package com.example.deviceowner.security.monitoring.removal
+package com.microspace.payo.security.monitoring.removal
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -6,9 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.receivers.AdminReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -262,9 +262,9 @@ class DeviceOwnerRemovalDetector(private val context: Context) {
             
             if (deviceId != null) {
                 // This will be logged as a critical tamper event
-                val database = com.example.deviceowner.data.local.database.DeviceOwnerDatabase.getDatabase(context)
+                val database = com.microspace.payo.data.local.database.DeviceOwnerDatabase.getDatabase(context)
                 
-                val tamperDetection = com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity(
+                val tamperDetection = com.microspace.payo.data.local.database.entities.tamper.TamperDetectionEntity(
                     deviceId = deviceId,
                     tamperType = breachType,
                     severity = "CRITICAL",

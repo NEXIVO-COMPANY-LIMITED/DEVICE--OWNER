@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils.logging
+package com.microspace.payo.utils.logging
 
 import android.content.Context
 import android.os.Environment

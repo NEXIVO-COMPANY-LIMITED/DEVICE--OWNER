@@ -1,4 +1,4 @@
-package com.example.deviceowner.security.enforcement.kiosk
+package com.microspace.payo.security.enforcement.kiosk
 
 import android.app.Activity
 import android.app.ActivityManager
@@ -8,8 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
+import com.microspace.payo.receivers.AdminReceiver
+import com.microspace.payo.ui.activities.lock.security.SecurityViolationActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

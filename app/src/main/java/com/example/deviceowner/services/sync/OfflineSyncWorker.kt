@@ -1,17 +1,17 @@
-package com.example.deviceowner.services.sync
+package com.microspace.payo.services.sync
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.core.device.DeviceDataCollector
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
-import com.example.deviceowner.data.models.tamper.TamperEventRequest
-import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.core.device.DeviceDataCollector
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.models.heartbeat.HeartbeatRequest
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.data.models.tamper.TamperEventRequest
+import com.microspace.payo.data.remote.ApiClient
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +48,7 @@ class OfflineSyncWorker(
             for (record in toSend) {
                 val sent = syncHeartbeatFromRecord(record)
                 if (sent) {
-                    heartbeatSyncDao.updateSyncStatus(record.id, com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity.STATUS_SYNCED)
+                    heartbeatSyncDao.updateSyncStatus(record.id, com.microspace.payo.data.local.database.entities.offline.HeartbeatSyncEntity.STATUS_SYNCED)
                     heartbeatSyncCount++
                 }
             }
@@ -83,7 +83,7 @@ class OfflineSyncWorker(
         }
     }
 
-    private suspend fun syncHeartbeatFromRecord(record: com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity): Boolean {
+    private suspend fun syncHeartbeatFromRecord(record: com.microspace.payo.data.local.database.entities.offline.HeartbeatSyncEntity): Boolean {
         return try {
             val request = gson.fromJson(record.payloadJson, HeartbeatRequest::class.java) ?: return false
             val deviceId = record.deviceId
@@ -157,7 +157,7 @@ class OfflineSyncWorker(
                     isLocked = response.isDeviceLocked(),
                     lockReason = response.getLockReason().takeIf { it.isNotBlank() }
                 )
-                com.example.deviceowner.utils.storage.PaymentDataManager(applicationContext).apply {
+                com.microspace.payo.utils.storage.PaymentDataManager(applicationContext).apply {
                     saveNextPaymentInfo(nextPaymentDate, unlockPassword)
                     saveServerTime(response.serverTime)
                     saveLockState(response.isDeviceLocked(), response.getLockReason().takeIf { it.isNotBlank() })
@@ -167,7 +167,7 @@ class OfflineSyncWorker(
                     val appContext = applicationContext
                     CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
                         try {
-                            com.example.deviceowner.deactivation.DeviceOwnerDeactivationManager(appContext).deactivateDeviceOwner()
+                            com.microspace.payo.deactivation.DeviceOwnerDeactivationManager(appContext).deactivateDeviceOwner()
                         } catch (_: Exception) { }
                     }
                     return@withContext

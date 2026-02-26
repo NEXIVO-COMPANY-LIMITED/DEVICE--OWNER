@@ -1,7 +1,7 @@
-package com.example.deviceowner.data.local.database.dao
+package com.microspace.payo.data.local.database.dao
 
 import androidx.room.*
-import com.example.deviceowner.data.local.database.entities.payment.InstallmentEntity
+import com.microspace.payo.data.local.database.entities.payment.InstallmentEntity
 
 @Dao
 interface InstallmentDao {

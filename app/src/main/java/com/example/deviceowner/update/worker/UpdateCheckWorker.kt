@@ -1,10 +1,10 @@
-package com.example.deviceowner.update.worker
+package com.microspace.payo.update.worker
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.deviceowner.update.github.GitHubUpdateManager
+import com.microspace.payo.update.github.GitHubUpdateManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

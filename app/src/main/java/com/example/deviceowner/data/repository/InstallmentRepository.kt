@@ -1,11 +1,11 @@
-package com.example.deviceowner.data.repository
+package com.microspace.payo.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.payment.InstallmentEntity
-import com.example.deviceowner.data.models.payment.InstallmentData
-import com.example.deviceowner.data.remote.ApiClient
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.payment.InstallmentEntity
+import com.microspace.payo.data.models.payment.InstallmentData
+import com.microspace.payo.data.remote.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

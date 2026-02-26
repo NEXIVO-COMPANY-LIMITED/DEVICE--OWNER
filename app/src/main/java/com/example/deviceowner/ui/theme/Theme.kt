@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.theme
+package com.microspace.payo.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*

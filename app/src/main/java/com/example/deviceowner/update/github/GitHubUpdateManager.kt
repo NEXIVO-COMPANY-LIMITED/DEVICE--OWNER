@@ -1,4 +1,4 @@
-package com.example.deviceowner.update.github
+package com.microspace.payo.update.github
 
 import android.app.PendingIntent
 import android.content.Context
@@ -7,11 +7,11 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.data.repository.DeviceRegistrationRepository
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
-import com.example.deviceowner.update.config.UpdateConfig
-import com.example.deviceowner.update.receiver.UpdateReceiver
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.data.repository.DeviceRegistrationRepository
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.update.config.UpdateConfig
+import com.microspace.payo.update.receiver.UpdateReceiver
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.CoroutineScope

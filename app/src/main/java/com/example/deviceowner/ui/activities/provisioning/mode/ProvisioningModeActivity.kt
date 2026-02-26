@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.provisioning.mode
+package com.microspace.payo.ui.activities.provisioning.mode
 
 import android.app.Activity
 import android.content.Intent
@@ -40,7 +40,7 @@ class ProvisioningModeActivity : Activity() {
 
         // CRITICAL: Check device compatibility BEFORE provisioning
         Log.d(TAG, "🔍 Checking device compatibility...")
-        val validator = com.example.deviceowner.provisioning.ProvisioningValidator(this)
+        val validator = com.microspace.payo.provisioning.ProvisioningValidator(this)
         val isCompatible = validator.validateBeforeProvisioning()
 
         if (!isCompatible) {

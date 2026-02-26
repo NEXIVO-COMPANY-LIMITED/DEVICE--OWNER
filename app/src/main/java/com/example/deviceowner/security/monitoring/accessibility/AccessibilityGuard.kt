@@ -1,11 +1,11 @@
-package com.example.deviceowner.security.monitoring.accessibility
+package com.microspace.payo.security.monitoring.accessibility
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.util.Log
 import android.view.accessibility.AccessibilityManager
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.device.DeviceOwnerManager
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.device.DeviceOwnerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -183,7 +183,7 @@ class AccessibilityGuard(private val context: Context) {
             
             // Step 4: Send tamper to backend (POST api/devices/{id}/tamper/ + tech log)
             Log.e(TAG, "Step 4: Sending tamper to backend...")
-            com.example.deviceowner.security.response.EnhancedAntiTamperResponse(context)
+            com.microspace.payo.security.response.EnhancedAntiTamperResponse(context)
                 .sendTamperToBackendOnly("UNAUTHORIZED_ACCESS", "HIGH", "Unauthorized accessibility service: $serviceId")
             
         } catch (e: Exception) {
@@ -214,7 +214,7 @@ class AccessibilityGuard(private val context: Context) {
                 // Alternative: Use device owner to block accessibility service installation
                 // This would prevent new services from being installed
                 val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
-                val adminComponent = android.content.ComponentName(context, com.example.deviceowner.receivers.AdminReceiver::class.java)
+                val adminComponent = android.content.ComponentName(context, com.microspace.payo.receivers.AdminReceiver::class.java)
                 
                 // Block installation of unknown apps (prevents new accessibility services)
                 devicePolicyManager.addUserRestriction(
@@ -243,9 +243,9 @@ class AccessibilityGuard(private val context: Context) {
                     .getString("device_id_for_heartbeat", null)
             
             if (deviceId != null) {
-                val database = com.example.deviceowner.data.local.database.DeviceOwnerDatabase.getDatabase(context)
+                val database = com.microspace.payo.data.local.database.DeviceOwnerDatabase.getDatabase(context)
                 
-                val tamperDetection = com.example.deviceowner.data.local.database.entities.tamper.TamperDetectionEntity(
+                val tamperDetection = com.microspace.payo.data.local.database.entities.tamper.TamperDetectionEntity(
                     deviceId = deviceId,
                     tamperType = breachType,
                     severity = "HIGH",

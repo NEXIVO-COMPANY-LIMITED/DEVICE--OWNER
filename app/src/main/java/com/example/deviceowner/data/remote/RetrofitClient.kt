@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.remote
+package com.microspace.payo.data.remote
 
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

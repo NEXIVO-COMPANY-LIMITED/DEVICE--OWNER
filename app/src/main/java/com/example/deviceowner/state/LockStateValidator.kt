@@ -1,10 +1,10 @@
-package com.example.deviceowner.state
+package com.microspace.payo.state
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * Lock State Validator

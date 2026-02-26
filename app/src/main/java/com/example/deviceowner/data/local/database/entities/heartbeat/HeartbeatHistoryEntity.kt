@@ -1,11 +1,11 @@
-package com.example.deviceowner.data.local.database.entities.heartbeat
+package com.microspace.payo.data.local.database.entities.heartbeat
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.example.deviceowner.data.local.database.entities.device.DeviceDataEntity
+import com.microspace.payo.data.local.database.entities.device.DeviceDataEntity
 
 /**
  * Heartbeat History Entity - Stores heartbeat records locally

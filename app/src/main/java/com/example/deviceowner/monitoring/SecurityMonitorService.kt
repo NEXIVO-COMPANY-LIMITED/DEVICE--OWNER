@@ -1,4 +1,4 @@
-package com.example.deviceowner.monitoring
+package com.microspace.payo.monitoring
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -11,9 +11,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.deviceowner.update.config.UpdateConfig
-import com.example.deviceowner.update.github.GitHubUpdateManager
-import com.example.deviceowner.receivers.ServiceGuardReceiver
+import com.microspace.payo.update.config.UpdateConfig
+import com.microspace.payo.update.github.GitHubUpdateManager
+import com.microspace.payo.receivers.ServiceGuardReceiver
 import kotlinx.coroutines.*
 
 /**

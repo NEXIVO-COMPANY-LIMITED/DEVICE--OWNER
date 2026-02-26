@@ -1,10 +1,10 @@
-package com.example.deviceowner.data.db.dao
+package com.microspace.payo.data.db.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.example.deviceowner.data.models.heartbeat.Heartbeat
+import com.microspace.payo.data.models.heartbeat.Heartbeat
 import kotlinx.coroutines.flow.Flow
 
 @Dao

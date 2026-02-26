@@ -1,7 +1,7 @@
-package com.example.deviceowner.data.local.database.dao.device
+package com.microspace.payo.data.local.database.dao.device
 
 import androidx.room.*
-import com.example.deviceowner.data.local.database.entities.device.DeviceDataEntity
+import com.microspace.payo.data.local.database.entities.device.DeviceDataEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

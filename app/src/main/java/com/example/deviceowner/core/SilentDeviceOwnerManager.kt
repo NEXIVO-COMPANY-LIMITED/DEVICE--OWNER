@@ -1,4 +1,4 @@
-package com.example.deviceowner.core
+package com.microspace.payo.core
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -6,7 +6,7 @@ import android.content.Context
 import android.os.Build
 import android.os.UserManager
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * SILENT DEVICE OWNER MANAGER

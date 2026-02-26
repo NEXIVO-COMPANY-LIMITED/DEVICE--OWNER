@@ -1,8 +1,8 @@
-package com.example.deviceowner.utils.error
+package com.microspace.payo.utils.error
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import retrofit2.Response

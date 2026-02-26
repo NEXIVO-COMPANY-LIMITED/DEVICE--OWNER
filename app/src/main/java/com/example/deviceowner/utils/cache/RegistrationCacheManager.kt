@@ -1,8 +1,8 @@
-package com.example.deviceowner.utils.cache
+package com.microspace.payo.utils.cache
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

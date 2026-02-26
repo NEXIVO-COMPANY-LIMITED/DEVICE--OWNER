@@ -1,12 +1,12 @@
-package com.example.deviceowner.ui.base
+package com.microspace.payo.ui.base
 
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
-import com.example.deviceowner.state.DeviceLockStateManager
-import com.example.deviceowner.state.LockState
-import com.example.deviceowner.state.LockReason
+import com.microspace.payo.state.DeviceLockStateManager
+import com.microspace.payo.state.LockState
+import com.microspace.payo.state.LockReason
 
 /**
  * Base Activity for all lock-aware screens

@@ -1,8 +1,8 @@
-package com.example.deviceowner.security.monitoring.violation
+package com.microspace.payo.security.monitoring.violation
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
 import java.time.LocalDateTime
 
 /**

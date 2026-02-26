@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.remote.models
+package com.microspace.payo.data.remote.models
 
 import com.google.gson.annotations.SerializedName
 

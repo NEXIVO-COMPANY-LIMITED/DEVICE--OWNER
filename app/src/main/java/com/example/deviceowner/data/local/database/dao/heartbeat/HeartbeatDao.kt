@@ -1,7 +1,7 @@
-package com.example.deviceowner.data.local.database.dao.heartbeat
+package com.microspace.payo.data.local.database.dao.heartbeat
 
 import androidx.room.*
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatEntity
+import com.microspace.payo.data.local.database.entities.heartbeat.HeartbeatEntity
 
 @Dao
 interface HeartbeatDao {

@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.remote
+package com.microspace.payo.services.remote
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,11 +10,11 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.data.remote.ApiEndpoints
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.utils.ui.CustomToast
-import com.example.deviceowner.utils.logging.LogManager
+import com.microspace.payo.data.remote.ApiClient
+import com.microspace.payo.data.remote.ApiEndpoints
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.utils.ui.CustomToast
+import com.microspace.payo.utils.logging.LogManager
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import kotlinx.coroutines.*

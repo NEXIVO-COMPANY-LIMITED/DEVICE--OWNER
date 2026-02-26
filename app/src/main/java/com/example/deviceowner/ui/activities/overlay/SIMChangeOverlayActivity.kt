@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.overlay
+package com.microspace.payo.ui.activities.overlay
 
 import android.os.Build
 import android.os.Bundle
@@ -33,9 +33,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.security.monitoring.sim.SIMChangeDetector
-import com.example.deviceowner.security.monitoring.sim.SIMStatus
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
+import com.microspace.payo.security.monitoring.sim.SIMStatus
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
 import kotlinx.coroutines.delay
 
 class SIMChangeOverlayActivity : ComponentActivity() {

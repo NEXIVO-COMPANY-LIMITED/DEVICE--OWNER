@@ -1,15 +1,15 @@
-package com.example.deviceowner.services.heartbeat
+package com.microspace.payo.services.heartbeat
 
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
-import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.services.data.DeviceDataCollector
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.data.models.heartbeat.HeartbeatRequest
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.data.remote.ApiClient
+import com.microspace.payo.services.data.DeviceDataCollector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -28,7 +28,6 @@ class HeartbeatManager(private val context: Context) {
     private val TAG = "HeartbeatManager"
     private val dataCollector = DeviceDataCollector(context)
     private val apiClient = ApiClient()
-    private val eventLogger = HeartbeatEventLogger(context)
     
     // Track heartbeat sequence for better reporting
     private var currentHeartbeatNumber = 0
@@ -44,12 +43,7 @@ class HeartbeatManager(private val context: Context) {
             deviceId = validateAndGetDeviceId()
             if (deviceId == null) {
                 val responseTime = System.currentTimeMillis() - startTime
-                eventLogger.logFailure(
-                    heartbeatNumber = heartbeatNumber,
-                    responseTime = responseTime,
-                    reason = "Device ID is NULL or BLANK - Registration required",
-                    errorType = "MISSING_DEVICE_ID"
-                )
+                Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): Device ID is NULL or BLANK - Registration required")
                 return@withContext null
             }
             
@@ -58,11 +52,7 @@ class HeartbeatManager(private val context: Context) {
                 dataCollector.collectDeviceData()
             } catch (e: Exception) {
                 val responseTime = System.currentTimeMillis() - startTime
-                eventLogger.logException(
-                    heartbeatNumber = heartbeatNumber,
-                    responseTime = responseTime,
-                    exception = e
-                )
+                Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): Data collection error: ${e.message}", e)
                 return@withContext null
             }
             
@@ -71,12 +61,7 @@ class HeartbeatManager(private val context: Context) {
                 buildHeartbeatRequest(registrationData)
             } catch (e: Exception) {
                 val responseTime = System.currentTimeMillis() - startTime
-                Log.e(TAG, "❌ Failed to build request: ${e.message}")
-                eventLogger.logException(
-                    heartbeatNumber = heartbeatNumber,
-                    responseTime = responseTime,
-                    exception = e
-                )
+                Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): Failed to build request: ${e.message}", e)
                 return@withContext null
             }
             
@@ -90,69 +75,33 @@ class HeartbeatManager(private val context: Context) {
                 val body = response.body()
                 if (body != null) {
                     val isLocked = body.isDeviceLocked()
-                    eventLogger.logSuccess(
-                        heartbeatNumber = heartbeatNumber,
-                        responseTime = responseTime,
-                        message = "Heartbeat #$heartbeatNumber successful",
-                        isLocked = isLocked
-                    )
-                    Log.d(TAG, "✅ Heartbeat #$heartbeatNumber successful: $deviceId (${responseTime}ms)")
+                    Log.d(TAG, "✅ Heartbeat #$heartbeatNumber SUCCESS (${responseTime}ms): Device=$deviceId, Locked=$isLocked")
                     return@withContext body
                 } else {
-                    eventLogger.logFailure(
-                        heartbeatNumber = heartbeatNumber,
-                        responseTime = responseTime,
-                        reason = "Server returned empty body (200 OK but null content)",
-                        errorType = "EMPTY_RESPONSE_BODY"
-                    )
+                    Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): Server returned empty body (200 OK but null content)")
                     return@withContext null
                 }
             } else {
                 val errorMsg = response.errorBody()?.string() ?: response.message() ?: "Unknown error"
-                eventLogger.logServerError(
-                    heartbeatNumber = heartbeatNumber,
-                    responseTime = responseTime,
-                    httpCode = response.code(),
-                    errorMessage = errorMsg
-                )
+                Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): HTTP ${response.code()} - $errorMsg")
                 return@withContext null
             }
             
         } catch (e: java.net.UnknownHostException) {
             val responseTime = System.currentTimeMillis() - startTime
-            eventLogger.logNetworkError(
-                heartbeatNumber = heartbeatNumber,
-                responseTime = responseTime,
-                errorType = "NO_INTERNET",
-                errorMessage = "Device offline: UnknownHostException"
-            )
+            Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): NO_INTERNET - Device offline")
             return@withContext null
         } catch (e: java.net.ConnectException) {
             val responseTime = System.currentTimeMillis() - startTime
-            eventLogger.logNetworkError(
-                heartbeatNumber = heartbeatNumber,
-                responseTime = responseTime,
-                errorType = "CONNECTION_FAILED",
-                errorMessage = "Failed to connect to server: ${e.message}"
-            )
+            Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): CONNECTION_FAILED - ${e.message}")
             return@withContext null
         } catch (e: java.net.SocketTimeoutException) {
             val responseTime = System.currentTimeMillis() - startTime
-            eventLogger.logNetworkError(
-                heartbeatNumber = heartbeatNumber,
-                responseTime = responseTime,
-                errorType = "TIMEOUT",
-                errorMessage = "Request timed out after ${responseTime}ms"
-            )
+            Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): TIMEOUT - Request timed out")
             return@withContext null
         } catch (e: Exception) {
             val responseTime = System.currentTimeMillis() - startTime
-            Log.e(TAG, "❌ Unexpected Error in Heartbeat: ${e.message}")
-            eventLogger.logException(
-                heartbeatNumber = heartbeatNumber,
-                responseTime = responseTime,
-                exception = e
-            )
+            Log.e(TAG, "❌ Heartbeat #$heartbeatNumber FAILED (${responseTime}ms): Unexpected error: ${e.message}", e)
             return@withContext null
         }
     }
@@ -209,8 +158,8 @@ class HeartbeatManager(private val context: Context) {
             sdkVersion = Build.VERSION.SDK_INT,
             securityPatchLevel = Build.VERSION.SECURITY_PATCH ?: androidInfo["security_patch"]?.toString() ?: "unknown",
             systemUptime = android.os.SystemClock.elapsedRealtime(),
-            installedAppsHash = com.example.deviceowner.utils.helpers.HashGenerator.generateInstalledAppsHash(context),
-            systemPropertiesHash = com.example.deviceowner.utils.helpers.HashGenerator.generateSystemPropertiesHash(),
+            installedAppsHash = com.microspace.payo.utils.helpers.HashGenerator.generateInstalledAppsHash(context),
+            systemPropertiesHash = com.microspace.payo.utils.helpers.HashGenerator.generateSystemPropertiesHash(),
             latitude = (locationInfo["latitude"] as? Number)?.toDouble(),
             longitude = (locationInfo["longitude"] as? Number)?.toDouble(),
             batteryLevel = getBatteryLevel(),

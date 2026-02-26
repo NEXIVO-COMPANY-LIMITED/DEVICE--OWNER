@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.models.registration
+package com.microspace.payo.data.models.registration
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

@@ -1,15 +1,15 @@
-package com.example.deviceowner.services.payment
+package com.microspace.payo.services.payment
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.ui.screens.lock.LockScreenState
-import com.example.deviceowner.ui.screens.lock.LockScreenStrategy
-import com.example.deviceowner.ui.screens.lock.LockScreenType
-import com.example.deviceowner.utils.storage.PaymentDataManager
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
-import com.example.deviceowner.control.HardLockManager
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.services.lock.SoftLockOverlayService
+import com.microspace.payo.ui.screens.lock.LockScreenState
+import com.microspace.payo.ui.screens.lock.LockScreenStrategy
+import com.microspace.payo.ui.screens.lock.LockScreenType
+import com.microspace.payo.utils.storage.PaymentDataManager
+import com.microspace.payo.utils.storage.SharedPreferencesManager
+import com.microspace.payo.control.HardLockManager
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.services.lock.SoftLockOverlayService
 import java.time.ZonedDateTime
 
 /**

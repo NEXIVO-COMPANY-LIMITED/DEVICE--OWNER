@@ -1,14 +1,14 @@
-package com.example.deviceowner.ui.screens.lock
+package com.microspace.payo.ui.screens.lock
 
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
-import com.example.deviceowner.kiosk.KioskModeManager
-import com.example.deviceowner.ui.activities.lock.payment.SoftLockReminderActivity
-import com.example.deviceowner.ui.activities.lock.payment.PaymentOverdueActivity
-import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
-import com.example.deviceowner.ui.activities.lock.system.DeactivationActivity
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.kiosk.KioskModeManager
+import com.microspace.payo.ui.activities.lock.payment.SoftLockReminderActivity
+import com.microspace.payo.ui.activities.lock.payment.PaymentOverdueActivity
+import com.microspace.payo.ui.activities.lock.security.SecurityViolationActivity
+import com.microspace.payo.ui.activities.lock.system.DeactivationActivity
 
 /**
  * Lock Screen Manager
@@ -66,7 +66,7 @@ object LockScreenManager {
     }
 
     private fun dismissLockScreen(context: Context) {
-        context.sendBroadcast(Intent("com.example.deviceowner.DISMISS_LOCK_SCREEN"))
+        context.sendBroadcast(Intent("com.microspace.payo.DISMISS_LOCK_SCREEN"))
         KioskModeManager.disableKioskMode(context)
     }
 }

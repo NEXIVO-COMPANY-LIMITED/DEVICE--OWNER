@@ -1,8 +1,8 @@
-package com.example.deviceowner.data.local.database.dao.lock
+package com.microspace.payo.data.local.database.dao.lock
 
 import androidx.room.*
-import com.example.deviceowner.data.local.database.entities.common.SyncStatus
-import com.example.deviceowner.data.local.database.entities.lock.LockEventEntity
+import com.microspace.payo.data.local.database.entities.common.SyncStatus
+import com.microspace.payo.data.local.database.entities.lock.LockEventEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

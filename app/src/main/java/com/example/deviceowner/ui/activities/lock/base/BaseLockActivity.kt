@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.lock.base
+package com.microspace.payo.ui.activities.lock.base
 
 import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
@@ -13,7 +13,7 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * Base Activity for all Lock Screen variations.
@@ -25,6 +25,7 @@ abstract class BaseLockActivity : ComponentActivity() {
     protected lateinit var admin: ComponentName
     protected var wakeLock: PowerManager.WakeLock? = null
     protected var kioskNotActive = false
+    protected var isExitingForced = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,15 +104,19 @@ abstract class BaseLockActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus) {
+        // CRITICAL: Do not relaunch if we are explicitly finishing the activity
+        if (!hasFocus && !isFinishing && !isDestroyed && !isExitingForced) {
             window.decorView.postDelayed({
                 try {
-                    val intent = Intent(this, this::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    // Check again inside the delay
+                    if (!isFinishing && !isDestroyed && !isExitingForced) {
+                        val intent = Intent(this, this::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                        startActivity(intent)
                     }
-                    startActivity(intent)
                 } catch (_: Exception) {}
-            }, 100)
+            }, 150)
         }
     }
 

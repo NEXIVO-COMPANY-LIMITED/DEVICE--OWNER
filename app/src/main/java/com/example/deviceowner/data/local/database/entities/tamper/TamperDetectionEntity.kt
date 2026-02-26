@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.local.database.entities.tamper
+package com.microspace.payo.data.local.database.entities.tamper
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

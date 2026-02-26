@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.local.database.entities.offline
+package com.microspace.payo.data.local.database.entities.offline
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

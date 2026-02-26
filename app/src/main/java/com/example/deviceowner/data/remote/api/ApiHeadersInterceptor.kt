@@ -1,8 +1,8 @@
-package com.example.deviceowner.data.remote.api
+package com.microspace.payo.data.remote.api
 
 import android.util.Log
-import com.example.deviceowner.AppConfig
-import com.example.deviceowner.BuildConfig
+import com.microspace.payo.AppConfig
+import com.microspace.payo.BuildConfig
 import okhttp3.Interceptor
 import okhttp3.Response
 

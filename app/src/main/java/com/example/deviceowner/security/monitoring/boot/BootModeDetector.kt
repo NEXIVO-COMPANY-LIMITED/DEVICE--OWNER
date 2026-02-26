@@ -1,8 +1,8 @@
-package com.example.deviceowner.security.monitoring.boot
+package com.microspace.payo.security.monitoring.boot
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.microspace.payo.control.RemoteDeviceControlManager
 
 /**
  * BootModeDetector - Detects if device is in recovery/fastboot/bootloader mode

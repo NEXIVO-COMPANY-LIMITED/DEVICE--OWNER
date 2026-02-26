@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.lock.system
+package com.microspace.payo.ui.activities.lock.system
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -19,8 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.ui.activities.lock.base.BaseLockActivity
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.ui.activities.lock.base.BaseLockActivity
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
 import java.text.SimpleDateFormat
 import java.util.*
 

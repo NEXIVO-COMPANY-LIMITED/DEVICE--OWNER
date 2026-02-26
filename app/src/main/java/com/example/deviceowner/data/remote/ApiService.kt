@@ -1,22 +1,22 @@
-package com.example.deviceowner.data.remote
+package com.microspace.payo.data.remote
 
-import com.example.deviceowner.data.models.heartbeat.HeartbeatLogRequest
-import com.example.deviceowner.data.models.heartbeat.HeartbeatLogResponse
-import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
-import com.example.deviceowner.data.models.installation.InstallationStatusRequest
-import com.example.deviceowner.data.models.installation.InstallationStatusResponse
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
-import com.example.deviceowner.data.models.registration.DeviceRegistrationResponse
-import com.example.deviceowner.data.models.tamper.TamperEventRequest
-import com.example.deviceowner.data.models.tamper.TamperEventResponse
-import com.example.deviceowner.data.models.tech.BugReportRequest
-import com.example.deviceowner.data.models.tech.BugReportResponse
-import com.example.deviceowner.data.models.tech.DeviceLogRequest
-import com.example.deviceowner.data.models.tech.DeviceLogResponse
-import com.example.deviceowner.data.models.payment.InstallmentResponse
-import com.example.deviceowner.data.models.payment.PaymentRequest
-import com.example.deviceowner.data.models.payment.PaymentResponse
+import com.microspace.payo.data.models.heartbeat.HeartbeatLogRequest
+import com.microspace.payo.data.models.heartbeat.HeartbeatLogResponse
+import com.microspace.payo.data.models.heartbeat.HeartbeatRequest
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.data.models.installation.InstallationStatusRequest
+import com.microspace.payo.data.models.installation.InstallationStatusResponse
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.data.models.registration.DeviceRegistrationResponse
+import com.microspace.payo.data.models.tamper.TamperEventRequest
+import com.microspace.payo.data.models.tamper.TamperEventResponse
+import com.microspace.payo.data.models.tech.BugReportRequest
+import com.microspace.payo.data.models.tech.BugReportResponse
+import com.microspace.payo.data.models.tech.DeviceLogRequest
+import com.microspace.payo.data.models.tech.DeviceLogResponse
+import com.microspace.payo.data.models.payment.InstallmentResponse
+import com.microspace.payo.data.models.payment.PaymentRequest
+import com.microspace.payo.data.models.payment.PaymentResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -70,7 +70,7 @@ interface ApiService {
     @GET("api/devices/device/{deviceId}/installments/")
     suspend fun getDeviceInstallments(
         @Path("deviceId") deviceId: String
-    ): Response<com.example.deviceowner.data.models.payment.InstallmentsResponse>
+    ): Response<com.microspace.payo.data.models.payment.InstallmentsResponse>
 
     /** POST /api/payments/public/loans/pay/ - Process payment and get gateway URL */
     @POST("api/payments/public/loans/pay/")

@@ -1,10 +1,10 @@
-package com.example.deviceowner.presentation.activities
+package com.microspace.payo.presentation.activities
 
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.deviceowner.data.repository.DeviceRegistrationRepository
+import com.microspace.payo.data.repository.DeviceRegistrationRepository
 import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
@@ -73,9 +73,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.R
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.utils.helpers.LoanNumberValidator
+import com.microspace.payo.R
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.utils.helpers.LoanNumberValidator
 
 class DeviceRegistrationActivity : ComponentActivity() {
 
@@ -111,10 +111,10 @@ class DeviceRegistrationActivity : ComponentActivity() {
     private fun navigateToDataCollection(loanNumber: String) {
         val intent = Intent(
             this,
-            com.example.deviceowner.ui.activities.data.DeviceDataCollectionActivity::class.java
+            com.microspace.payo.ui.activities.data.DeviceDataCollectionActivity::class.java
         )
         intent.putExtra(
-            com.example.deviceowner.ui.activities.data.DeviceDataCollectionActivity.EXTRA_LOAN_NUMBER,
+            com.microspace.payo.ui.activities.data.DeviceDataCollectionActivity.EXTRA_LOAN_NUMBER,
             loanNumber
         )
         startActivity(intent)

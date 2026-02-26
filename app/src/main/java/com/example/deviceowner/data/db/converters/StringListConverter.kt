@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.db.converters
+package com.microspace.payo.data.db.converters
 
 import androidx.room.TypeConverter
 

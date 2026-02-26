@@ -1,10 +1,10 @@
-package com.example.deviceowner.data.local.database.dao.sim
+package com.microspace.payo.data.local.database.dao.sim
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.example.deviceowner.data.local.database.entities.sim.SimChangeHistoryEntity
+import com.microspace.payo.data.local.database.entities.sim.SimChangeHistoryEntity
 
 @Dao
 interface SimChangeHistoryDao {

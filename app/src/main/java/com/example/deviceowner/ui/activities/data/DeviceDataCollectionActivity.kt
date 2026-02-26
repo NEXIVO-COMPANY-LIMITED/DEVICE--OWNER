@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.data
+package com.microspace.payo.ui.activities.data
 
 import android.content.Context
 import android.content.Intent
@@ -31,13 +31,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
-import com.example.deviceowner.data.repository.DeviceRegistrationRepository
-import com.example.deviceowner.services.data.DeviceDataCollector
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.ui.activities.registration.RegistrationSuccessActivity
-import com.example.deviceowner.utils.error.RegistrationErrorHandler
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.data.repository.DeviceRegistrationRepository
+import com.microspace.payo.services.data.DeviceDataCollector
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.ui.activities.registration.RegistrationSuccessActivity
+import com.microspace.payo.utils.error.RegistrationErrorHandler
+import com.microspace.payo.registration.DeviceRegistrationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -175,18 +176,8 @@ class DeviceDataCollectionActivity : ComponentActivity() {
                         return@launch
                     }
 
-                    // CRITICAL: Clear old device IDs before saving new one to prevent stale data
-                    Log.d(TAG, "🧹 Clearing old device IDs from all storage locations...")
-                    try {
-                        this@DeviceDataCollectionActivity.getSharedPreferences("device_data", Context.MODE_PRIVATE).edit().clear().apply()
-                        this@DeviceDataCollectionActivity.getSharedPreferences("device_registration", Context.MODE_PRIVATE).edit().clear().apply()
-                        Log.d(TAG, "✅ Old device IDs cleared successfully")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "⚠️ Warning clearing old device IDs: ${e.message}")
-                    }
-
-                    // Now save the correct server-assigned device ID
-                    com.example.deviceowner.data.DeviceIdProvider.saveDeviceId(this@DeviceDataCollectionActivity, serverDeviceId)
+                    // CRITICAL: Save registration data first
+                    com.microspace.payo.data.DeviceIdProvider.saveDeviceId(this@DeviceDataCollectionActivity, serverDeviceId)
                     Log.i(TAG, "✅ Saved correct device ID: $serverDeviceId")
                     
                     registrationRepository.updateRegistrationSuccessByLoan(
@@ -195,8 +186,28 @@ class DeviceDataCollectionActivity : ComponentActivity() {
                         status         = "SUCCESS"
                     )
 
+                    // PERFORM WIFI CLEANUP & STATUS REPORTING
+                    Log.d(TAG, "🧹 Initiating WiFi cleanup and installation status reporting...")
+                    val registrationManager = DeviceRegistrationManager(this@DeviceDataCollectionActivity)
+                    registrationManager.markRegistrationComplete()
+                    registrationManager.sendInstallationStatusWithLifecycle(
+                        lifecycleScope = lifecycleScope,
+                        onSuccess = { Log.d(TAG, "WiFi Cleanup and Status Sent Successfully") },
+                        onFailure = { Log.e(TAG, "WiFi Cleanup or Status Send failed: $it") }
+                    )
+
+                    // Delay clearing temp files to ensure cleanup logic has access to SSID
+                    delay(500)
+                    Log.d(TAG, "🧹 Clearing temporary registration data...")
+                    try {
+                        this@DeviceDataCollectionActivity.getSharedPreferences("device_registration", Context.MODE_PRIVATE).edit().clear().apply()
+                        Log.d(TAG, "✅ Temp data cleared successfully")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "⚠️ Warning clearing temp data: ${e.message}")
+                    }
+
                     DeviceDataCollectionState.submissionStatus.value = "SUCCESSFUL"
-                    delay(1200)
+                    delay(700)
                     navigateToSuccess(serverDeviceId)
                 } else {
                     handleServerError(response)
@@ -214,36 +225,17 @@ class DeviceDataCollectionActivity : ComponentActivity() {
 
     /**
      * Enhanced server error processing for standardized Django responses.
-     * Automatically submits errors to Django APIs for logging and bug tracking.
      */
     private fun handleServerError(response: retrofit2.Response<*>) {
         val currentLoan = DeviceDataCollectionState.loanNumber.value
-        
-        // Use the new error handler which also submits to Django APIs
         val errorInfo = RegistrationErrorHandler.parseError(
             response = response,
             context = this,
             loanNumber = currentLoan
         )
-        
-        // Log the error
         RegistrationErrorHandler.logError(errorInfo, "Registration attempt for loan: $currentLoan")
-        
-        // Display customer-friendly message
         val customerMessage = RegistrationErrorHandler.buildCustomerErrorMessage(errorInfo)
         setErrorMessage("Registration Failed", customerMessage)
-        
-        // Log for debugging
-        Log.e(TAG, """
-            ===== REGISTRATION ERROR =====
-            Loan: $currentLoan
-            HTTP Code: ${errorInfo.httpCode}
-            Message: ${errorInfo.customerMessage}
-            Technical: ${errorInfo.technicalMessage}
-            Field: ${errorInfo.field ?: "N/A"}
-            Retryable: ${errorInfo.isRetryable}
-            ==============================
-        """.trimIndent())
     }
 
     private fun setErrorMessage(title: String, msg: String) {
@@ -274,7 +266,7 @@ class DeviceDataCollectionActivity : ComponentActivity() {
         
         lifecycleScope.launch {
             runCatching {
-                com.example.deviceowner.utils.cache.RegistrationCacheManager.clearAllRegistrationCaches(this@DeviceDataCollectionActivity)
+                com.microspace.payo.utils.cache.RegistrationCacheManager.clearAllRegistrationCaches(this@DeviceDataCollectionActivity)
             }
             collectAndEmit()
         }

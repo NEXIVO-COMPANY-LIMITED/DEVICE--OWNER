@@ -1,4 +1,4 @@
-package com.example.deviceowner.config
+package com.microspace.payo.config
 
 /**
  * API and network constants for device owner app.

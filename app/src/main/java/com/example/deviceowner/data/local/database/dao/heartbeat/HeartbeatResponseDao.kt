@@ -1,10 +1,10 @@
-package com.example.deviceowner.data.local.database.dao.heartbeat
+package com.microspace.payo.data.local.database.dao.heartbeat
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import com.example.deviceowner.data.local.database.entities.heartbeat.HeartbeatResponseEntity
+import com.microspace.payo.data.local.database.entities.heartbeat.HeartbeatResponseEntity
 import kotlinx.coroutines.flow.Flow
 
 /**

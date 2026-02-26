@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.remote
+package com.microspace.payo.data.remote
 
 /**
  * API endpoint paths for Device Owner app.

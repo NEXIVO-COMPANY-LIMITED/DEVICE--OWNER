@@ -1,4 +1,4 @@
-package com.example.deviceowner.security.enforcement.input
+package com.microspace.payo.security.enforcement.input
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -6,7 +6,7 @@ import android.content.Context
 import android.os.Build
 import android.os.UserManager
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * PowerButtonBlocker - Prevents fastboot/recovery access via power button combinations

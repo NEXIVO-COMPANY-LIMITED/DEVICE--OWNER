@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils
+package com.microspace.payo.utils
 
 import android.util.Log
 

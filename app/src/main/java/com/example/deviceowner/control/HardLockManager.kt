@@ -1,12 +1,12 @@
-package com.example.deviceowner.control
+package com.microspace.payo.control
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
+import com.microspace.payo.receivers.AdminReceiver
+import com.microspace.payo.ui.activities.lock.security.SecurityViolationActivity
 
 /**
  * HardLockManager - Applies system-level hard locks to device

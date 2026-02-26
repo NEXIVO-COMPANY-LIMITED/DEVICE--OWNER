@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.data
+package com.microspace.payo.services.data
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,9 +10,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.deviceowner.R
-import com.example.deviceowner.core.device.DeviceDataCollector as CoreDeviceDataCollector
-import com.example.deviceowner.data.db.AppDatabase
+import com.microspace.payo.R
+import com.microspace.payo.core.device.DeviceDataCollector as CoreDeviceDataCollector
+import com.microspace.payo.data.db.AppDatabase
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first

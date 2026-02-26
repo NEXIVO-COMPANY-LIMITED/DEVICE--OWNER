@@ -1,13 +1,13 @@
-package com.example.deviceowner.data.db
+package com.microspace.payo.data.db
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.deviceowner.data.db.dao.HeartbeatDao
-import com.example.deviceowner.data.db.converters.StringListConverter
-import com.example.deviceowner.data.models.heartbeat.Heartbeat
+import com.microspace.payo.data.db.dao.HeartbeatDao
+import com.microspace.payo.data.db.converters.StringListConverter
+import com.microspace.payo.data.models.heartbeat.Heartbeat
 
 @Database(entities = [Heartbeat::class], version = 1, exportSchema = false)
 @TypeConverters(StringListConverter::class)

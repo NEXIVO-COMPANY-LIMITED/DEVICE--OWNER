@@ -1,4 +1,4 @@
-package com.example.deviceowner.work
+package com.microspace.payo.work
 
 import android.content.Context
 import android.util.Log
@@ -7,10 +7,10 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.example.deviceowner.core.SilentDeviceOwnerManager
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.mode.CompleteSilentMode
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import com.microspace.payo.core.SilentDeviceOwnerManager
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.security.mode.CompleteSilentMode
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit

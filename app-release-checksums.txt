@@ -1,15 +1,15 @@
 ﻿APK Build Information
 =====================
-Build Date: 2026-02-23 14:48:29
+Build Date: 2026-02-25 17:31:44
 APK File: app\build\outputs\apk\release\app-release.apk
-File Size: 3.97 MB
+File Size: 3.98 MB
 
 Checksums:
 ----------
-SHA256 (Hex): 9E7EC5C95A4ACC489A23D4747ED966986775DF251F0471F962693ABD27F1A319
-SHA256 (Base64URL): nn7FyVpKzEiaI9R0ftlmmGd13yUfBHH5Ymk6vSfxoxk
-SHA1:   F1F07827365212A5A5ABB5806E75D5B8551C0C6B
-MD5:    31F182CF9E02489D93BFF0E5187F78E8
+SHA256 (Hex): DCE1D4087DE6455F93A5FD74928D20FA88A88996FA75381A167023B4C3430B23
+SHA256 (Base64URL): 3OHUCH3mRV-Tpf10ko0g-oioiZb6dTgaFnAjtMNDCyM
+SHA1:   1E8E764717BAFEC41CD5F000109B6A7EC85CC85D
+MD5:    88C7A8B06B4C1757EE8C2944D68C29BB
 
 Installation Command:
 adb install -r app\build\outputs\apk\release\app-release.apk
@@ -19,4 +19,4 @@ Verification Command:
 
 For Device Owner Provisioning:
 Add this to provisioning-config.json:
-"android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "nn7FyVpKzEiaI9R0ftlmmGd13yUfBHH5Ymk6vSfxoxk"
+"android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "3OHUCH3mRV-Tpf10ko0g-oioiZb6dTgaFnAjtMNDCyM"

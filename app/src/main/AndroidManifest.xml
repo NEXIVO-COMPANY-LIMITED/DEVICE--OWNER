@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.microspace.payo">
 
     <!-- Internet permission for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -58,7 +59,11 @@
     <!-- Foreground service permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+
+    <!-- Required for systemExempted foreground service -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <!-- Account management permissions -->
     <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
@@ -81,7 +86,7 @@
 
         <property
             android:name="android.app.PROPERTY_FOREGROUND_SERVICE_TYPES"
-            android:value="dataSync" />
+            android:value="dataSync|systemExempted" />
 
         <!-- Registration flow -->
         <activity
@@ -212,17 +217,17 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".receivers.PaymentOverdueReceiver" android:exported="false"><intent-filter><action android:name="com.example.deviceowner.PAYMENT_OVERDUE" /></intent-filter></receiver>
-        <receiver android:name=".receivers.TamperLockReceiver" android:exported="false"><intent-filter><action android:name="com.example.deviceowner.TAMPER_LOCK" /></intent-filter></receiver>
-        <receiver android:name=".receivers.PaymentReminderReceiver" android:exported="false"><intent-filter><action android:name="com.example.deviceowner.PAYMENT_REMINDER" /></intent-filter></receiver>
-        <receiver android:name=".receivers.DeactivationReceiver" android:exported="false"><intent-filter><action android:name="com.example.deviceowner.DEACTIVATE_DEVICE" /></intent-filter></receiver>
+        <receiver android:name=".receivers.PaymentOverdueReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_OVERDUE" /></intent-filter></receiver>
+        <receiver android:name=".receivers.TamperLockReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.TAMPER_LOCK" /></intent-filter></receiver>
+        <receiver android:name=".receivers.PaymentReminderReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_REMINDER" /></intent-filter></receiver>
+        <receiver android:name=".receivers.DeactivationReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.DEACTIVATE_DEVICE" /></intent-filter></receiver>
 
         <!-- Services -->
-        <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync" />
+        <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync|systemExemption" />
         <service android:name=".services.remote.RemoteManagementService" android:foregroundServiceType="dataSync" />
-        <service android:name=".services.lock.SoftLockOverlayService" android:foregroundServiceType="dataSync" />
-        <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="dataSync" />
-        <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="dataSync" />
+        <service android:name=".services.lock.SoftLockOverlayService" android:foregroundServiceType="systemExemption" />
+        <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="systemExemption" />
+        <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="systemExemption" />
         <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="dataSync" />
 
         <provider

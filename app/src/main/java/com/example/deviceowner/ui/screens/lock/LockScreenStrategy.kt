@@ -1,8 +1,8 @@
-package com.example.deviceowner.ui.screens.lock
+package com.microspace.payo.ui.screens.lock
 
 import android.util.Log
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
-import com.example.deviceowner.data.models.heartbeat.NextPaymentInfo
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.data.models.heartbeat.NextPaymentInfo
 import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter

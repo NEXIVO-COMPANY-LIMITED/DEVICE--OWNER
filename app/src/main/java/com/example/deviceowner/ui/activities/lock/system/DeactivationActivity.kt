@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.lock.system
+package com.microspace.payo.ui.activities.lock.system
 
 import android.os.Bundle
 import android.util.Log
@@ -23,11 +23,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
-import com.example.deviceowner.ui.activities.lock.base.BaseLockActivity
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.ui.activities.lock.base.BaseLockActivity
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.services.heartbeat.HeartbeatService
+import com.microspace.payo.services.heartbeat.HeartbeatWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -46,6 +48,7 @@ private val LogPending = Color(0x734CAF50)
 class DeactivationActivity : BaseLockActivity() {
 
     private val controlManager by lazy { RemoteDeviceControlManager(this) }
+    private var deactivationStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,7 +56,12 @@ class DeactivationActivity : BaseLockActivity() {
         setContent {
             DeviceOwnerTheme {
                 DeactivationScreen(
-                    onDeactivationComplete = { startDeactivationFlow() }
+                    onDeactivationComplete = { 
+                        if (!deactivationStarted) {
+                            deactivationStarted = true
+                            startDeactivationFlow() 
+                        }
+                    }
                 )
             }
         }
@@ -65,24 +73,57 @@ class DeactivationActivity : BaseLockActivity() {
     private fun startDeactivationFlow() {
         val deviceId = DeviceIdProvider.getDeviceId(this)
         
+        // CRITICAL: Stop relaunching logic in BaseLockActivity
+        isExitingForced = true
+        
+        // 1. Stop all heartbeat and monitoring services IMMEDIATELY
+        Log.w("Deactivation", "🛑 Stopping all monitoring services to prevent loop")
+        HeartbeatService.stop(this)
+        HeartbeatWorker.stop(this)
+        
+        // 2. Clear ALL possible deactivation/lock flags from ALL shared preferences
+        // This ensures that if the app restarts, it won't think it's still supposed to deactivate or lock
+        val prefsToClear = listOf(
+            "heartbeat_state",
+            "control_prefs",
+            "device_deactivation",
+            "device_lock",
+            "device_lock_state",
+            "heartbeat_response"
+        )
+        
+        prefsToClear.forEach { name ->
+            try {
+                getSharedPreferences(name, MODE_PRIVATE).edit().clear().apply()
+                Log.d("Deactivation", "✓ Cleared prefs: $name")
+            } catch (e: Exception) {
+                Log.e("Deactivation", "Error clearing $name: ${e.message}")
+            }
+        }
+        
+        // Set state to unlocked explicitly
+        try {
+            getSharedPreferences("control_prefs", MODE_PRIVATE).edit().putString("state", "unlocked").apply()
+        } catch (e: Exception) {}
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 1. Send SUCCESS Log to Server BEFORE clearing DO
+                // 3. Send SUCCESS Log to Server BEFORE clearing DO
                 Log.i("Deactivation", "Reporting success to server...")
                 ServerBugAndLogReporter.postLog(
                     logType = "deactivation_success",
                     logLevel = "Info",
-                    message = "Device deactivation sequence completed successfully. Removing Device Owner.",
+                    message = "Device deactivation sequence completed successfully for $deviceId. Removing Device Owner.",
                     extraData = mapOf("status" to "success")
                 )
                 
-                // Wait a bit for log to be sent
+                // Wait for log to be sent
                 delay(2000)
 
-                // 2. Perform Clean-up
+                // 4. Perform Clean-up (Unsuspend apps, clear restrictions)
                 controlManager.clearAllPoliciesAndRestrictions()
                 
-                // 3. Final Deactivation
+                // 5. Final Deactivation
                 launch(Dispatchers.Main) {
                     performFinalDeactivation()
                 }
@@ -100,15 +141,36 @@ class DeactivationActivity : BaseLockActivity() {
 
     private fun performFinalDeactivation() {
         try {
+            Log.i("Deactivation", "Final Step: Clearing Device Owner status")
+            
+            // Exit LockTask mode before clearing DO
+            try { stopLockTask() } catch (e: Exception) {}
+            
             if (dpm.isDeviceOwnerApp(packageName)) {
+                // This is the point of no return
                 dpm.clearDeviceOwnerApp(packageName)
                 Log.i("Deactivation", "✅ Device owner removed successfully")
             }
-            stopLockTask()
+            
+            Log.i("Deactivation", "🏁 Deactivation complete. Exiting activity.")
+            
+            // Use finishAndRemoveTask to clear from recents
             finishAndRemoveTask()
+            
+            // Force exit process to ensure all background loops and threads are killed immediately
+            // This prevents any "zombie" services from trying to restart the activity
+            android.os.Process.killProcess(android.os.Process.myPid())
+            System.exit(0)
+            
         } catch (e: Exception) {
             Log.e("Deactivation", "Error in final step: ${e.message}")
+            finishAndRemoveTask()
+            android.os.Process.killProcess(android.os.Process.myPid())
         }
+    }
+    
+    override fun onBackPressed() {
+        // Disable back button during deactivation
     }
 }
 
@@ -123,14 +185,15 @@ fun DeactivationScreen(onDeactivationComplete: () -> Unit) {
 
     LaunchedEffect(Unit) {
         scope.launch {
+            // Speed up the visual progress slightly for better UX
             while (progress < 1f) {
-                delay(120)
-                progress = minOf(1f, progress + (Math.random() * 0.025f).toFloat())
+                delay(100)
+                progress = minOf(1f, progress + (Math.random() * 0.04f).toFloat())
                 if (progress > 0.30f && !logLine0Done) logLine0Done = true
                 if (progress > 0.65f && !logLine1Done) logLine1Done = true
                 if (progress >= 1f && !logLine2Done) { logLine2Done = true; isDone = true }
             }
-            delay(1500)
+            delay(1000)
             onDeactivationComplete()
         }
     }

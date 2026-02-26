@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.components
+package com.microspace.payo.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

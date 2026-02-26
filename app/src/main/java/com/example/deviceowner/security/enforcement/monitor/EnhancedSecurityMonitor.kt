@@ -1,12 +1,12 @@
-package com.example.deviceowner.security.enforcement.monitor
+package com.microspace.payo.security.enforcement.monitor
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.security.enforcement.adb.AdbBlocker
-import com.example.deviceowner.security.enforcement.bootloader.BootloaderLockEnforcer
-import com.example.deviceowner.security.enforcement.integrity.CustomRomBlocker
-import com.example.deviceowner.security.monitoring.boot.BootModeDetector
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.security.enforcement.adb.AdbBlocker
+import com.microspace.payo.security.enforcement.bootloader.BootloaderLockEnforcer
+import com.microspace.payo.security.enforcement.integrity.CustomRomBlocker
+import com.microspace.payo.security.monitoring.boot.BootModeDetector
 import kotlinx.coroutines.*
 
 /**

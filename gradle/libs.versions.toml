@@ -38,6 +38,7 @@ playservices-location = "21.0.1"
 
 # Security
 androidx-security = "1.1.0-alpha06"
+sqlcipher = "4.5.4"
 
 # Image Loading
 coil = "2.5.0"
@@ -101,6 +102,7 @@ playservices-location = { group = "com.google.android.gms", name = "play-service
 
 # Security
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "androidx-security" }
+sqlcipher = { group = "net.zetetic", name = "android-database-sqlcipher", version.ref = "sqlcipher" }
 
 # Image Loading
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }

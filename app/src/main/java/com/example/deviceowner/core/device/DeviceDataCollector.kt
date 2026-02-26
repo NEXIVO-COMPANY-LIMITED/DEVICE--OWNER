@@ -1,4 +1,4 @@
-package com.example.deviceowner.core.device
+package com.microspace.payo.core.device
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -10,7 +10,7 @@ import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.example.deviceowner.data.models.device.DeviceDataSnapshot
+import com.microspace.payo.data.models.device.DeviceDataSnapshot
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -91,7 +91,7 @@ class DeviceDataCollector(private val context: Context) {
     } catch (_: Exception) { false }
 
     private fun isBootloaderUnlockedCheck(): Boolean = try {
-        com.example.deviceowner.security.enforcement.bootloader.BootloaderLockEnforcer(context).isBootloaderUnlocked()
+        com.microspace.payo.security.enforcement.bootloader.BootloaderLockEnforcer(context).isBootloaderUnlocked()
     } catch (_: Exception) { false }
 
     private fun isDeviceRootedCheck(): Boolean {
@@ -138,7 +138,7 @@ class DeviceDataCollector(private val context: Context) {
      * Collect heartbeat data for sending to server
      */
     @SuppressLint("MissingPermission", "HardwareIds")
-    fun collectHeartbeatData(): com.example.deviceowner.data.models.heartbeat.HeartbeatRequest {
+    fun collectHeartbeatData(): com.microspace.payo.data.models.heartbeat.HeartbeatRequest {
         Log.d("Collector", "🔍 Collecting heartbeat data")
         
         // Collect device data directly
@@ -146,7 +146,7 @@ class DeviceDataCollector(private val context: Context) {
         val imeis = getRealImeis()
         val (lat, lon) = getLocationCoords()
         
-        return com.example.deviceowner.data.models.heartbeat.HeartbeatRequest(
+        return com.microspace.payo.data.models.heartbeat.HeartbeatRequest(
             deviceImeis = imeis,
             serialNumber = serial,
             installedRam = getInstalledRam(),

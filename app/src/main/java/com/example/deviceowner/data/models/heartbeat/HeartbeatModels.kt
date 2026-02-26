@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.models.heartbeat
+package com.microspace.payo.data.models.heartbeat
 
 import com.google.gson.annotations.SerializedName
 

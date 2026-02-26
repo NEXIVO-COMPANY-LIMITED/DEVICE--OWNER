@@ -1,8 +1,12 @@
-package com.example.deviceowner.ui.activities.lock.payment
+package com.microspace.payo.ui.activities.lock.payment
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -30,10 +34,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.services.payment.PaymentLockManager
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
-import com.example.deviceowner.ui.activities.lock.base.BaseLockActivity
+import com.microspace.payo.services.payment.PaymentLockManager
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.utils.storage.SharedPreferencesManager
+import com.microspace.payo.ui.activities.lock.base.BaseLockActivity
 import kotlinx.coroutines.launch
 
 private val RedCard     = Color(0xFFE94560)
@@ -46,8 +50,27 @@ private val SlateBlue   = Color(0xFF94A3B8)
 
 class PaymentOverdueActivity : BaseLockActivity() {
 
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.microspace.payo.DISMISS_LOCK_SCREEN") {
+                Log.i("PaymentOverdue", "🔓 Dismiss signal received. Finishing lock screen.")
+                isExitingForced = true
+                finishAndRemoveTask()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Register for automatic unlock broadcast
+        val filter = IntentFilter("com.microspace.payo.DISMISS_LOCK_SCREEN")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(unlockReceiver, filter, RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(unlockReceiver, filter)
+        }
 
         val nextPayDate = intent.getStringExtra("next_payment_date")
         val daysOverdue = intent.getLongExtra("days_overdue", 0L)
@@ -60,7 +83,14 @@ class PaymentOverdueActivity : BaseLockActivity() {
                     nextPaymentDate = nextPayDate,
                     daysOverdue = daysOverdue,
                     hoursOverdue = hoursOverdue,
-                    onUnlockAttempt = { code -> PaymentLockManager(this).verifyOfflineUnlockPassword(code) },
+                    onUnlockAttempt = { code -> 
+                        val ok = PaymentLockManager(this).verifyOfflineUnlockPassword(code)
+                        if (ok) {
+                            isExitingForced = true
+                            finishAndRemoveTask()
+                        }
+                        ok
+                    },
                     onContactSupport = { openSupport(supportContact) }
                 )
             }
@@ -86,6 +116,13 @@ class PaymentOverdueActivity : BaseLockActivity() {
                 )
             )
         }
+    }
+
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(unlockReceiver)
+        } catch (_: Exception) {}
+        super.onDestroy()
     }
 }
 

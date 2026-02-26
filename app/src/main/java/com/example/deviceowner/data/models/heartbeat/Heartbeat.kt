@@ -1,9 +1,9 @@
-package com.example.deviceowner.data.models.heartbeat
+package com.microspace.payo.data.models.heartbeat
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
-import com.example.deviceowner.data.db.converters.StringListConverter
+import com.microspace.payo.data.db.converters.StringListConverter
 
 @Entity(tableName = "heartbeats")
 @TypeConverters(StringListConverter::class)

@@ -1,4 +1,4 @@
-package com.example.deviceowner.utils.helpers
+package com.microspace.payo.utils.helpers
 
 import android.content.Context
 import android.net.ConnectivityManager

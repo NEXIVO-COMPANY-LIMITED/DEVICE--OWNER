@@ -1,14 +1,14 @@
-package com.example.deviceowner.data.repository
+package com.microspace.payo.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.device.CompleteDeviceRegistrationEntity
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
-import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.data.remote.ApiService
-import com.example.deviceowner.utils.logging.LogManager
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.device.CompleteDeviceRegistrationEntity
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.data.remote.ApiClient
+import com.microspace.payo.data.remote.ApiService
+import com.microspace.payo.utils.logging.LogManager
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Dispatchers
@@ -17,8 +17,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import com.example.deviceowner.AppConfig
-import com.example.deviceowner.data.remote.api.ApiHeadersInterceptor
+import com.microspace.payo.AppConfig
+import com.microspace.payo.data.remote.api.ApiHeadersInterceptor
 
 
 class DeviceRegistrationRepository(private val context: Context) {
@@ -26,7 +26,7 @@ class DeviceRegistrationRepository(private val context: Context) {
     private val database = DeviceOwnerDatabase.getDatabase(context)
     private val dao = database.completeDeviceRegistrationDao()
     private val gson = GsonBuilder().setLenient().create()
-    private val registrationBackup = com.example.deviceowner.data.local.RegistrationDataBackup(context)
+    private val registrationBackup = com.microspace.payo.data.local.RegistrationDataBackup(context)
     
     // Public API client for logging errors
     val apiClient = ApiClient()

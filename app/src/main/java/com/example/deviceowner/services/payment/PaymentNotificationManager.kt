@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.payment
+package com.microspace.payo.services.payment
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -81,7 +81,7 @@ class PaymentNotificationManager(private val context: Context) {
     }
     
     private fun createPendingIntent(): PendingIntent {
-        val intent = Intent(context, com.example.deviceowner.ui.activities.registration.RegistrationStatusActivity::class.java).apply {
+        val intent = Intent(context, com.microspace.payo.ui.activities.registration.RegistrationStatusActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         return PendingIntent.getActivity(

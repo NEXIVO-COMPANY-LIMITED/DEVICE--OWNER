@@ -1,13 +1,13 @@
-package com.example.deviceowner.ui.activities.provisioning.compatibility.main
+package com.microspace.payo.ui.activities.provisioning.compatibility.main
 
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.deviceowner.device.DeviceOwnerCompatibilityChecker
-import com.example.deviceowner.ui.activities.provisioning.compatibility.screens.CompatibilitySuccessActivity
-import com.example.deviceowner.ui.activities.provisioning.compatibility.screens.CompatibilityFailureActivity
+import com.microspace.payo.device.DeviceOwnerCompatibilityChecker
+import com.microspace.payo.ui.activities.provisioning.compatibility.screens.CompatibilitySuccessActivity
+import com.microspace.payo.ui.activities.provisioning.compatibility.screens.CompatibilityFailureActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 

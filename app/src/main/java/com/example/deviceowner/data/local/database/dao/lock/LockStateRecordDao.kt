@@ -1,7 +1,7 @@
-package com.example.deviceowner.data.local.database.dao.lock
+package com.microspace.payo.data.local.database.dao.lock
 
 import androidx.room.*
-import com.example.deviceowner.data.local.database.entities.lock.LockStateRecordEntity
+import com.microspace.payo.data.local.database.entities.lock.LockStateRecordEntity
 
 @Dao
 interface LockStateRecordDao {

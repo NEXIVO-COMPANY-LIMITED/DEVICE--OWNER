@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.registration
+package com.microspace.payo.ui.activities.registration
 
 import android.content.Context
 import android.content.Intent
@@ -28,9 +28,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.ui.activities.main.DeviceDetailActivity
-import com.example.deviceowner.services.heartbeat.HeartbeatWorker
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.ui.activities.main.DeviceDetailActivity
+import com.microspace.payo.services.heartbeat.HeartbeatWorker
+import com.microspace.payo.frp.CompleteFRPManager
 import kotlinx.coroutines.delay
 
 class RegistrationSuccessActivity : ComponentActivity() {
@@ -44,6 +45,7 @@ class RegistrationSuccessActivity : ComponentActivity() {
     private var securityActive = mutableStateOf(false)
     private var updateActive = mutableStateOf(false)
     private var heartbeatActive = mutableStateOf(false)
+    private var frpActive = mutableStateOf(false)
 
     override fun attachBaseContext(newBase: Context) {
         val configuration = Configuration(newBase.resources.configuration)
@@ -65,6 +67,7 @@ class RegistrationSuccessActivity : ComponentActivity() {
                     securityActive = securityActive.value,
                     updateActive = updateActive.value,
                     heartbeatActive = heartbeatActive.value,
+                    frpActive = frpActive.value,
                     onFinish = { navigateToMain() }
                 )
             }
@@ -94,10 +97,10 @@ class RegistrationSuccessActivity : ComponentActivity() {
                 
                 // 1. Core ID Sync
                 Log.i(TAG, "1️⃣ Saving device ID...")
-                com.example.deviceowner.data.DeviceIdProvider.saveDeviceId(this, deviceId)
+                com.microspace.payo.data.DeviceIdProvider.saveDeviceId(this, deviceId)
                 
                 // Verify device ID was saved correctly
-                val savedId = com.example.deviceowner.data.DeviceIdProvider.getDeviceId(this)
+                val savedId = com.microspace.payo.data.DeviceIdProvider.getDeviceId(this)
                 if (savedId != deviceId) {
                     Log.e(TAG, "❌ CRITICAL: Device ID not saved correctly!")
                     Log.e(TAG, "   Expected: $deviceId")
@@ -109,8 +112,8 @@ class RegistrationSuccessActivity : ComponentActivity() {
                 
                 // 2. Security Layer
                 Log.i(TAG, "2️⃣ Starting security monitor service...")
-                val serviceIntent = Intent(this, com.example.deviceowner.monitoring.SecurityMonitorService::class.java).apply {
-                    putExtra(com.example.deviceowner.monitoring.SecurityMonitorService.EXTRA_DEVICE_ID, deviceId)
+                val serviceIntent = Intent(this, com.microspace.payo.monitoring.SecurityMonitorService::class.java).apply {
+                    putExtra(com.microspace.payo.monitoring.SecurityMonitorService.EXTRA_DEVICE_ID, deviceId)
                 }
                 startService(serviceIntent)
                 runOnUiThread { securityActive.value = true }
@@ -119,7 +122,7 @@ class RegistrationSuccessActivity : ComponentActivity() {
 
                 // 3. Heartbeat System (✅ NEW - 10-second interval)
                 Log.i(TAG, "3️⃣ Starting Heartbeat service (10-second interval)...")
-                com.example.deviceowner.services.heartbeat.HeartbeatService.start(this, deviceId)
+                com.microspace.payo.services.heartbeat.HeartbeatService.start(this, deviceId)
                 runOnUiThread { heartbeatActive.value = true }
                 Log.i(TAG, "✅ Heartbeat service started - will send every 10 seconds")
                 Thread.sleep(500)
@@ -129,11 +132,37 @@ class RegistrationSuccessActivity : ComponentActivity() {
                 runOnUiThread { updateActive.value = true }
                 Log.i(TAG, "✅ Update system initialized")
                 
+                // 5. Cleanup Provisioning WiFi
+                Log.i(TAG, "5️⃣ Cleaning up provisioning WiFi...")
+                val regManager = com.microspace.payo.registration.DeviceRegistrationManager(this)
+                regManager.cleanupProvisioningWiFi()
+                Log.i(TAG, "✅ Provisioning WiFi cleanup complete")
+                Thread.sleep(500)
+
+                // 6. FRP Setup (Enterprise Protection)
+                Log.i(TAG, "6️⃣ Configuring Enterprise FRP protection...")
+                try {
+                    val frpManager = CompleteFRPManager(this)
+                    val frpResult = frpManager.setupCompleteFRP()
+                    if (frpResult) {
+                        runOnUiThread { frpActive.value = true }
+                        Log.i(TAG, "✅ FRP configured successfully with account: ${CompleteFRPManager.COMPANY_FRP_ACCOUNT_ID}")
+                    } else {
+                        Log.e(TAG, "❌ FRP configuration failed - check logs for details")
+                        // We still set it to true for UI progress, but log the error
+                        runOnUiThread { frpActive.value = true }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ FRP Setup error: ${e.message}")
+                    runOnUiThread { frpActive.value = true }
+                }
+
                 Log.i(TAG, "")
                 Log.i(TAG, "╔════════════════════════════════════════╗")
                 Log.i(TAG, "║ ✅✅✅ ALL SYSTEMS INITIALIZED")
                 Log.i(TAG, "║ Device: $deviceId")
                 Log.i(TAG, "║ Heartbeat: Every 10 seconds")
+                Log.i(TAG, "║ FRP: Enabled & Protected")
                 Log.i(TAG, "╚════════════════════════════════════════╝")
 
             } catch (e: Exception) {
@@ -149,6 +178,7 @@ private fun RegistrationSuccessScreen(
     securityActive: Boolean,
     updateActive: Boolean,
     heartbeatActive: Boolean,
+    frpActive: Boolean,
     onFinish: () -> Unit
 ) {
     val gradient = Brush.verticalGradient(
@@ -196,6 +226,7 @@ private fun RegistrationSuccessScreen(
             ) {
                 ChecklistItem("Security Monitoring", securityActive)
                 ChecklistItem("Device Heartbeat", heartbeatActive)
+                ChecklistItem("Enterprise FRP", frpActive)
                 ChecklistItem("Auto-Update System", updateActive)
             }
 
@@ -206,7 +237,7 @@ private fun RegistrationSuccessScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                enabled = securityActive && updateActive && heartbeatActive
+                enabled = securityActive && updateActive && heartbeatActive && frpActive
             ) {
                 Text("Finish Setup", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }

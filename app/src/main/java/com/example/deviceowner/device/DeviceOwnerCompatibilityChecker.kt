@@ -1,4 +1,4 @@
-package com.example.deviceowner.device
+package com.microspace.payo.device
 
 import android.content.Context
 import android.os.Build

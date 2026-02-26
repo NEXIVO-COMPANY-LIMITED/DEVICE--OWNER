@@ -1,15 +1,14 @@
-package com.example.deviceowner.kiosk
+package com.microspace.payo.kiosk
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import com.google.gson.Gson
 
 /**
  * PIN Manager for Hard Lock Unlock
  * 
- * Stores unlock PIN in encrypted local database
+ * Stores unlock PIN in local database (plain text)
  * PIN is NOT displayed on screen
  * User enters PIN via keyboard for verification
  */
@@ -20,8 +19,12 @@ object PinManager {
     private const val PIN_KEY = "current_unlock_pin"
     private const val PIN_TIMESTAMP_KEY = "pin_timestamp"
     
+    private fun getPrefs(context: Context): SharedPreferences {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+    
     /**
-     * Store unlock PIN in encrypted local database
+     * Store unlock PIN in local database
      * Called when heartbeat response contains unlock_password
      * 
      * @param context Android context
@@ -29,25 +32,14 @@ object PinManager {
      */
     fun storePinLocally(context: Context, pin: String) {
         try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            
-            val encryptedPrefs = EncryptedSharedPreferences.create(
-                context,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-            
-            encryptedPrefs.edit().apply {
+            val prefs = getPrefs(context)
+            prefs.edit().apply {
                 putString(PIN_KEY, pin)
                 putLong(PIN_TIMESTAMP_KEY, System.currentTimeMillis())
                 apply()
             }
             
-            Log.i(TAG, "✅ PIN stored securely in local database")
+            Log.i(TAG, "✅ PIN stored in local database")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error storing PIN: ${e.message}", e)
         }
@@ -62,19 +54,8 @@ object PinManager {
      */
     fun verifyPin(context: Context, userEnteredPin: String): Boolean {
         return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            
-            val encryptedPrefs = EncryptedSharedPreferences.create(
-                context,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-            
-            val storedPin = encryptedPrefs.getString(PIN_KEY, null)
+            val prefs = getPrefs(context)
+            val storedPin = prefs.getString(PIN_KEY, null)
             
             if (storedPin == null) {
                 Log.w(TAG, "⚠️ No PIN stored in database")
@@ -105,19 +86,8 @@ object PinManager {
      */
     fun getStoredPin(context: Context): String? {
         return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            
-            val encryptedPrefs = EncryptedSharedPreferences.create(
-                context,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-            
-            encryptedPrefs.getString(PIN_KEY, null)
+            val prefs = getPrefs(context)
+            prefs.getString(PIN_KEY, null)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting PIN: ${e.message}", e)
             null
@@ -131,19 +101,8 @@ object PinManager {
      */
     fun clearPin(context: Context) {
         try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            
-            val encryptedPrefs = EncryptedSharedPreferences.create(
-                context,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-            
-            encryptedPrefs.edit().apply {
+            val prefs = getPrefs(context)
+            prefs.edit().apply {
                 remove(PIN_KEY)
                 remove(PIN_TIMESTAMP_KEY)
                 apply()
@@ -163,19 +122,8 @@ object PinManager {
      */
     fun hasPinStored(context: Context): Boolean {
         return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            
-            val encryptedPrefs = EncryptedSharedPreferences.create(
-                context,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-            
-            encryptedPrefs.getString(PIN_KEY, null) != null
+            val prefs = getPrefs(context)
+            prefs.getString(PIN_KEY, null) != null
         } catch (e: Exception) {
             Log.e(TAG, "Error checking PIN: ${e.message}", e)
             false

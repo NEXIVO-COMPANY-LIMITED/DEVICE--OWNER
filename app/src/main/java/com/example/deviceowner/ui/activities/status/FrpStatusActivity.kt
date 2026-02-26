@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.status
+package com.microspace.payo.ui.activities.status
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,17 +20,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.config.FrpConfig
-import com.example.deviceowner.core.frp.manager.FrpManager
-import com.example.deviceowner.core.frp.manager.FrpStatus
+import com.microspace.payo.config.FrpConfig
+import com.microspace.payo.core.frp.manager.FrpManager
+import com.microspace.payo.core.frp.manager.FrpStatus
 
 /**
  * FRP Status Activity - Enterprise Factory Reset Protection status dashboard.
  * Shows activation countdown, account info, and Google Play Services status.
- * 
- * NOTE: FRP code is currently not in use. Commenting out for future reference.
  */
-/*
 class FrpStatusActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,10 +38,7 @@ class FrpStatusActivity : ComponentActivity() {
         }
     }
 }
-*/
 
-/*
-// NOTE: FRP code is currently not in use. Commenting out for future reference.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FrpStatusScreen() {
@@ -126,10 +120,7 @@ fun FrpStatusScreen() {
         }
     }
 }
-*/
 
-/*
-// NOTE: FRP code is currently not in use. Commenting out for future reference.
 @Composable
 private fun StatusCard(
     title: String,
@@ -176,4 +167,3 @@ private fun StatusCard(
         }
     }
 }
-*/

@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.models.lock
+package com.microspace.payo.data.models.lock
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*

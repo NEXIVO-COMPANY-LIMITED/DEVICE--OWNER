@@ -1,27 +1,28 @@
-package com.example.deviceowner.utils.storage
+package com.microspace.payo.utils.storage
 
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
-import com.example.deviceowner.data.DeviceIdProvider
+import com.microspace.payo.data.DeviceIdProvider
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.microspace.payo.security.crypto.EncryptionManager
 
 /**
- * SharedPreferencesManager - ENHANCED v6.2
+ * SharedPreferencesManager - v8.0
  * 
  * ✅ Direct Boot Aware: Critical data in Device Protected Storage.
- * ✅ Secure Storage: Sensitive data in EncryptedSharedPreferences.
+ * ✅ Encrypted storage using EncryptedSharedPreferences.
  */
 class SharedPreferencesManager(private val context: Context) {
 
+    private val encryptionManager = EncryptionManager(context)
+
     companion object {
         private const val TAG = "PrefsManager"
-        private const val PREF_NAME = "device_owner_prefs"
-        private const val SECURE_PREF_NAME = "secure_device_owner_prefs"
+        private const val PREF_NAME = "device_owner_prefs_encrypted"
+        private const val PROTECTED_PREF_NAME = "device_owner_prefs_protected_encrypted"
         
         // Critical Boot Keys (Stored in Protected Storage)
         private const val KEY_DEVICE_REGISTERED = "device_registered"
@@ -37,43 +38,25 @@ class SharedPreferencesManager(private val context: Context) {
         private const val KEY_DEVICE_TYPE = "device_type"
         private const val KEY_LAST_HEARTBEAT_TIME = "last_heartbeat_time"
         private const val KEY_REGISTRATION_STATUS = "registration_status"
-
-        // Sensitive Keys (Stored in Encrypted Storage)
+        private const val KEY_PROVISIONING_WIFI_SSID = "provisioning_wifi_ssid"
         private const val KEY_UNLOCK_PASSWORD = "unlock_password"
         private const val KEY_LOAN_NUMBER = "loan_number"
     }
 
-    // 1. Normal Prefs (Credential Encrypted)
+    // 1. Normal Encrypted Prefs
     private val sharedPreferences: SharedPreferences =
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        encryptionManager.getEncryptedSharedPreferences(PREF_NAME)
 
     // 2. Device Protected Prefs (Available during Direct Boot)
+    // Note: EncryptedSharedPreferences might have limitations in Direct Boot if the key is not accessible.
+    // For now, we use a separate encrypted file for protected storage if possible.
     private val protectedPrefs: SharedPreferences by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val protectedContext = context.createDeviceProtectedStorageContext()
-            protectedContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            // We still want encryption even in protected storage
+            EncryptionManager(protectedContext).getEncryptedSharedPreferences(PROTECTED_PREF_NAME)
         } else {
             sharedPreferences
-        }
-    }
-
-    // 3. Encrypted Prefs (Only available after first unlock)
-    private val encryptedPrefs: SharedPreferences? by lazy {
-        try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-
-            EncryptedSharedPreferences.create(
-                context,
-                SECURE_PREF_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize EncryptedSharedPreferences: ${e.message}")
-            null
         }
     }
 
@@ -92,13 +75,11 @@ class SharedPreferencesManager(private val context: Context) {
     }
 
     fun saveLoanNumber(loanNumber: String) {
-        encryptedPrefs?.edit()?.putString(KEY_LOAN_NUMBER, loanNumber)?.apply()
-            ?: sharedPreferences.edit().putString(KEY_LOAN_NUMBER, loanNumber).apply()
+        sharedPreferences.edit().putString(KEY_LOAN_NUMBER, loanNumber).apply()
     }
 
     fun getLoanNumber(): String? {
-        return encryptedPrefs?.getString(KEY_LOAN_NUMBER, null) 
-            ?: sharedPreferences.getString(KEY_LOAN_NUMBER, null)
+        return sharedPreferences.getString(KEY_LOAN_NUMBER, null)
     }
 
     fun saveDeviceId(deviceId: String) {
@@ -113,7 +94,6 @@ class SharedPreferencesManager(private val context: Context) {
             ?: DeviceIdProvider.getDeviceId(context)
     }
 
-    // Aliases for build compatibility
     fun getDeviceIdForHeartbeat(): String? = getDeviceId()
     fun getDeviceIdForDeviceDetail(): String? = getDeviceId()
 
@@ -164,26 +144,35 @@ class SharedPreferencesManager(private val context: Context) {
 
     fun getRegistrationStatus(): String? = protectedPrefs.getString(KEY_REGISTRATION_STATUS, null)
 
-    // --- Secure Password Management ---
-    
+    fun saveProvisioningWifiSsid(ssid: String) {
+        protectedPrefs.edit().putString(KEY_PROVISIONING_WIFI_SSID, ssid).apply()
+        Log.d(TAG, "Provisioning WiFi SSID saved: $ssid")
+    }
+
+    fun getProvisioningWifiSsid(): String? {
+        return protectedPrefs.getString(KEY_PROVISIONING_WIFI_SSID, null)
+    }
+
+    fun clearProvisioningWifiSsid() {
+        protectedPrefs.edit().remove(KEY_PROVISIONING_WIFI_SSID).apply()
+        Log.d(TAG, "Provisioning WiFi SSID cleared from storage")
+    }
+
     fun saveUnlockPassword(password: String?) {
         if (password == null) {
-            encryptedPrefs?.edit()?.remove(KEY_UNLOCK_PASSWORD)?.apply()
+            sharedPreferences.edit().remove(KEY_UNLOCK_PASSWORD).apply()
+            protectedPrefs.edit().remove(KEY_UNLOCK_PASSWORD).apply()
             return
         }
-        encryptedPrefs?.edit()?.putString(KEY_UNLOCK_PASSWORD, password)?.apply()
-            ?: sharedPreferences.edit().putString(KEY_UNLOCK_PASSWORD, password).apply()
+        sharedPreferences.edit().putString(KEY_UNLOCK_PASSWORD, password).apply()
         protectedPrefs.edit().putString(KEY_UNLOCK_PASSWORD, password).apply()
     }
 
     fun getUnlockPassword(): String? {
-        return encryptedPrefs?.getString(KEY_UNLOCK_PASSWORD, null)
-            ?: protectedPrefs.getString(KEY_UNLOCK_PASSWORD, null)
+        return protectedPrefs.getString(KEY_UNLOCK_PASSWORD, null)
             ?: sharedPreferences.getString(KEY_UNLOCK_PASSWORD, null)
     }
 
-    // --- Heartbeat Status Cache (Boot Survival) ---
-    
     fun saveHeartbeatResponse(
         nextPaymentDate: String?,
         unlockPassword: String?,

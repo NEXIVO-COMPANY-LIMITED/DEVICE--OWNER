@@ -1,4 +1,4 @@
-package com.example.deviceowner.security.firmware
+package com.microspace.payo.security.firmware
 
 import android.content.Context
 import android.util.Log

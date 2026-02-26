@@ -1,10 +1,10 @@
-package com.example.deviceowner.security.ssl
+package com.microspace.payo.security.ssl
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.utils.ssl.CertificateInfo
-import com.example.deviceowner.utils.ssl.SSLCertificateExtractor
-import com.example.deviceowner.utils.ssl.SSLValidationResult
+import com.microspace.payo.utils.ssl.CertificateInfo
+import com.microspace.payo.utils.ssl.SSLCertificateExtractor
+import com.microspace.payo.utils.ssl.SSLValidationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.KeyStore
@@ -87,7 +87,7 @@ class DeviceOwnerSSLManager(private val context: Context) {
     private suspend fun testDeviceOwnerCompatibility(): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
             // Check if Device Owner restrictions allow HTTPS connections
-            val deviceOwnerManager = com.example.deviceowner.device.DeviceOwnerManager(context)
+            val deviceOwnerManager = com.microspace.payo.device.DeviceOwnerManager(context)
             val isDeviceOwner = deviceOwnerManager.isDeviceOwner()
             
             if (isDeviceOwner) {

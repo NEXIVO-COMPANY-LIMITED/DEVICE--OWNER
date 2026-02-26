@@ -1,12 +1,12 @@
-package com.example.deviceowner.receivers
+package com.microspace.payo.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.ui.activities.registration.RegistrationStatusActivity
-import com.example.deviceowner.work.RestrictionEnforcementWorker
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.ui.activities.registration.RegistrationStatusActivity
+import com.microspace.payo.work.RestrictionEnforcementWorker
 import kotlinx.coroutines.*
 
 /**

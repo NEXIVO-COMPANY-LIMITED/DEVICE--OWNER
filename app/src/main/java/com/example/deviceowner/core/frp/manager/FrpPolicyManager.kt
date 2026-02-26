@@ -1,4 +1,4 @@
-package com.example.deviceowner.core.frp.manager
+package com.microspace.payo.core.frp.manager
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -7,8 +7,8 @@ import android.os.Build
 import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.config.FrpConfig
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.config.FrpConfig
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * FRP Policy Manager - Device policies with Customer Account Freedom

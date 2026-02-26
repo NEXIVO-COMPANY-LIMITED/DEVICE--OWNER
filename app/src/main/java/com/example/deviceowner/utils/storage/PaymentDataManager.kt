@@ -1,9 +1,10 @@
-package com.example.deviceowner.utils.storage
+package com.microspace.payo.utils.storage
 
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
+import com.microspace.payo.security.crypto.EncryptionManager
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -16,12 +17,15 @@ import java.util.*
  * - Payment history
  * - Lock/unlock state
  * - Server time for synchronization
+ * 
+ * Uses EncryptedSharedPreferences to ensure sensitive data (like unlock passwords) 
+ * is not stored in plain text.
  */
 class PaymentDataManager(private val context: Context) {
     
     companion object {
         private const val TAG = "PaymentDataManager"
-        private const val PREF_NAME = "payment_data"
+        private const val PREF_NAME = "payment_data_encrypted"
         
         // Payment info keys
         private const val KEY_NEXT_PAYMENT_DATE = "next_payment_date"
@@ -46,10 +50,11 @@ class PaymentDataManager(private val context: Context) {
         private const val KEY_DAYS_UNTIL_PAYMENT = "days_until_payment"
     }
     
+    // Use EncryptionManager to get EncryptedSharedPreferences
     private val sharedPreferences: SharedPreferences =
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        EncryptionManager(context).getEncryptedSharedPreferences(PREF_NAME)
     
-    private val gson = com.example.deviceowner.utils.gson.SafeGsonProvider.getGson()
+    private val gson = com.microspace.payo.utils.gson.SafeGsonProvider.getGson()
 
     // ============================================================
     // NEXT PAYMENT INFORMATION
@@ -57,11 +62,6 @@ class PaymentDataManager(private val context: Context) {
     
     /**
      * Save next payment information from heartbeat response
-     * 
-     * @param dateTime ISO-8601 format: "2026-02-07T23:59:00+03:00"
-     * @param unlockPassword Password to unlock device after payment
-     * @param amount Payment amount (optional)
-     * @param currency Payment currency (optional)
      */
     fun saveNextPaymentInfo(
         dateTime: String?,
@@ -79,10 +79,7 @@ class PaymentDataManager(private val context: Context) {
                 apply()
             }
             
-            Log.d(TAG, "✅ Next payment info saved:")
-            Log.d(TAG, "   - Date: $dateTime")
-            Log.d(TAG, "   - Password: ${if (unlockPassword != null) "***saved" else "none"}")
-            Log.d(TAG, "   - Amount: $amount $currency")
+            Log.d(TAG, "✅ Next payment info saved securely")
             
             // Calculate days until payment
             calculateDaysUntilPayment(dateTime)
@@ -118,7 +115,6 @@ class PaymentDataManager(private val context: Context) {
         if (dateTimeStr == null) return
         
         try {
-            // Parse ISO-8601 format: "2026-02-07T23:59:00+03:00"
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
             sdf.timeZone = TimeZone.getTimeZone("UTC")
             
@@ -161,7 +157,7 @@ class PaymentDataManager(private val context: Context) {
                 apply()
             }
             
-            Log.d(TAG, "🔒 Lock state saved: isLocked=$isLocked, reason=$reason")
+            Log.d(TAG, "🔒 Lock state saved securely")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error saving lock state: ${e.message}", e)
         }
@@ -191,7 +187,7 @@ class PaymentDataManager(private val context: Context) {
                 apply()
             }
             
-            Log.d(TAG, "🕐 Server time saved: $serverTime")
+            Log.d(TAG, "🕐 Server time saved securely")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error saving server time: ${e.message}", e)
         }
@@ -213,7 +209,7 @@ class PaymentDataManager(private val context: Context) {
         val date: Long,
         val amount: String?,
         val currency: String?,
-        val status: String, // "pending", "paid", "overdue"
+        val status: String,
         val daysUntilDue: Int
     )
     
@@ -222,7 +218,6 @@ class PaymentDataManager(private val context: Context) {
             val history = getPaymentHistory().toMutableList()
             history.add(record)
             
-            // Keep only last 12 records
             if (history.size > 12) {
                 history.removeAt(0)
             }
@@ -230,7 +225,7 @@ class PaymentDataManager(private val context: Context) {
             val json = gson.toJson(history)
             sharedPreferences.edit().putString(KEY_PAYMENT_HISTORY, json).apply()
             
-            Log.d(TAG, "📝 Payment record added: $record")
+            Log.d(TAG, "📝 Payment record added securely")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error adding payment record: ${e.message}", e)
         }
@@ -239,7 +234,7 @@ class PaymentDataManager(private val context: Context) {
     fun getPaymentHistory(): List<PaymentRecord> {
         return try {
             val json = sharedPreferences.getString(KEY_PAYMENT_HISTORY, null) ?: return emptyList()
-            com.example.deviceowner.utils.gson.SafeGsonProvider.fromJson(json) {
+            com.microspace.payo.utils.gson.SafeGsonProvider.fromJson(json) {
                 object : com.google.gson.reflect.TypeToken<List<PaymentRecord>>() {}.type
             } ?: emptyList()
         } catch (e: Exception) {
@@ -261,25 +256,16 @@ class PaymentDataManager(private val context: Context) {
     // UTILITY METHODS
     // ============================================================
     
-    /**
-     * Check if payment is overdue
-     */
     fun isPaymentOverdue(): Boolean {
         val daysUntil = getDaysUntilPayment()
         return daysUntil >= 0 && daysUntil <= 0
     }
     
-    /**
-     * Check if payment is due soon (within 3 days)
-     */
     fun isPaymentDueSoon(): Boolean {
         val daysUntil = getDaysUntilPayment()
         return daysUntil in 1..3
     }
     
-    /**
-     * Get formatted payment due date
-     */
     fun getFormattedPaymentDate(): String? {
         val dateStr = getNextPaymentDate() ?: return null
         
@@ -296,27 +282,9 @@ class PaymentDataManager(private val context: Context) {
         }
     }
     
-    /**
-     * Clear all payment data
-     */
     fun clearAllPaymentData() {
         try {
-            sharedPreferences.edit().apply {
-                remove(KEY_NEXT_PAYMENT_DATE)
-                remove(KEY_NEXT_PAYMENT_TIME)
-                remove(KEY_UNLOCK_PASSWORD)
-                remove(KEY_PAYMENT_AMOUNT)
-                remove(KEY_PAYMENT_CURRENCY)
-                remove(KEY_IS_LOCKED)
-                remove(KEY_LOCK_REASON)
-                remove(KEY_LOCK_TIMESTAMP)
-                remove(KEY_SERVER_TIME)
-                remove(KEY_LAST_SYNC_TIME)
-                remove(KEY_PAYMENT_HISTORY)
-                remove(KEY_DAYS_UNTIL_PAYMENT)
-                apply()
-            }
-            
+            sharedPreferences.edit().clear().apply()
             Log.d(TAG, "🗑️ All payment data cleared")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error clearing payment data: ${e.message}", e)

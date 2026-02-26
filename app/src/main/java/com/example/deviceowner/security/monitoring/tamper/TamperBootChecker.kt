@@ -1,11 +1,11 @@
-package com.example.deviceowner.security.monitoring.tamper
+package com.microspace.payo.security.monitoring.tamper
 
 import android.content.Context
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
-import com.example.deviceowner.security.enforcement.bootloader.BootloaderLockEnforcer
-import com.example.deviceowner.security.response.EnhancedAntiTamperResponse
+import com.microspace.payo.control.RemoteDeviceControlManager
+import com.microspace.payo.security.enforcement.bootloader.BootloaderLockEnforcer
+import com.microspace.payo.security.response.EnhancedAntiTamperResponse
 
 /**
  * Runs tamper/security check on boot (and optionally elsewhere).

@@ -1,4 +1,4 @@
-package com.example.deviceowner.data.local.database.entities.heartbeat
+package com.microspace.payo.data.local.database.entities.heartbeat
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.data
+package com.microspace.payo.services.data
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
@@ -13,9 +13,9 @@ import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource

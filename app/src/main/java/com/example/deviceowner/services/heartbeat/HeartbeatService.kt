@@ -1,4 +1,4 @@
-package com.example.deviceowner.services.heartbeat
+package com.microspace.payo.services.heartbeat
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -13,7 +13,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.deviceowner.data.DeviceIdProvider
+import com.microspace.payo.data.DeviceIdProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,14 +51,14 @@ class HeartbeatService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private lateinit var heartbeatManager: HeartbeatManager
-    private lateinit var responseHandler: HeartbeatResponseHandler
+    private lateinit var responseHandler: HeartbeatResponseHandler_v2
     private var heartbeatRunnable: Runnable? = null
     private val isRunning = AtomicBoolean(false)
 
     override fun onCreate() {
         super.onCreate()
         heartbeatManager = HeartbeatManager(this)
-        responseHandler = HeartbeatResponseHandler(this)
+        responseHandler = HeartbeatResponseHandler_v2(this)
         createNotificationChannel()
         
         // Start foreground immediately with a silent notification

@@ -1,4 +1,4 @@
-package com.example.deviceowner.presentation.activities
+package com.microspace.payo.presentation.activities
 
 import android.os.Bundle
 import android.webkit.WebView
@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*

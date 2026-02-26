@@ -1,9 +1,9 @@
-package com.example.deviceowner.data.local.database.entities.lock
+package com.microspace.payo.data.local.database.entities.lock
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.deviceowner.data.local.database.entities.common.SyncStatus
+import com.microspace.payo.data.local.database.entities.common.SyncStatus
 
 @Entity(tableName = "lock_events")
 data class LockEventEntity(

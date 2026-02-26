@@ -1,10 +1,10 @@
-package com.example.deviceowner.receivers
+package com.microspace.payo.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.microspace.payo.control.RemoteDeviceControlManager
 
 /**
  * Receiver for Deactivation events.

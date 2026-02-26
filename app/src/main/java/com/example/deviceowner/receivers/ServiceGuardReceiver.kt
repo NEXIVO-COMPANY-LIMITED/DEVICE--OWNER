@@ -1,13 +1,13 @@
-package com.example.deviceowner.receivers
+package com.microspace.payo.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.services.heartbeat.HeartbeatService
-import com.example.deviceowner.monitoring.SecurityMonitorService
-import com.example.deviceowner.services.remote.RemoteManagementService
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.services.heartbeat.HeartbeatService
+import com.microspace.payo.monitoring.SecurityMonitorService
+import com.microspace.payo.services.remote.RemoteManagementService
 
 /**
  * ServiceGuardReceiver - Protects essential services from being permanently killed.
@@ -17,7 +17,7 @@ class ServiceGuardReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "ServiceGuard"
-        const val ACTION_GUARD_CHECK = "com.example.deviceowner.GUARD_CHECK"
+        const val ACTION_GUARD_CHECK = "com.microspace.payo.GUARD_CHECK"
     }
 
     override fun onReceive(context: Context, intent: Intent) {

@@ -1,4 +1,4 @@
-package com.example.deviceowner.update.config
+package com.microspace.payo.update.config
 
 /**
  * Configuration for auto-update from GitHub Releases.
@@ -37,5 +37,5 @@ object UpdateConfig {
     const val SKIP_MAJOR_VERSIONS = false
 
     // Install complete broadcast action
-    const val ACTION_INSTALL_COMPLETE = "com.example.deviceowner.INSTALL_COMPLETE"
+    const val ACTION_INSTALL_COMPLETE = "com.microspace.payo.INSTALL_COMPLETE"
 }

@@ -1,4 +1,4 @@
-package com.example.deviceowner.config
+package com.microspace.payo.config
 
 /**
  * Enterprise FRP Configuration - Production Ready

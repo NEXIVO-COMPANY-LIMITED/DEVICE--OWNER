@@ -1,4 +1,4 @@
-package com.example.deviceowner.receivers
+package com.microspace.payo.receivers
 
 import android.annotation.SuppressLint
 import android.app.admin.DeviceAdminReceiver
@@ -10,12 +10,12 @@ import android.os.Build
 import android.os.UserManager
 import android.telephony.TelephonyManager
 import android.util.Log
-import com.example.deviceowner.core.frp.manager.FrpManager
-import com.example.deviceowner.core.frp.manager.FrpPolicyManager
-import com.example.deviceowner.device.DeviceOwnerManager
-import com.example.deviceowner.security.mode.CompleteSilentMode
-import com.example.deviceowner.security.monitoring.sim.SIMChangeDetector
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import com.microspace.payo.core.frp.manager.FrpManager
+import com.microspace.payo.core.frp.manager.FrpPolicyManager
+import com.microspace.payo.device.DeviceOwnerManager
+import com.microspace.payo.security.mode.CompleteSilentMode
+import com.microspace.payo.security.monitoring.sim.SIMChangeDetector
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -107,6 +107,7 @@ class AdminReceiver : DeviceAdminReceiver() {
             }
 
             // SAVE: WiFi SSID configured during provisioning (QR code setup)
+            // Use improved persistent storage method
             saveProvisioningWiFiSSID(context)
             Log.i(TAG, "✅ Provisioning WiFi SSID saved for later cleanup")
 
@@ -149,7 +150,7 @@ class AdminReceiver : DeviceAdminReceiver() {
                     Log.e(TAG, "Failed to block USB/debug at provisioning: ${e.message}", e)
                 }
 
-                com.example.deviceowner.work.RestrictionEnforcementWorker.schedule(context)
+                com.microspace.payo.work.RestrictionEnforcementWorker.schedule(context)
                 Log.i(TAG, "✅ Periodic restriction enforcement scheduled")
             }
 
@@ -172,22 +173,6 @@ class AdminReceiver : DeviceAdminReceiver() {
                 } catch (e: Exception) {
                     Log.e(TAG, "SIM detection init failed: ${e.message}", e)
                 }
-
-                // Enterprise FRP: Factory Reset Protection with company account
-                /* 🔴 DISABLED: FRP NOT USED CURRENTLY
-                try {
-                    val frpResult = FrpManager(context).setupFrpProtection()
-                    if (frpResult.success) {
-                        Log.i(TAG, "✅ Enterprise FRP enabled - 72h activation in progress")
-                        FrpPolicyManager(context).applyEnterprisePolicies()
-                        Log.i(TAG, "✅ FRP policies applied (factory reset blocked, customer accounts allowed)")
-                    } else {
-                        Log.w(TAG, "⚠️ FRP setup skipped: ${frpResult.message}")
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "FRP setup failed: ${e.message}", e)
-                }
-                */
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed during provisioning: ${e.message}", e)
@@ -247,7 +232,7 @@ class AdminReceiver : DeviceAdminReceiver() {
 
             Log.i(TAG, "✅ Security restrictions applied. Device is now locked.")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to apply security restrictions: ${e.message}", e)
+            Log.e(TAG, "❌ Failed to apply security restrictions: ${e.message}")
         }
     }
 
@@ -301,7 +286,7 @@ class AdminReceiver : DeviceAdminReceiver() {
 
             Log.i(TAG, "✅ Security restrictions removed. Device is now unlocked.")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to remove security restrictions: ${e.message}", e)
+            Log.e(TAG, "❌ Failed to remove security restrictions: ${e.message}")
         }
     }
 
@@ -466,10 +451,9 @@ class AdminReceiver : DeviceAdminReceiver() {
                 val currentSSID = connectionInfo.ssid?.replace("\"", "") ?: ""
                 
                 if (currentSSID.isNotBlank() && currentSSID != "<unknown ssid>") {
-                    val prefs = context.getSharedPreferences("device_registration", Context.MODE_PRIVATE)
-                    prefs.edit()
-                        .putString("provisioning_wifi_ssid", currentSSID)
-                        .apply()
+                    // Use SharedPreferencesManager for persistent storage that won't be cleared accidentally
+                    val prefs = SharedPreferencesManager(context)
+                    prefs.saveProvisioningWifiSsid(currentSSID)
                     
                     Log.i(TAG, "✅ Saved provisioning WiFi SSID for cleanup: $currentSSID")
                 } else {

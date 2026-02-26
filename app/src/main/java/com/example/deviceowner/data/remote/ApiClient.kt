@@ -1,22 +1,22 @@
-package com.example.deviceowner.data.remote
+package com.microspace.payo.data.remote
 
 // Force rebuild - timestamp: 2026-02-14
 import android.util.Log
-import com.example.deviceowner.AppConfig
-import com.example.deviceowner.data.remote.api.ApiHeadersInterceptor
-import com.example.deviceowner.data.remote.api.HtmlResponseInterceptor
-import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
-import com.example.deviceowner.data.models.heartbeat.HeartbeatResponse
-import com.example.deviceowner.data.models.installation.InstallationStatusRequest
-import com.example.deviceowner.data.models.installation.InstallationStatusResponse
-import com.example.deviceowner.data.models.registration.DeviceRegistrationRequest
-import com.example.deviceowner.data.models.registration.DeviceRegistrationResponse
-import com.example.deviceowner.data.models.tamper.TamperEventRequest
-import com.example.deviceowner.data.models.tamper.TamperEventResponse
-import com.example.deviceowner.data.models.tech.BugReportRequest
-import com.example.deviceowner.data.models.tech.BugReportResponse
-import com.example.deviceowner.data.models.tech.DeviceLogRequest
-import com.example.deviceowner.data.models.tech.DeviceLogResponse
+import com.microspace.payo.AppConfig
+import com.microspace.payo.data.remote.api.ApiHeadersInterceptor
+import com.microspace.payo.data.remote.api.HtmlResponseInterceptor
+import com.microspace.payo.data.models.heartbeat.HeartbeatRequest
+import com.microspace.payo.data.models.heartbeat.HeartbeatResponse
+import com.microspace.payo.data.models.installation.InstallationStatusRequest
+import com.microspace.payo.data.models.installation.InstallationStatusResponse
+import com.microspace.payo.data.models.registration.DeviceRegistrationRequest
+import com.microspace.payo.data.models.registration.DeviceRegistrationResponse
+import com.microspace.payo.data.models.tamper.TamperEventRequest
+import com.microspace.payo.data.models.tamper.TamperEventResponse
+import com.microspace.payo.data.models.tech.BugReportRequest
+import com.microspace.payo.data.models.tech.BugReportResponse
+import com.microspace.payo.data.models.tech.DeviceLogRequest
+import com.microspace.payo.data.models.tech.DeviceLogResponse
 import com.google.gson.GsonBuilder
 import okhttp3.CertificatePinner
 import okhttp3.ConnectionSpec
@@ -326,7 +326,7 @@ class ApiClient {
         }
     }
 
-    suspend fun getDeviceInstallments(deviceId: String): Response<com.example.deviceowner.data.models.payment.InstallmentsResponse> {
+    suspend fun getDeviceInstallments(deviceId: String): Response<com.microspace.payo.data.models.payment.InstallmentsResponse> {
         return try {
             apiService.getDeviceInstallments(deviceId)
         } catch (e: Exception) {

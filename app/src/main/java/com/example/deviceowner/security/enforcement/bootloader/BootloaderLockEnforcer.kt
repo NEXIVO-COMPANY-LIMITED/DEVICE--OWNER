@@ -1,4 +1,4 @@
-package com.example.deviceowner.security.enforcement.bootloader
+package com.microspace.payo.security.enforcement.bootloader
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -6,8 +6,8 @@ import android.content.Context
 import android.os.Build
 import android.os.UserManager
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.microspace.payo.receivers.AdminReceiver
+import com.microspace.payo.control.RemoteDeviceControlManager
 
 /**
  * BootloaderLockEnforcer - Ensures bootloader remains locked

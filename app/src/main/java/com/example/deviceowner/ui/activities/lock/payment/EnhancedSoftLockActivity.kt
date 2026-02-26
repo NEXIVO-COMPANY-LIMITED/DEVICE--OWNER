@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.lock.payment
+package com.microspace.payo.ui.activities.lock.payment
 
 import android.content.Context
 import android.content.Intent

@@ -1,4 +1,4 @@
-package com.example.deviceowner.core.frp.verification
+package com.microspace.payo.core.frp.verification
 
 import android.app.admin.DevicePolicyManager
 import android.app.admin.FactoryResetProtectionPolicy
@@ -8,8 +8,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.example.deviceowner.config.FrpConfig
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.config.FrpConfig
+import com.microspace.payo.receivers.AdminReceiver
 import java.security.MessageDigest
 
 /**

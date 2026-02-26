@@ -1,4 +1,4 @@
-package com.example.deviceowner.control
+package com.microspace.payo.control
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -10,15 +10,15 @@ import android.os.Looper
 import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.services.lock.SoftLockOverlayService
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.lock.LockStateRecordEntity
-import com.example.deviceowner.ui.activities.lock.payment.PaymentOverdueActivity
-import com.example.deviceowner.ui.activities.lock.payment.SoftLockReminderActivity
-import com.example.deviceowner.ui.activities.lock.security.SecurityViolationActivity
-import com.example.deviceowner.ui.activities.lock.system.DeactivationActivity
-import com.example.deviceowner.ui.activities.lock.system.HardLockGenericActivity
+import com.microspace.payo.receivers.AdminReceiver
+import com.microspace.payo.services.lock.SoftLockOverlayService
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.lock.LockStateRecordEntity
+import com.microspace.payo.ui.activities.lock.payment.PaymentOverdueActivity
+import com.microspace.payo.ui.activities.lock.payment.SoftLockReminderActivity
+import com.microspace.payo.ui.activities.lock.security.SecurityViolationActivity
+import com.microspace.payo.ui.activities.lock.system.DeactivationActivity
+import com.microspace.payo.ui.activities.lock.system.HardLockGenericActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,7 +27,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Remote lock control: manages specialized lock activities and enforcement.
- * v5.0 - Enhanced Deactivation and Kiosk Mode Cleanup.
+ * v5.5 - Enhanced with Direct Boot recovery and perfect state sync support.
  */
 class RemoteDeviceControlManager(private val context: Context) {
 
@@ -64,6 +64,10 @@ class RemoteDeviceControlManager(private val context: Context) {
     fun isSoftLocked(): Boolean = getLockState() == LOCK_SOFT
     fun isLocked(): Boolean = getLockState() != LOCK_UNLOCKED
 
+    fun getLockTimestamp(): Long = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("lock_timestamp", 0L)
+
+    // --- Boot and Direct Boot Support ---
+
     fun getLockStateForBoot(): String {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try {
@@ -97,7 +101,14 @@ class RemoteDeviceControlManager(private val context: Context) {
         return getLockType()
     }
 
-    fun getLockTimestamp(): Long = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("lock_timestamp", 0L)
+    fun checkAndEnforceLockStateFromBoot() {
+        val state = getLockStateForBoot()
+        if (state == LOCK_HARD) {
+            applyHardLock(reason = getLockReasonForBoot(), lockType = getLockTypeForBoot())
+        }
+    }
+
+    // --- Action Methods ---
 
     fun applyHardLock(
         reason: String,
@@ -107,7 +118,6 @@ class RemoteDeviceControlManager(private val context: Context) {
         tamperType: String? = null,
         nextPaymentDate: String? = null
     ) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         Log.e(TAG, "🔒 APPLYING HARD LOCK ($lockType): $reason")
         
         saveState(LOCK_HARD, reason, lockType)
@@ -115,6 +125,11 @@ class RemoteDeviceControlManager(private val context: Context) {
         saveLockStateToDatabase(LOCK_HARD, reason, tamperType ?: if (lockType == TYPE_TAMPER) "SYSTEM_MODIFIED" else null)
 
         showLockActivity(reason, lockType, nextPaymentDate)
+
+        if (lockType == TYPE_DEACTIVATION) {
+            Log.w(TAG, "🔓 Master Override: Skipping restrictions for Deactivation Flow")
+            return 
+        }
 
         ioScope.launch {
             if (dpm.isDeviceOwnerApp(context.packageName)) {
@@ -148,27 +163,20 @@ class RemoteDeviceControlManager(private val context: Context) {
         }
     }
 
-    /**
-     * Critical cleanup for deactivation. Must be called while still Device Owner.
-     */
     suspend fun clearAllPoliciesAndRestrictions() = withContext(Dispatchers.IO) {
         if (!dpm.isDeviceOwnerApp(context.packageName)) return@withContext
         
-        Log.w(TAG, "🛠 CLEANUP: Removing all policies and restrictions")
+        Log.w(TAG, "🛠 MASTER CLEANUP: Reverting all policies")
         try {
-            // 1. Unsuspend all packages (Most important!)
             suspendAllOtherPackages(false)
-            
-            // 2. Clear LockTask settings
             dpm.setLockTaskPackages(admin, emptyArray())
             
-            // 3. Reset UI features
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 dpm.setStatusBarDisabled(admin, false)
                 dpm.setKeyguardDisabledFeatures(admin, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE)
+                dpm.setCameraDisabled(admin, false)
             }
             
-            // 4. Clear all user restrictions
             val restrictions = arrayOf(
                 UserManager.DISALLOW_FACTORY_RESET,
                 UserManager.DISALLOW_SAFE_BOOT,
@@ -180,16 +188,12 @@ class RemoteDeviceControlManager(private val context: Context) {
                 UserManager.DISALLOW_ADD_USER,
                 UserManager.DISALLOW_REMOVE_USER,
                 UserManager.DISALLOW_CONFIG_WIFI,
-                UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS,
-                UserManager.DISALLOW_OUTGOING_CALLS,
-                UserManager.DISALLOW_SMS,
-                UserManager.DISALLOW_INSTALL_APPS
+                "no_config_developer_opts"
             )
             for (restriction in restrictions) {
                 try { dpm.clearUserRestriction(admin, restriction) } catch (_: Exception) {}
             }
-            
-            Log.i(TAG, "✅ Cleanup complete")
+            Log.i(TAG, "✅ Master Cleanup Successful")
         } catch (e: Exception) {
             Log.e(TAG, "Cleanup failed: ${e.message}")
         }
@@ -201,11 +205,6 @@ class RemoteDeviceControlManager(private val context: Context) {
             UserManager.DISALLOW_USB_FILE_TRANSFER,
             UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA
         )
-        
-        if (!reason.contains("Developer", true) && !reason.contains("ADB", true)) {
-            restrictions.add(UserManager.DISALLOW_DEBUGGING_FEATURES)
-        }
-        
         for (restriction in restrictions) {
             try { dpm.addUserRestriction(admin, restriction) } catch (_: Exception) {}
         }
@@ -224,7 +223,6 @@ class RemoteDeviceControlManager(private val context: Context) {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 putExtra("lock_reason", reason)
                 putExtra("lock_type", lockType)
-                putExtra("lock_timestamp", getLockTimestamp())
                 nextPaymentDate?.let { putExtra("next_payment_date", it) }
             }
             try { context.startActivity(intent) } catch (_: Exception) {}
@@ -290,12 +288,5 @@ class RemoteDeviceControlManager(private val context: Context) {
         try {
             dpm.setPackagesSuspended(admin, packages.toTypedArray(), suspend)
         } catch (_: Exception) {}
-    }
-
-    fun checkAndEnforceLockStateFromBoot() {
-        val state = getLockStateForBoot()
-        if (state == LOCK_HARD) {
-            applyHardLock(reason = getLockReasonForBoot(), lockType = getLockTypeForBoot())
-        }
     }
 }

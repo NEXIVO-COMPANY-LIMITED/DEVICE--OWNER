@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.provisioning.progress
+package com.microspace.payo.ui.activities.provisioning.progress
 
 import android.content.Intent
 import android.os.Bundle
@@ -7,10 +7,10 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.deviceowner.R
-import com.example.deviceowner.device.DeviceOwnerCompatibilityChecker
-import com.example.deviceowner.ui.activities.provisioning.compatibility.screens.CompatibilitySuccessActivity
-import com.example.deviceowner.ui.activities.provisioning.compatibility.screens.CompatibilityFailureActivity
+import com.microspace.payo.R
+import com.microspace.payo.device.DeviceOwnerCompatibilityChecker
+import com.microspace.payo.ui.activities.provisioning.compatibility.screens.CompatibilitySuccessActivity
+import com.microspace.payo.ui.activities.provisioning.compatibility.screens.CompatibilityFailureActivity
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

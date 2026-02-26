@@ -1,4 +1,4 @@
-package com.example.deviceowner.data
+package com.microspace.payo.data
 
 import android.content.Context
 import android.util.Log

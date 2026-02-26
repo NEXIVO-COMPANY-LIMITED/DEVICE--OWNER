@@ -1,8 +1,12 @@
-package com.example.deviceowner.ui.activities.lock.security
+package com.microspace.payo.ui.activities.lock.security
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -23,8 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.ui.activities.lock.base.BaseLockActivity
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.ui.activities.lock.base.BaseLockActivity
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -33,8 +37,27 @@ private val RedCard = Color(0xFFE94560)
 
 class SecurityViolationActivity : BaseLockActivity() {
 
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.microspace.payo.DISMISS_LOCK_SCREEN") {
+                Log.i("SecurityViolation", "🔓 Dismiss signal received. Finishing lock screen.")
+                isExitingForced = true
+                finishAndRemoveTask()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Register for automatic unlock broadcast
+        val filter = IntentFilter("com.microspace.payo.DISMISS_LOCK_SCREEN")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(unlockReceiver, filter, RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(unlockReceiver, filter)
+        }
 
         val reason = intent.getStringExtra("lock_reason") ?: "Security Violation"
         val lockedAt = intent.getLongExtra("lock_timestamp", System.currentTimeMillis())
@@ -68,6 +91,13 @@ class SecurityViolationActivity : BaseLockActivity() {
             })
             else -> null
         }
+    }
+
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(unlockReceiver)
+        } catch (_: Exception) {}
+        super.onDestroy()
     }
 }
 

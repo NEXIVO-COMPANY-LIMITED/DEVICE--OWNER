@@ -1,4 +1,4 @@
-package com.example.deviceowner.device
+package com.microspace.payo.device
 
 import android.Manifest
 import android.app.admin.DevicePolicyManager
@@ -11,12 +11,12 @@ import android.os.Build
 import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.utils.constants.UserManagerConstants
+import com.microspace.payo.receivers.AdminReceiver
+import com.microspace.payo.utils.constants.UserManagerConstants
 
 /**
  * Optimized DeviceOwnerManager - Enterprise Device Policy Controller.
- * v7.7 - Restored compatibility and added WiFi cleanup.
+ * v7.9 - Added Forget All WiFi Networks for full deactivation.
  */
 class DeviceOwnerManager(private val context: Context) {
 
@@ -99,24 +99,69 @@ class DeviceOwnerManager(private val context: Context) {
         } catch (e: Exception) { false }
     }
 
-    fun forgetWiFiNetwork(ssid: String) {
-        if (!isDeviceOwner()) return
+    /**
+     * FORGET ALL WIFI: Removes every saved WiFi network from the device.
+     * This ensures no internet trace remains after deactivation.
+     */
+    fun forgetAllWiFiNetworks() {
+        if (!isDeviceOwner()) {
+            Log.w(TAG, "⚠️ Cannot forget WiFi: Not Device Owner")
+            return
+        }
+        
         try {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             @Suppress("DEPRECATION")
             val configuredNetworks = wifiManager.configuredNetworks
+            
             if (configuredNetworks != null) {
-                val targetSsid = if (ssid.startsWith("\"") && ssid.endsWith("\"")) ssid else "\"$ssid\""
+                Log.i(TAG, "🧹 Found ${configuredNetworks.size} WiFi networks. Starting full wipe...")
+                var successCount = 0
                 for (config in configuredNetworks) {
-                    if (config.SSID == targetSsid) {
+                    @Suppress("DEPRECATION")
+                    if (wifiManager.removeNetwork(config.networkId)) {
+                        successCount++
+                    }
+                }
+                @Suppress("DEPRECATION")
+                wifiManager.saveConfiguration()
+                Log.i(TAG, "✅ Wiped $successCount WiFi networks.")
+            } else {
+                Log.d(TAG, "ℹ️ No configured WiFi networks found to wipe.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error while wiping WiFi networks: ${e.message}")
+        }
+    }
+
+    /**
+     * FORGET WIFI: Specifically target networks used during QR provisioning.
+     */
+    fun forgetWiFiNetwork(ssid: String) {
+        if (!isDeviceOwner()) {
+            Log.w(TAG, "⚠️ Cannot forget WiFi: Not Device Owner")
+            return
+        }
+        
+        try {
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val cleanSsid = ssid.replace("\"", "")
+            
+            Log.d(TAG, "🧹 Attempting to forget WiFi: $cleanSsid")
+
+            @Suppress("DEPRECATION")
+            val configuredNetworks = wifiManager.configuredNetworks
+            if (configuredNetworks != null) {
+                for (config in configuredNetworks) {
+                    val configSsid = config.SSID?.replace("\"", "")
+                    if (configSsid == cleanSsid) {
                         @Suppress("DEPRECATION")
                         val success = wifiManager.removeNetwork(config.networkId)
                         if (success) {
                             @Suppress("DEPRECATION")
                             wifiManager.saveConfiguration()
-                            Log.i(TAG, "✅ Successfully forgot WiFi network: $ssid")
+                            Log.i(TAG, "✅ Removed WiFi network: $cleanSsid")
                         }
-                        return
                     }
                 }
             }

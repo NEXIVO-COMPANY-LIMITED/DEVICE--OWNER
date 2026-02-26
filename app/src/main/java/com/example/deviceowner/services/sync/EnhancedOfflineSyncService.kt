@@ -1,14 +1,14 @@
-package com.example.deviceowner.services.sync
+package com.microspace.payo.services.sync
 
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.offline.OfflineEvent
-import com.example.deviceowner.data.models.heartbeat.HeartbeatRequest
-import com.example.deviceowner.data.remote.ApiClient
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.offline.OfflineEvent
+import com.microspace.payo.data.models.heartbeat.HeartbeatRequest
+import com.microspace.payo.data.remote.ApiClient
 import com.google.gson.Gson
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicBoolean

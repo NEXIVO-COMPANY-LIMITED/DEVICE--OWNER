@@ -1,10 +1,10 @@
 // ═════════════════════════════════════════════════════════════
 // File        : ui/theme/Colors.kt
-// Package     : com.example.deviceowner.ui.theme
+// Package     : com.microspace.payo.ui.theme
 // Description : Shared color tokens used by both screens
 // ═════════════════════════════════════════════════════════════
 
-package com.example.deviceowner.ui.theme
+package com.microspace.payo.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

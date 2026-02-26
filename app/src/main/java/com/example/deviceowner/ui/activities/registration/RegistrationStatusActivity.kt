@@ -1,24 +1,20 @@
-package com.example.deviceowner.ui.activities.registration
+package com.microspace.payo.ui.activities.registration
 
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.deviceowner.data.repository.DeviceRegistrationRepository
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
-import com.example.deviceowner.ui.activities.data.DeviceDataCollectionActivity
-import com.example.deviceowner.ui.activities.provisioning.consent.DataPrivacyConsentActivity
-import com.example.deviceowner.ui.activities.main.DeviceDetailActivity
+import com.microspace.payo.data.repository.DeviceRegistrationRepository
+import com.microspace.payo.utils.storage.SharedPreferencesManager
+import com.microspace.payo.ui.activities.data.DeviceDataCollectionActivity
+import com.microspace.payo.ui.activities.provisioning.consent.DataPrivacyConsentActivity
+import com.microspace.payo.ui.activities.main.DeviceDetailActivity
+import com.microspace.payo.registration.DeviceRegistrationManager
 import kotlinx.coroutines.launch
 
 /**
  * Registration Status Activity - Determines which activity to launch
- *
- * Flow:
- * 1. Check if device is already registered successfully
- * 2. If registered -> Launch DeviceDetailActivity (Main dashboard)
- * 3. If not registered -> Launch Registration Flow
  */
 class RegistrationStatusActivity : AppCompatActivity() {
 
@@ -57,9 +53,18 @@ class RegistrationStatusActivity : AppCompatActivity() {
                     }
                 }
 
-                // 4. If registered, go to the MAIN page (DeviceDetailActivity)
+                // 4. If registered, ensure WiFi cleanup is done and go to MAIN page
                 if (isRegistered) {
-                    Log.d(TAG, "Device registered - launching DeviceDetailActivity as main screen")
+                    Log.d(TAG, "Device registered - performing cleanup and launching dashboard")
+                    
+                    // CRITICAL: Ensure provisioning WiFi is forgotten after successful registration
+                    try {
+                        val regManager = DeviceRegistrationManager(this@RegistrationStatusActivity)
+                        regManager.cleanupProvisioningWiFi()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Cleanup failed: ${e.message}")
+                    }
+
                     launchMainDashboard()
                     return@launch
                 }
@@ -95,7 +100,7 @@ class RegistrationStatusActivity : AppCompatActivity() {
     }
 
     private fun launchRegistrationFlow() {
-        startActivity(Intent(this, com.example.deviceowner.presentation.activities.DeviceRegistrationActivity::class.java).apply {
+        startActivity(Intent(this, com.microspace.payo.presentation.activities.DeviceRegistrationActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         })
         finish()

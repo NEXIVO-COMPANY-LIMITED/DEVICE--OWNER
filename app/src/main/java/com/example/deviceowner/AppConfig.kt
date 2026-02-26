@@ -1,4 +1,4 @@
-package com.example.deviceowner
+package com.microspace.payo
 
 /**
  * App configuration constants.

@@ -1,10 +1,10 @@
-package com.example.deviceowner.data.remote.api
+package com.microspace.payo.data.remote.api
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.data.models.installation.InstallationStatusInner
-import com.example.deviceowner.data.models.installation.InstallationStatusRequest
-import com.example.deviceowner.data.remote.ApiClient
+import com.microspace.payo.data.models.installation.InstallationStatusInner
+import com.microspace.payo.data.models.installation.InstallationStatusRequest
+import com.microspace.payo.data.remote.ApiClient
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*

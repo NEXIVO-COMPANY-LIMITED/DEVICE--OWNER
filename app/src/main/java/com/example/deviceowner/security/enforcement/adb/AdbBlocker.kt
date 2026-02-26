@@ -1,12 +1,12 @@
-package com.example.deviceowner.security.enforcement.adb
+package com.microspace.payo.security.enforcement.adb
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.UserManager
 import android.util.Log
-import com.example.deviceowner.receivers.AdminReceiver
-import com.example.deviceowner.utils.constants.UserManagerConstants
+import com.microspace.payo.receivers.AdminReceiver
+import com.microspace.payo.utils.constants.UserManagerConstants
 
 /**
  * AdbBlocker - USB debugging and file transfer are allowed.

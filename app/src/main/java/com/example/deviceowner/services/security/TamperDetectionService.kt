@@ -1,13 +1,13 @@
-package com.example.deviceowner.services.security
+package com.microspace.payo.services.security
 
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import com.example.deviceowner.data.DeviceIdProvider
-import com.example.deviceowner.data.models.tamper.TamperEventRequest
-import com.example.deviceowner.data.remote.ApiClient
-import com.example.deviceowner.services.reporting.ServerBugAndLogReporter
+import com.microspace.payo.data.DeviceIdProvider
+import com.microspace.payo.data.models.tamper.TamperEventRequest
+import com.microspace.payo.data.remote.ApiClient
+import com.microspace.payo.services.reporting.ServerBugAndLogReporter
 import kotlinx.coroutines.*
 import java.io.File
 

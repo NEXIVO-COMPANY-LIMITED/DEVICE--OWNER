@@ -1,4 +1,4 @@
-package com.example.deviceowner.core.frp.manager
+package com.microspace.payo.core.frp.manager
 
 import android.app.admin.DevicePolicyManager
 import android.app.admin.FactoryResetProtectionPolicy
@@ -8,8 +8,8 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.example.deviceowner.config.FrpConfig
-import com.example.deviceowner.receivers.AdminReceiver
+import com.microspace.payo.config.FrpConfig
+import com.microspace.payo.receivers.AdminReceiver
 
 /**
  * Enterprise FRP Manager - Production Ready

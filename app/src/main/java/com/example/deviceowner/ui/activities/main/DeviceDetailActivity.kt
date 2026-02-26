@@ -1,4 +1,4 @@
-package com.example.deviceowner.ui.activities.main
+package com.microspace.payo.ui.activities.main
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -37,10 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.deviceowner.data.local.database.DeviceOwnerDatabase
-import com.example.deviceowner.data.local.database.entities.device.CompleteDeviceRegistrationEntity
-import com.example.deviceowner.ui.theme.DeviceOwnerTheme
-import com.example.deviceowner.utils.storage.SharedPreferencesManager
+import com.microspace.payo.data.local.database.DeviceOwnerDatabase
+import com.microspace.payo.data.local.database.entities.device.CompleteDeviceRegistrationEntity
+import com.microspace.payo.ui.theme.DeviceOwnerTheme
+import com.microspace.payo.utils.storage.SharedPreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -176,10 +176,6 @@ fun DeviceDetailScreen(prefsManager: SharedPreferencesManager) {
 
                 Spacer(Modifier.height(20.dp))
 
-                SecurityScoreCard(data = registrationData, isRooted = isRooted)
-
-                Spacer(Modifier.height(20.dp))
-
                 InfoSection(title = "CORE DETAILS", icon = Icons.Default.Info) {
                     DetailRow(
                         label      = "Loan ID",
@@ -209,29 +205,7 @@ fun DeviceDetailScreen(prefsManager: SharedPreferencesManager) {
 
                 Spacer(Modifier.height(20.dp))
 
-                InfoSection(title = "SYSTEM SPECIFICATIONS", icon = Icons.Default.Settings) {
-                    DetailRow(
-                        label     = "OS Version",
-                        value     = "Android ${registrationData?.osVersion ?: "Unknown"}",
-                        icon      = Icons.Default.Android,
-                        pillColor = SlateIconBg,
-                        iconColor = TextSecondary
-                    )
-                    DetailRow(
-                        label     = "Memory (RAM)",
-                        value     = registrationData?.installedRam ?: "N/A",
-                        icon      = Icons.Default.Memory,
-                        pillColor = AmberBg,
-                        iconColor = AmberColor
-                    )
-                    DetailRow(
-                        label     = "Storage",
-                        value     = registrationData?.totalStorage ?: "N/A",
-                        icon      = Icons.Default.SdStorage,
-                        pillColor = SuccessBg,
-                        iconColor = SuccessGreen
-                    )
-                }
+                SecurityScoreCard(data = registrationData, isRooted = isRooted)
 
                 Spacer(Modifier.height(20.dp))
 
@@ -358,9 +332,25 @@ fun RowScope.HeaderStat(label: String, value: String) {
 
 @Composable
 fun SecurityScoreCard(data: CompleteDeviceRegistrationEntity?, isRooted: Boolean) {
-    val score       = if (isRooted) 42 else 94
-    val scoreColor  = when { score >= 80 -> SuccessGreen; score >= 50 -> AmberColor; else -> DangerRed }
-    val animScore   by animateFloatAsState(targetValue = score.toFloat(), animationSpec = tween(1200), label = "score")
+    // Calculate real security score based on available data
+    val isUsbDebug = data?.isUsbDebuggingEnabled == true
+    val isDevMode = data?.isDeveloperModeEnabled == true
+    val isBootloaderUnlocked = data?.isBootloaderUnlocked == true
+    val isCustomRom = data?.isCustomRom == true
+
+    val rootScore = if (isRooted) 0 else 100
+    val integrityScore = when {
+        isCustomRom -> 30
+        isBootloaderUnlocked -> 60
+        else -> 100
+    }
+    val policyScore = if (isUsbDebug || isDevMode) 70 else 100
+
+    // Weighted average: Root (40%), Integrity (40%), Policy (20%)
+    val totalScore = (rootScore * 0.4 + integrityScore * 0.4 + policyScore * 0.2).toInt()
+
+    val scoreColor  = when { totalScore >= 80 -> SuccessGreen; totalScore >= 50 -> AmberColor; else -> DangerRed }
+    val animScore   by animateFloatAsState(targetValue = totalScore.toFloat(), animationSpec = tween(1200), label = "score")
 
     Surface(
         modifier        = Modifier.fillMaxWidth(),
@@ -387,9 +377,9 @@ fun SecurityScoreCard(data: CompleteDeviceRegistrationEntity?, isRooted: Boolean
                 }
                 Spacer(Modifier.width(24.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SecurityBar("Root Check", if (isRooted) 0f else 100f, if (isRooted) DangerRed else SuccessGreen)
-                    SecurityBar("OS Integrity", if (isRooted) 60f else 90f, if (isRooted) DangerRed else SuccessGreen)
-                    SecurityBar("Policy Sync", if (isRooted) 66f else 92f, if (isRooted) AmberColor else SuccessGreen)
+                    SecurityBar("Root Check", rootScore.toFloat(), if (isRooted) DangerRed else SuccessGreen)
+                    SecurityBar("OS Integrity", integrityScore.toFloat(), if (integrityScore < 80) DangerRed else SuccessGreen)
+                    SecurityBar("Policy Sync", policyScore.toFloat(), if (policyScore < 100) AmberColor else SuccessGreen)
                 }
             }
         }

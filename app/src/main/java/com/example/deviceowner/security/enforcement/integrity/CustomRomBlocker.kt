@@ -1,8 +1,8 @@
-package com.example.deviceowner.security.enforcement.integrity
+package com.microspace.payo.security.enforcement.integrity
 
 import android.content.Context
 import android.util.Log
-import com.example.deviceowner.control.RemoteDeviceControlManager
+import com.microspace.payo.control.RemoteDeviceControlManager
 import java.io.File
 
 /**

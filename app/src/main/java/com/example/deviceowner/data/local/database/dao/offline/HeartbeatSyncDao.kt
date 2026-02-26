@@ -1,10 +1,10 @@
-package com.example.deviceowner.data.local.database.dao.offline
+package com.microspace.payo.data.local.database.dao.offline
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import com.example.deviceowner.data.local.database.entities.offline.HeartbeatSyncEntity
+import com.microspace.payo.data.local.database.entities.offline.HeartbeatSyncEntity
 
 @Dao
 interface HeartbeatSyncDao {
