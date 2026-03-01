@@ -1,29 +1,29 @@
-﻿# 02 Getting Started
+﻿# 02 - Getting Started
 
-This guide walks you through installation, provisioning, and initial setup of the Device Owner application.
+This guide walks you through installation, provisioning, and initial setup of the PAYO Device Owner application.
 
 ---
 
-## ðŸ“‹ Prerequisites
+## Prerequisites
 
 Before you begin, ensure you have:
 
-- **Android Device**: Android 12 (API 31) or higher
-- **Network Connection**: Continuous internet connectivity
+- **Android Device**: Android 5.0 (API 21) or higher (Android 8.0+ recommended)
+- **Network Connection**: Internet connectivity for initial setup
 - **Backend Server**: Running and accessible
-- **Provisioning Method**: QR code or NFC capability
+- **Provisioning Method**: QR code, NFC, or ADB capability
 - **Admin Access**: Device provisioning permissions
 
 ---
 
-## ðŸš€ Installation Steps
+## Installation Steps
 
 ### Step 1: Build the Application
 
 #### Using Android Studio
 
 1. Open the project in Android Studio
-2. Select **Build** â†’ **Build Bundle(s) / APK(s)** â†’ **Build APK(s)**
+2. Select **Build** → **Build Bundle(s) / APK(s)** → **Build APK(s)**
 3. Wait for the build to complete
 4. APK will be available in `app/build/outputs/apk/`
 
@@ -33,11 +33,21 @@ Before you begin, ensure you have:
 # Build debug APK
 ./gradlew assembleDebug
 
-# Build release APK
-./gradlew assembleRelease
+# Build release APK (Windows)
+./gradlew.bat assembleRelease
 
-# Build with specific configuration
-./gradlew assembleRelease -Pbuild_type=production
+# Build release APK (Linux/Mac)
+./gradlew assembleRelease
+```
+
+#### Using Build Scripts
+
+```powershell
+# Windows - Complete build and sign
+./build_release.ps1
+
+# Calculate APK checksum for provisioning
+./calculate_checksum.ps1 -ApkPath "app-release.apk"
 ```
 
 ### Step 2: Install on Device
@@ -46,7 +56,7 @@ Before you begin, ensure you have:
 
 1. Connect device via USB
 2. Enable USB Debugging on device
-3. Click **Run** â†’ **Run 'app'**
+3. Click **Run** → **Run 'app'**
 4. Select your device
 5. Wait for installation to complete
 
@@ -54,351 +64,409 @@ Before you begin, ensure you have:
 
 ```bash
 # Install APK
-adb install app/build/outputs/apk/release/app-release.apk
+adb install app-release.apk
 
-# Install and run
-adb install -r app/build/outputs/apk/release/app-release.apk
-adb shell am start -n com.microspace.payo/.MainActivity
+# Install and replace existing
+adb install -r app-release.apk
+
+# Verify installation
+adb shell pm list packages | grep payo
 ```
 
-#### Via APK File
+#### Via APK File Transfer
 
-1. Transfer APK to device
-2. Open file manager
+1. Transfer APK to device storage
+2. Open file manager on device
 3. Tap APK file
 4. Follow installation prompts
+5. Enable "Install from Unknown Sources" if prompted
 
 ---
 
-## ðŸ”§ Device Provisioning
+## Device Provisioning
 
 ### What is Provisioning?
 
-Provisioning grants the app Device Owner privileges, enabling full device control and security enforcement.
+Provisioning grants the app **Device Owner** privileges, enabling:
+- Full device control
+- Policy enforcement
+- Factory reset protection
+- Remote management capabilities
+
+**Important**: Device must be factory reset or never set up before provisioning.
 
 ### Provisioning Methods
 
 #### Method 1: QR Code Provisioning (Recommended)
 
-1. **Generate QR Code**
-   ```
-   Backend generates provisioning QR code with:
-   - Device ID
-   - Server URL
-   - API Key
-   - Loan Number
-   ```
+**Best for**: Bulk device deployment
 
-2. **Scan QR Code**
-   - Open Device Owner app
-   - Tap "Provision Device"
-   - Scan QR code with device camera
-   - Confirm provisioning
+1. **Prepare Provisioning Config**
+   - Edit `provisioning-config.json`
+   - Set correct APK URL
+   - Calculate and set APK checksum
+   - Configure WiFi credentials
 
-3. **Grant Permissions**
-   - Accept Device Owner request
-   - Accept Device Admin request
-   - Allow location access
-   - Allow notification permissions
+2. **Generate QR Code**
+   - Use online QR generator
+   - Input: Contents of `provisioning-config.json`
+   - Format: JSON string
 
-4. **Verification**
-   - App confirms provisioning success
-   - Device registers with backend
+3. **Factory Reset Device**
+   - Settings → System → Reset → Factory Reset
+   - Device will restart to setup wizard
+
+4. **Scan QR Code**
+   - During setup wizard, tap screen 6 times
+   - Camera opens for QR scanning
+   - Scan the provisioning QR code
+   - Device downloads and installs APK
+   - Device Owner is automatically set
+
+5. **Complete Setup**
+   - Device finishes setup automatically
+   - App launches and registers with backend
    - Heartbeat begins
 
 #### Method 2: NFC Provisioning
 
+**Best for**: Field deployment
+
 1. **Prepare NFC Tag**
-   - Backend writes provisioning data to NFC tag
-   - Includes device ID, server URL, API key
+   - Write provisioning JSON to NFC tag
+   - Use NFC Tools app or similar
 
-2. **Tap NFC Tag**
-   - Open Device Owner app
-   - Tap NFC tag with device
-   - App reads provisioning data
+2. **Factory Reset Device**
+   - Reset device to setup wizard
 
-3. **Complete Setup**
-   - Follow same steps as QR code method
-   - Grant required permissions
-   - Verify registration
+3. **Tap NFC Tag**
+   - During setup wizard, tap NFC tag to device
+   - Device reads provisioning data
+   - Follows same flow as QR code
 
-#### Method 3: Manual Provisioning
+#### Method 3: ADB Provisioning
 
-1. **Open App Settings**
-   - Launch Device Owner app
-   - Navigate to Settings
-   - Select "Manual Provisioning"
+**Best for**: Development and testing
 
-2. **Enter Details**
-   - Device ID (from backend)
-   - Server URL
-   - API Key
-   - Loan Number
+1. **Factory Reset Device**
+   - Reset to clean state
 
-3. **Complete Setup**
-   - Tap "Provision"
-   - Grant permissions
-   - Verify registration
+2. **Install APK**
+   ```bash
+   adb install app-release.apk
+   ```
+
+3. **Set Device Owner**
+   ```bash
+   adb shell dpm set-device-owner com.microspace.payo/.receivers.admin.AdminReceiver
+   ```
+
+4. **Verify**
+   ```bash
+   adb shell dpm get-device-owner
+   # Should output: com.microspace.payo/.receivers.admin.AdminReceiver
+   ```
+
+5. **Launch App**
+   ```bash
+   adb shell am start -n com.microspace.payo/.ui.activities.registration.RegistrationStatusActivity
+   ```
 
 ---
 
-## ðŸ“± Initial Setup
+## Initial Setup
 
 ### Step 1: Grant Permissions
 
 The app requires these permissions:
 
-| Permission | Purpose | Required |
-|-----------|---------|----------|
-| **Device Admin** | Device control and policies | Yes |
-| **Device Owner** | Full device management | Yes |
-| **Location** | Heartbeat reporting | Yes |
-| **Notifications** | User alerts and reminders | Yes |
-| **Camera** | QR code scanning | Optional |
-| **Phone State** | SIM change detection | Yes |
+| Permission | Purpose | Required | When |
+|-----------|---------|----------|------|
+| **Device Admin** | Device control and policies | Yes | Provisioning |
+| **Device Owner** | Full device management | Yes | Provisioning |
+| **Location** | Device tracking | Yes | First launch |
+| **Notifications** | User alerts | Yes | First launch |
+| **Camera** | QR code scanning | No | When needed |
+| **Phone State** | SIM detection | Yes | First launch |
+| **Storage** | Local data | Yes | First launch |
 
-### Step 2: Configure Backend Connection
+### Step 2: Device Registration
 
-1. **Enter Server URL**
+After provisioning, the app automatically:
+
+1. **Collects Device Information**
+   - IMEI / Serial Number
+   - Model and Manufacturer
+   - Android Version
+   - Storage Capacity
+   - Network Information
+
+2. **Registers with Backend**
+   - Sends device data to API
+   - Receives device_id
+   - Stores credentials locally
+
+3. **Starts Heartbeat**
+   - Begins 30-second heartbeat cycle
+   - Reports device status
+   - Receives commands from backend
+
+### Step 3: Verify Setup
+
+Check that everything is working:
+
+1. **Device Owner Status**
+   ```bash
+   adb shell dpm get-device-owner
+   # Should show: com.microspace.payo/.receivers.admin.AdminReceiver
    ```
-   https://your-backend-server.com/api
-   ```
 
-2. **Verify SSL Certificate**
-   - App validates certificate
-   - Ensures secure connection
-   - Blocks insecure connections
+2. **App Status**
+   - Open app
+   - Check "Device Status" screen
+   - Should show "Registered" and "Active"
 
-3. **Test Connection**
-   - Tap "Test Connection"
-   - Verify successful response
-   - Check network logs
+3. **Heartbeat Status**
+   - Check "Last Heartbeat" timestamp
+   - Should update every 30 seconds
 
-### Step 3: Register Device
-
-1. **Enter Loan Number**
-   - Unique identifier for device
-   - Links device to loan account
-
-2. **Collect Device Information**
-   - IMEI
-   - Serial Number
-   - Model
-   - OS Version
-   - Storage capacity
-
-3. **Submit Registration**
-   - App sends data to backend
-   - Backend assigns device_id
-   - App stores device_id locally
-
-4. **Verify Registration**
-   - Check device status in backend dashboard
-   - Confirm heartbeat is active
-   - Verify device appears in device list
+4. **Backend Dashboard**
+   - Login to backend
+   - Find device in device list
+   - Check "Last Seen" is recent
 
 ---
 
-## âœ… Verification Checklist
+## Verification Checklist
 
-After setup, verify everything is working:
+After setup, verify:
 
 - [ ] App installed successfully
 - [ ] Device Owner privileges granted
 - [ ] Device Admin privileges granted
-- [ ] Location permissions enabled
-- [ ] Notification permissions enabled
-- [ ] Backend connection established
-- [ ] Device registered with loan number
-- [ ] Device ID assigned by backend
-- [ ] Heartbeat active (check logs)
+- [ ] All permissions granted
+- [ ] Device registered with backend
+- [ ] Device ID assigned
+- [ ] Heartbeat active (updates every 30s)
 - [ ] Device appears in backend dashboard
 - [ ] Can receive commands from backend
 - [ ] Tamper detection active
+- [ ] Location reporting works
+- [ ] Lock/unlock commands work
 
 ---
 
-## ðŸ” Troubleshooting
+## Troubleshooting
 
 ### Installation Issues
 
 **Problem**: APK installation fails
-```
-Solution:
-1. Check device storage (need 100MB+ free)
-2. Enable "Unknown Sources" in settings
-3. Uninstall previous version
-4. Try installing again
-```
 
-**Problem**: Build fails in Android Studio
-```
-Solution:
-1. Clean project: Build â†’ Clean Project
-2. Rebuild: Build â†’ Rebuild Project
+**Solutions**:
+1. Check device storage (need 100MB+ free)
+2. Enable "Install from Unknown Sources"
+3. Uninstall previous version first
+4. Check APK is not corrupted
+5. Try different installation method
+
+**Problem**: Build fails
+
+**Solutions**:
+1. Clean project: `./gradlew.bat clean`
+2. Rebuild: `./gradlew.bat assembleRelease`
 3. Check Gradle sync
-4. Verify SDK versions in build.gradle
-```
+4. Verify JDK version (need JDK 11+)
+5. Check `local.properties` has correct SDK path
 
 ### Provisioning Issues
 
-**Problem**: QR code won't scan
-```
-Solution:
-1. Ensure good lighting
-2. Hold device steady
-3. Check QR code is valid
-4. Try manual provisioning instead
-```
+**Problem**: "Contact your IT admin for help" error
+
+**Solutions**:
+1. **Checksum mismatch** (most common):
+   ```powershell
+   # Recalculate checksum
+   ./calculate_checksum.ps1 -ApkPath "app-release.apk"
+   # Update provisioning-config.json
+   ```
+2. Verify APK URL is accessible
+3. Check WiFi credentials are correct
+4. Ensure device is factory reset
+5. Try ADB provisioning method instead
 
 **Problem**: Device Owner permission denied
-```
-Solution:
-1. Device may not support Device Owner
-2. Check Android version (need 12+)
-3. Try factory reset and re-provision
-4. Contact device manufacturer
-```
+
+**Solutions**:
+1. Device must be factory reset first
+2. No Google accounts should be added yet
+3. Check Android version (need 5.0+)
+4. Some devices don't support Device Owner
+5. Try manufacturer-specific provisioning
+
+**Problem**: QR code won't scan
+
+**Solutions**:
+1. Ensure good lighting
+2. Hold device steady
+3. Verify QR code is valid JSON
+4. Try regenerating QR code
+5. Use NFC or ADB method instead
 
 ### Connection Issues
 
 **Problem**: Cannot connect to backend
-```
-Solution:
+
+**Solutions**:
 1. Check internet connection
-2. Verify server URL is correct
+2. Verify server URL in `ApiConstants.kt`
 3. Check SSL certificate validity
-4. Verify firewall rules
-5. Check backend server status
-```
+4. Verify firewall allows connection
+5. Check backend server is running
+6. Test URL in browser first
 
 **Problem**: Heartbeat not sending
-```
-Solution:
+
+**Solutions**:
 1. Check network connectivity
-2. Verify backend URL in settings
-3. Check app logs for errors
+2. Verify backend URL is correct
+3. Check app logs:
+   ```bash
+   adb logcat | grep "HeartbeatService"
+   ```
 4. Restart app
 5. Check backend server logs
-```
+6. Verify device is registered
 
 ### Permission Issues
 
 **Problem**: Location permission denied
-```
-Solution:
-1. Go to Settings â†’ Apps â†’ Device Owner
+
+**Solutions**:
+1. Settings → Apps → PAYO
 2. Tap Permissions
-3. Enable Location
+3. Enable Location → "Allow all the time"
 4. Restart app
-```
 
 **Problem**: Notification permission denied
-```
-Solution:
-1. Go to Settings â†’ Apps â†’ Device Owner
+
+**Solutions**:
+1. Settings → Apps → PAYO
 2. Tap Permissions
 3. Enable Notifications
 4. Restart app
-```
 
 ---
 
-## ðŸ“Š Monitoring Setup
+## Monitoring Setup
 
 ### Check Heartbeat Status
 
-1. **In App**
-   - Open Device Owner app
-   - Go to Status screen
-   - Check "Last Heartbeat" timestamp
-   - Should update every 30 seconds
+**In App**:
+1. Open PAYO app
+2. Go to "Device Status" screen
+3. Check "Last Heartbeat" timestamp
+4. Should update every 30 seconds
 
-2. **In Backend Dashboard**
-   - Navigate to Devices
-   - Find your device by ID
-   - Check "Last Seen" timestamp
-   - Should be recent (within 1 minute)
+**Via ADB**:
+```bash
+adb logcat | grep "HeartbeatService"
+# Should see heartbeat logs every 30 seconds
+```
+
+**In Backend Dashboard**:
+1. Navigate to Devices
+2. Find device by ID or IMEI
+3. Check "Last Seen" timestamp
+4. Should be recent (within 1 minute)
 
 ### View Device Logs
 
-1. **Local Logs**
-   ```bash
-   adb logcat | grep DeviceOwner
-   ```
+**Local Logs**:
+```bash
+# All app logs
+adb logcat | grep "PAYO"
 
-2. **Backend Logs**
-   - Login to backend dashboard
-   - Navigate to Device Logs
-   - Filter by device ID
-   - Review recent entries
+# Heartbeat logs
+adb logcat | grep "HeartbeatService"
+
+# Registration logs
+adb logcat | grep "DeviceRegistration"
+
+# Lock logs
+adb logcat | grep "LockManager"
+```
+
+**Backend Logs**:
+1. Login to backend dashboard
+2. Navigate to Device Logs
+3. Filter by device ID
+4. Review recent entries
 
 ### Test Commands
 
-1. **Lock Device**
-   - Backend: Send lock command
-   - Device: Should lock immediately
-   - Check logs for confirmation
+**Lock Device**:
+1. Backend: Send lock command via API
+2. Device: Should lock immediately
+3. Check logs for confirmation
 
-2. **Unlock Device**
-   - Backend: Send unlock command
-   - Device: Should unlock
-   - Check logs for confirmation
+**Unlock Device**:
+1. Backend: Send unlock command
+2. Device: Should unlock
+3. Verify in logs
 
 ---
 
-## ðŸ” Security Configuration
+## Security Configuration
 
 ### SSL/TLS Setup
 
+The app uses HTTPS with certificate validation:
+
 1. **Certificate Validation**
-   - App validates server certificate
+   - Validates server certificate
    - Prevents man-in-the-middle attacks
-   - Blocks self-signed certificates in production
+   - Configured in `network_security_config.xml`
 
 2. **Certificate Pinning** (Optional)
-   ```
-   Configure in app settings:
-   - Server certificate hash
-   - Public key hash
-   - Backup certificate hash
-   ```
+   - Add certificate hash to config
+   - Prevents certificate substitution
+   - See `DeviceOwnerSSLManager.kt`
 
 ### API Key Management
 
-1. **Generate API Key**
-   - Backend generates unique key
-   - Store securely in encrypted storage
-   - Never share or expose
+1. **Configuration**
+   - Set in `ApiConstants.kt`
+   - Stored in encrypted preferences
+   - Never logged or exposed
 
-2. **Rotate API Key**
-   - Backend: Generate new key
-   - Device: Update in settings
-   - Old key: Revoke after verification
+2. **Rotation**
+   - Backend generates new key
+   - Update `ApiConstants.kt`
+   - Rebuild and redeploy
 
 ---
 
-## ðŸ“š Next Steps
+## Next Steps
 
 After successful setup:
 
-1. **Read Features Guide** â†’ [03-FEATURES-GUIDE.md](./03-FEATURES-GUIDE.md)
-2. **Understand Heartbeat** â†’ [06-HEARTBEAT-SYSTEM.md](./06-HEARTBEAT-SYSTEM.md)
-3. **Learn Device Locking** â†’ [07-DEVICE-LOCKING.md](./07-DEVICE-LOCKING.md)
-4. **Review API Reference** â†’ [04-API-REFERENCE.md](./04-API-REFERENCE.md)
+1. **Understand Features** → [03-FEATURES-GUIDE.md](03-FEATURES-GUIDE.md)
+2. **Learn About APIs** → [6.0-APIS.md](6.0-APIS.md)
+3. **Understand Heartbeat** → [7.0-DEVICE-HEARTBEAT.md](7.0-DEVICE-HEARTBEAT.md)
+4. **Learn Lock Mechanisms** → [8.0-HARD-LOCK-AND-SOFT-LOCK.md](8.0-HARD-LOCK-AND-SOFT-LOCK.md)
+5. **Review Security** → [9.0-DEVICE-TAMPER.md](9.0-DEVICE-TAMPER.md)
 
 ---
 
-## ðŸ†˜ Getting Help
+## Getting Help
 
-- **Setup Issues**: Check [Troubleshooting](#troubleshooting) section
-- **API Questions**: See [API Reference](./04-API-REFERENCE.md)
-- **Logging Help**: Review [Logging and Debugging](./12-LOGGING-AND-DEBUGGING.md)
-- **Architecture Questions**: Read [Architecture](./05-ARCHITECTURE.md)
+- **Setup Issues**: Check [Troubleshooting](#troubleshooting) section above
+- **API Questions**: See [6.0-APIS.md](6.0-APIS.md)
+- **Logging Help**: Review [11.0-DEVICE-LOGS-AND-BUGS.md](11.0-DEVICE-LOGS-AND-BUGS.md)
+- **Architecture**: Read [14.0-FOLDER-STRUCTURE.md](14.0-FOLDER-STRUCTURE.md)
+- **Support**: support@nexivo.io
 
 ---
 
-**Last Updated:** February 2026  
-**Version:** 2.0
-
-
+**Last Updated:** March 2026  
+**Version:** 1.1
