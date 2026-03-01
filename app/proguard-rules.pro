@@ -20,7 +20,11 @@
 -keep class com.microspace.payo.data.models.** { *; }
 
 # Keep the Device Admin Receiver
--keep class com.microspace.payo.receivers.** { *; }
+-keep class com.microspace.payo.receivers.admin.** { *; }
+-keep class com.microspace.payo.receivers.boot.** { *; }
+-keep class com.microspace.payo.receivers.payment.** { *; }
+-keep class com.microspace.payo.receivers.security.** { *; }
+-keep class com.microspace.payo.receivers.system.** { *; }
 
 # Keep the Firmware Security logic
 -keep class com.microspace.payo.security.firmware.FirmwareSecurity { *; }

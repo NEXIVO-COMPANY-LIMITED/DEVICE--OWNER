@@ -1,10 +1,10 @@
-# 02 Getting Started
+﻿# 02 Getting Started
 
 This guide walks you through installation, provisioning, and initial setup of the Device Owner application.
 
 ---
 
-## 📋 Prerequisites
+## ðŸ“‹ Prerequisites
 
 Before you begin, ensure you have:
 
@@ -16,14 +16,14 @@ Before you begin, ensure you have:
 
 ---
 
-## 🚀 Installation Steps
+## ðŸš€ Installation Steps
 
 ### Step 1: Build the Application
 
 #### Using Android Studio
 
 1. Open the project in Android Studio
-2. Select **Build** → **Build Bundle(s) / APK(s)** → **Build APK(s)**
+2. Select **Build** â†’ **Build Bundle(s) / APK(s)** â†’ **Build APK(s)**
 3. Wait for the build to complete
 4. APK will be available in `app/build/outputs/apk/`
 
@@ -46,7 +46,7 @@ Before you begin, ensure you have:
 
 1. Connect device via USB
 2. Enable USB Debugging on device
-3. Click **Run** → **Run 'app'**
+3. Click **Run** â†’ **Run 'app'**
 4. Select your device
 5. Wait for installation to complete
 
@@ -58,7 +58,7 @@ adb install app/build/outputs/apk/release/app-release.apk
 
 # Install and run
 adb install -r app/build/outputs/apk/release/app-release.apk
-adb shell am start -n com.example.deviceowner/.MainActivity
+adb shell am start -n com.microspace.payo/.MainActivity
 ```
 
 #### Via APK File
@@ -70,7 +70,7 @@ adb shell am start -n com.example.deviceowner/.MainActivity
 
 ---
 
-## 🔧 Device Provisioning
+## ðŸ”§ Device Provisioning
 
 ### What is Provisioning?
 
@@ -142,7 +142,7 @@ Provisioning grants the app Device Owner privileges, enabling full device contro
 
 ---
 
-## 📱 Initial Setup
+## ðŸ“± Initial Setup
 
 ### Step 1: Grant Permissions
 
@@ -199,7 +199,7 @@ The app requires these permissions:
 
 ---
 
-## ✅ Verification Checklist
+## âœ… Verification Checklist
 
 After setup, verify everything is working:
 
@@ -218,7 +218,7 @@ After setup, verify everything is working:
 
 ---
 
-## 🔍 Troubleshooting
+## ðŸ” Troubleshooting
 
 ### Installation Issues
 
@@ -234,8 +234,8 @@ Solution:
 **Problem**: Build fails in Android Studio
 ```
 Solution:
-1. Clean project: Build → Clean Project
-2. Rebuild: Build → Rebuild Project
+1. Clean project: Build â†’ Clean Project
+2. Rebuild: Build â†’ Rebuild Project
 3. Check Gradle sync
 4. Verify SDK versions in build.gradle
 ```
@@ -287,7 +287,7 @@ Solution:
 **Problem**: Location permission denied
 ```
 Solution:
-1. Go to Settings → Apps → Device Owner
+1. Go to Settings â†’ Apps â†’ Device Owner
 2. Tap Permissions
 3. Enable Location
 4. Restart app
@@ -296,7 +296,7 @@ Solution:
 **Problem**: Notification permission denied
 ```
 Solution:
-1. Go to Settings → Apps → Device Owner
+1. Go to Settings â†’ Apps â†’ Device Owner
 2. Tap Permissions
 3. Enable Notifications
 4. Restart app
@@ -304,7 +304,7 @@ Solution:
 
 ---
 
-## 📊 Monitoring Setup
+## ðŸ“Š Monitoring Setup
 
 ### Check Heartbeat Status
 
@@ -347,7 +347,7 @@ Solution:
 
 ---
 
-## 🔐 Security Configuration
+## ðŸ” Security Configuration
 
 ### SSL/TLS Setup
 
@@ -378,18 +378,18 @@ Solution:
 
 ---
 
-## 📚 Next Steps
+## ðŸ“š Next Steps
 
 After successful setup:
 
-1. **Read Features Guide** → [03-FEATURES-GUIDE.md](./03-FEATURES-GUIDE.md)
-2. **Understand Heartbeat** → [06-HEARTBEAT-SYSTEM.md](./06-HEARTBEAT-SYSTEM.md)
-3. **Learn Device Locking** → [07-DEVICE-LOCKING.md](./07-DEVICE-LOCKING.md)
-4. **Review API Reference** → [04-API-REFERENCE.md](./04-API-REFERENCE.md)
+1. **Read Features Guide** â†’ [03-FEATURES-GUIDE.md](./03-FEATURES-GUIDE.md)
+2. **Understand Heartbeat** â†’ [06-HEARTBEAT-SYSTEM.md](./06-HEARTBEAT-SYSTEM.md)
+3. **Learn Device Locking** â†’ [07-DEVICE-LOCKING.md](./07-DEVICE-LOCKING.md)
+4. **Review API Reference** â†’ [04-API-REFERENCE.md](./04-API-REFERENCE.md)
 
 ---
 
-## 🆘 Getting Help
+## ðŸ†˜ Getting Help
 
 - **Setup Issues**: Check [Troubleshooting](#troubleshooting) section
 - **API Questions**: See [API Reference](./04-API-REFERENCE.md)
@@ -400,3 +400,5 @@ After successful setup:
 
 **Last Updated:** February 2026  
 **Version:** 2.0
+
+

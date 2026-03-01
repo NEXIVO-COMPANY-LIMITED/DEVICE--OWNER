@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Dashboard Strings -->
     <string name="device_registered_title">Device Successfully Registered</string>
@@ -38,3 +38,4 @@
     <!-- Button Text -->
     <color name="button_text_color">#ffffff</color>
 </resources>
+

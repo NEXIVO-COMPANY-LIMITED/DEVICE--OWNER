@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -222,7 +222,7 @@
                         android:id="@+id/tv_failure_details"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="• Brand not supported\n• Android version below 13"
+                        android:text="â€¢ Brand not supported\nâ€¢ Android version below 13"
                         android:textColor="@color/on_error_container"
                         android:textSize="14sp"
                         android:lineSpacingExtra="6dp" />
@@ -261,7 +261,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="✓ Google Pixel device series\n✓ Android 13 or higher\n✓ Official firmware (No custom ROMs)"
+                        android:text="âœ“ Google Pixel device series\nâœ“ Android 13 or higher\nâœ“ Official firmware (No custom ROMs)"
                         android:textColor="@color/on_primary_container"
                         android:textSize="14sp"
                         android:lineSpacingExtra="6dp" />
@@ -312,3 +312,4 @@
         </LinearLayout>
     </ScrollView>
 </androidx.constraintlayout.widget.ConstraintLayout>
+

@@ -1,41 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Production API - HTTPS with certificate pinning for maximum security -->
+    <!-- Allow system-wide certificate trust during provisioning -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">payoplan.com</domain>
         <domain includeSubdomains="true">api.payoplan.com</domain>
-        
-        <!-- Certificate pinning - prevents man-in-the-middle attacks -->
-        <pin-set expiration="2027-12-31">
-            <!-- PRIMARY certificate pin - REAL PAYOPLAN.COM CERTIFICATE -->
-            <pin digest="SHA-256">y8S/sGw+VDqpDXnu4dKxrnI6nj1tdn0od2WAFM7zvog=</pin>
-            
-            <!-- Backup certificate pin (get from your SSL provider if you have one) -->
-            <!-- <pin digest="SHA-256">BACKUP_CERTIFICATE_PIN_HERE=</pin> -->
-        </pin-set>
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
         
         <trust-anchors>
-            <!-- Trust system certificates -->
             <certificates src="system" />
-            <!-- Trust user-added certificates (for testing) -->
-            <certificates src="user" />
         </trust-anchors>
     </domain-config>
 
     <!-- Development and testing domains -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">172.16.0.0</domain>
-        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
     </domain-config>
-    
-    <!-- Base configuration - HTTPS only for maximum Device Owner security -->
-    <base-config cleartextTrafficPermitted="false">
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
-        </trust-anchors>
-    </base-config>
 </network-security-config>

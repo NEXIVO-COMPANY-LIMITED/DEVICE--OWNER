@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <!-- Back up all shared preferences which include device identification and registration status -->
     <include domain="sharedpref" path="." />

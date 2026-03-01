@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Lock Overlay Strings -->
     <string name="device_locked">Device Locked</string>
@@ -16,3 +16,4 @@
     <color name="lock_device_id_color">#999999</color>
     <color name="emergency_button_text_color">#ffffff</color>
 </resources>
+

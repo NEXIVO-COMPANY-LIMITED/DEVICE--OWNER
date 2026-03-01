@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.microspace.payo">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Internet permission for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -159,7 +158,7 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Android 12+ Provisioning -->
+        <!-- Android 12+ Provisioning Handshake -->
         <activity
             android:name=".ui.activities.provisioning.mode.ProvisioningModeActivity"
             android:exported="true"
@@ -173,7 +172,6 @@
         <activity android:name=".ui.activities.provisioning.consent.DataPrivacyConsentActivity" />
         <activity android:name=".ui.activities.provisioning.progress.ProvisioningProgressActivity" />
 
-        <!-- Updated Compatibility Activities paths -->
         <activity
             android:name=".ui.activities.provisioning.compatibility.main.DeviceCompatibilityCheckActivity"
             android:exported="false"
@@ -191,25 +189,33 @@
 
         <activity android:name=".ui.activities.registration.RegistrationSuccessActivity" />
 
-        <activity android:name=".ui.activities.provisioning.policy.PolicyComplianceActivity" android:exported="true">
+        <!-- Android 12+ Policy Compliance Flow -->
+        <activity
+            android:name=".ui.activities.provisioning.policy.PolicyComplianceActivity"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
         
-        <!-- Receivers -->
-        <receiver android:name=".receivers.AdminReceiver" android:exported="true" android:permission="android.permission.BIND_DEVICE_ADMIN">
+        <!-- Device Admin Receiver -->
+        <receiver
+            android:name=".receivers.admin.AdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
-                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
+                <action android:name="android.app.action.PROVISIONING_COMPLETE" />
+                <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
             </intent-filter>
             <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin_receiver" />
         </receiver>
         
-        <receiver android:name=".receivers.BootReceiver" android:exported="false" android:enabled="true" android:directBootAware="true">
+        <receiver android:name=".receivers.boot.BootReceiver" android:exported="false" android:enabled="true" android:directBootAware="true">
             <intent-filter android:priority="999">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
@@ -217,10 +223,59 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".receivers.PaymentOverdueReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_OVERDUE" /></intent-filter></receiver>
-        <receiver android:name=".receivers.TamperLockReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.TAMPER_LOCK" /></intent-filter></receiver>
-        <receiver android:name=".receivers.PaymentReminderReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_REMINDER" /></intent-filter></receiver>
-        <receiver android:name=".receivers.DeactivationReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.DEACTIVATE_DEVICE" /></intent-filter></receiver>
+        <!-- QR Code Provisioning Receiver -->
+        <receiver
+            android:name=".receivers.system.QRProvisioningReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <intent-filter>
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
+                <action android:name="android.app.action.PROVISIONING_SUCCESSFUL" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".receivers.payment.PaymentOverdueReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_OVERDUE" /></intent-filter></receiver>
+        <receiver android:name=".receivers.security.TamperLockReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.TAMPER_LOCK" /></intent-filter></receiver>
+        <receiver android:name=".receivers.payment.PaymentReminderReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_REMINDER" /></intent-filter></receiver>
+        <receiver android:name=".receivers.system.DeactivationReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.DEACTIVATE_DEVICE" /></intent-filter></receiver>
+
+        <!-- Package Removal Protection Receiver -->
+        <receiver
+            android:name=".receivers.system.PackageRemovalReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_DATA_CLEARED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Service Guard Receiver -->
+        <receiver
+            android:name=".receivers.system.ServiceGuardReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.microspace.payo.GUARD_CHECK" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Heartbeat Alarm Receiver -->
+        <receiver
+            android:name=".receivers.system.HeartbeatAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Update Receiver for Silent App Updates -->
+        <receiver
+            android:name=".update.receiver.UpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.microspace.payo.UPDATE_COMPLETE" />
+                <action android:name="com.microspace.payo.ROLLBACK_COMPLETE" />
+            </intent-filter>
+        </receiver>
 
         <!-- Services -->
         <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync|systemExempted" />
