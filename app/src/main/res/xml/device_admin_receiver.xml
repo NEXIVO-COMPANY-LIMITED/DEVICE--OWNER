@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-policies>
-        <!-- Device owner policies -->
+        <!-- Standard Device Admin Policies -->
         <limit-password />
         <watch-login />
         <reset-password />
@@ -11,8 +11,5 @@
         <encrypted-storage />
         <disable-camera />
         <disable-keyguard-features />
-        <disable-keyguard-widgets />
-        <disable-keyguard-secure-camera />
-        <disable-keyguard-unredacted-notifications />
     </uses-policies>
 </device-admin>

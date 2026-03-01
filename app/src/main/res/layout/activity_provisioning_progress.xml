@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -66,15 +66,15 @@
             android:padding="24dp"
             android:gravity="center">
 
-            <com.google.android.material.progressindicator.CircularProgressIndicator
-                android:id="@+id/provisioning_progress_spinner"
-                android:layout_width="wrap_content"
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/provisioning_progress_bar"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:indeterminate="true"
-                app:indicatorSize="48dp"
-                app:trackThickness="4dp"
                 app:indicatorColor="#10B981"
-                app:trackColor="#F3F4F6" />
+                app:trackColor="#F3F4F6"
+                app:trackThickness="8dp"
+                app:trackCornerRadius="4dp" />
 
             <TextView
                 android:id="@+id/tv_current_service"
@@ -135,3 +135,4 @@
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+

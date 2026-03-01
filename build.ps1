@@ -1,4 +1,4 @@
-now # Build Release APK with Checksum - Final Working Version
+# Build Release APK with Checksum - Final Working Version
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Building Release APK" -ForegroundColor Cyan

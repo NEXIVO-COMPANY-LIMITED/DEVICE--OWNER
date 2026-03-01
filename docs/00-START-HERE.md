@@ -1,4 +1,4 @@
-# 🚀 Start Here
+﻿# ðŸš€ Start Here
 
 Welcome to Device Owner! This page gets you oriented in 2 minutes.
 
@@ -8,20 +8,20 @@ Welcome to Device Owner! This page gets you oriented in 2 minutes.
 
 **Device Owner** is an Android app that secures and controls loan-backed devices. It:
 
-- 🔒 Detects tampering and locks devices
-- 📱 Monitors devices with a 30-second heartbeat
-- 🔄 Integrates with a backend for fleet management
-- 💾 Works offline with local database
-- 🔐 Provides Factory Reset Protection
+- ðŸ”’ Detects tampering and locks devices
+- ðŸ“± Monitors devices with a 30-second heartbeat
+- ðŸ”„ Integrates with a backend for fleet management
+- ðŸ’¾ Works offline with local database
+- ðŸ” Provides Factory Reset Protection
 
 ---
 
 ## How to Read the Documentation
 
 ### Option 1: Quick Overview (30 minutes)
-1. [1.0-DEVICE-OWNER-OVERVIEW.md](./1.0-DEVICE-OWNER-OVERVIEW.md) — What is Device Owner?
-2. [2.0-FEATURES-IMPLEMENTED.md](./2.0-FEATURES-IMPLEMENTED.md) — What features exist?
-3. [3.0-COMPATIBILITY.md](./3.0-COMPATIBILITY.md) — What devices are supported?
+1. [1.0-DEVICE-OWNER-OVERVIEW.md](./1.0-DEVICE-OWNER-OVERVIEW.md) â€” What is Device Owner?
+2. [2.0-FEATURES-IMPLEMENTED.md](./2.0-FEATURES-IMPLEMENTED.md) â€” What features exist?
+3. [3.0-COMPATIBILITY.md](./3.0-COMPATIBILITY.md) â€” What devices are supported?
 
 ### Option 2: Complete Understanding (5 hours)
 Follow the reading order in [README.md](./README.md)
@@ -47,10 +47,12 @@ Choose your role in [README.md](./README.md) for a focused path
 
 ## Next Steps
 
-👉 **Go to [README.md](./README.md)** for the complete reading order and full documentation guide.
+ðŸ‘‰ **Go to [README.md](./README.md)** for the complete reading order and full documentation guide.
 
 Or jump directly to:
-- **Developer?** → [1.0-DEVICE-OWNER-OVERVIEW.md](./1.0-DEVICE-OWNER-OVERVIEW.md)
-- **DevOps?** → [02-GETTING-STARTED.md](./02-GETTING-STARTED.md)
-- **Security?** → [9.0-DEVICE-TAMPER.md](./9.0-DEVICE-TAMPER.md)
-- **Project Manager?** → [2.0-FEATURES-IMPLEMENTED.md](./2.0-FEATURES-IMPLEMENTED.md)
+- **Developer?** â†’ [1.0-DEVICE-OWNER-OVERVIEW.md](./1.0-DEVICE-OWNER-OVERVIEW.md)
+- **DevOps?** â†’ [02-GETTING-STARTED.md](./02-GETTING-STARTED.md)
+- **Security?** â†’ [9.0-DEVICE-TAMPER.md](./9.0-DEVICE-TAMPER.md)
+- **Project Manager?** â†’ [2.0-FEATURES-IMPLEMENTED.md](./2.0-FEATURES-IMPLEMENTED.md)
+
+

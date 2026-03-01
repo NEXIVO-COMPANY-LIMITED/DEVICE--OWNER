@@ -1,54 +1,46 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
+# By default, the flags in this file are appended to flags specified
+# in C:\Users\abuu\AppData\Local\Android\sdk/tools/proguard/proguard-android.txt
+# You can edit the include path and order by changing the proguardFiles
+# directive in build.gradle.
+
 # For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+#   http://developer.android.com/guide/developing/tools/proguard/index.html
 
-# Preserve line number information for debugging stack traces
--keepattributes SourceFile,LineNumberTable
+# Keep the entity classes used in the Room database
+-keep class com.microspace.payo.data.local.database.entities.** { *; }
 
-# 1. Preserve signatures for Retrofit's reflection (CRITICAL FIX)
--keepattributes Signature, InnerClasses, EnclosingMethod, Exceptions
--keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
+# Keep the DAO interfaces
+-keep class com.microspace.payo.data.local.database.dao.** { *; }
 
-# 2. Keep your specific models (Based on your package: com.example.deviceowner)
--keep class com.example.deviceowner.data.models.** { *; }
--keep class com.example.deviceowner.data.remote.models.** { *; }
+# Keep Retrofit and related API classes
+-keep interface com.microspace.payo.data.remote.ApiService { *; }
+-keep class com.microspace.payo.data.remote.ApiClient { *; }
+-keep class com.microspace.payo.data.remote.models.** { *; }
+-keep class com.microspace.payo.data.models.** { *; }
 
-# 3. Keep your Retrofit Service and Client
--keep interface com.example.deviceowner.data.remote.ApiService { *; }
--keep class com.example.deviceowner.data.remote.ApiClient { *; }
+# Keep the Device Admin Receiver
+-keep class com.microspace.payo.receivers.admin.** { *; }
+-keep class com.microspace.payo.receivers.boot.** { *; }
+-keep class com.microspace.payo.receivers.payment.** { *; }
+-keep class com.microspace.payo.receivers.security.** { *; }
+-keep class com.microspace.payo.receivers.system.** { *; }
 
-# 4. Keep Retrofit and OkHttp internals
--dontwarn retrofit2.**
--keep class retrofit2.** { *; }
--keep class okhttp3.** { *; }
--dontwarn okhttp3.**
+# Keep the Firmware Security logic
+-keep class com.microspace.payo.security.firmware.FirmwareSecurity { *; }
 
-# 5. Keep Gson @SerializedName fields
--keepclassmembers class * {
-    @com.google.gson.annotations.SerializedName <fields>;
-}
+# Keep GSON models
+-keep class com.microspace.payo.utils.storage.PaymentDataManager$PaymentRecord { *; }
 
-# 6. Keep Android System Components (Admin and Receivers)
--keep class com.example.deviceowner.receivers.** { *; }
--keep class * extends android.app.admin.DeviceAdminReceiver { *; }
--keep class * extends android.content.BroadcastReceiver { *; }
--keep class * extends android.app.Service { *; }
+# Keep BuildConfig
+-keep class com.microspace.payo.BuildConfig { *; }
 
-# 7. Keep Room Database and Entities
--keep class * extends androidx.room.RoomDatabase
--keep class com.example.deviceowner.data.local.database.dao.** { *; }
--keep class com.example.deviceowner.data.local.database.entities.** { *; }
+# General Compose keep rules
+-keep class androidx.compose.ui.platform.** { *; }
 
-# 8. Keep Coroutines and Compose metadata
--keep class kotlinx.coroutines.** { *; }
--keep class kotlin.Metadata { *; }
-
-# 9. Firmware security (stub – native/JNI removed)
--keep class com.example.deviceowner.security.firmware.FirmwareSecurity { *; }
--keep class com.example.deviceowner.security.firmware.FirmwareSecurity$* { *; }
-
-# 10. Keep BuildConfig (generated - contains BASE_URL, DEVICE_API_KEY, etc.)
--keep class com.example.deviceowner.BuildConfig { *; }
+# Hilt/Dagger rules (if using)
+-keep class * extends android.app.Service
+-keep class * extends android.app.Application
+-keep class * extends android.app.Activity
+-keep class * extends android.content.BroadcastReceiver
+-keep class * extends android.content.ContentProvider

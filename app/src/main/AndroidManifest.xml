@@ -6,20 +6,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- Device information permissions (SIM detection requires these) -->
+    <!-- Device information permissions -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE" tools:ignore="ProtectedPermissions" />
     
-    <!-- Storage permissions for device data collection -->
+    <!-- Storage permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     
     <!-- Camera permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-    
+
     <!-- Location permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -31,42 +30,49 @@
     <!-- Overlay permissions for soft lock -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     
-    <!-- Device Owner specific permissions for complete control -->
-    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
-    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
-    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
+    <!-- Device Owner specific permissions -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <uses-permission android:name="android.permission.STATUS_BAR" />
-    <uses-permission android:name="android.permission.SYSTEM_UI" />
-    <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW" />
+    <uses-permission android:name="android.permission.SYSTEM_UI" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW" tools:ignore="ProtectedPermissions" />
     
     <!-- Wake lock permission -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Auto-update from GitHub Releases (Device Owner silent install) -->
+    <!-- Auto-update from GitHub Releases -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.INSTALL_PACKAGES" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.DELETE_PACKAGES" tools:ignore="ProtectedPermissions" />
     
     <!-- Power management permissions -->
-    <uses-permission android:name="android.permission.DEVICE_POWER" />
-    <uses-permission android:name="android.permission.REBOOT" />
+    <uses-permission android:name="android.permission.DEVICE_POWER" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.REBOOT" tools:ignore="ProtectedPermissions" />
     
-    <!-- Notifications (Android 13+) for update progress -->
+    <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Foreground service permission (Android 9+) -->
+    <!-- Foreground service permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+
+    <!-- Required for systemExempted foreground service -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <!-- Account management permissions -->
     <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    
+    <!-- Battery Optimization -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".DeviceOwnerApplication"
-        android:allowBackup="false"
+        android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/nexivo"
@@ -75,13 +81,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DEVICEOWNER"
         android:networkSecurityConfig="@xml/network_security_config"
-        tools:targetApi="31"
-        tools:ignore="AllowBackup,GoogleAppIndexingWarning">
-        <!-- Android 14+ (API 34+): Declare foreground service types used by the app -->
+        tools:targetApi="31">
+
         <property
             android:name="android.app.PROPERTY_FOREGROUND_SERVICE_TYPES"
-            android:value="dataSync" />
-        <!-- Registration Status Activity - Determines launch flow -->
+            android:value="dataSync|systemExempted" />
+
+        <!-- Registration flow -->
         <activity
             android:name=".ui.activities.registration.RegistrationStatusActivity"
             android:exported="true"
@@ -92,76 +98,67 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ui.activities.main.DeviceDetailActivity" android:theme="@style/Theme.DEVICEOWNER" />
+        <activity android:name=".presentation.activities.DeviceRegistrationActivity" android:theme="@style/Theme.DEVICEOWNER" />
+        <activity android:name=".presentation.activities.RegistrationErrorViewerActivity" android:theme="@style/Theme.DEVICEOWNER" />
+        <activity android:name=".ui.activities.data.DeviceDataCollectionActivity" android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- SEPARATE LOCK ACTIVITIES (ORGANIZED) -->
         <activity
-            android:name=".ui.activities.main.MainActivity"
-            android:exported="true"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- FRP Status Activity - Enterprise Factory Reset Protection status -->
-        <activity
-            android:name=".ui.activities.status.FrpStatusActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Device Registration Activity - Input loan number for registration -->
-        <activity
-            android:name=".presentation.activities.DeviceRegistrationActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Registration Error Viewer - Lists and opens HTML error files (DeviceOwner/RegistrationErrors) -->
-        <activity
-            android:name=".presentation.activities.RegistrationErrorViewerActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Device Data Collection Activity - Collects and displays device data for user verification -->
-        <activity
-            android:name=".ui.activities.data.DeviceDataCollectionActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-
-
-        <!-- Enhanced Soft Lock Activity - Kotlin Compose implementation -->
-        <activity
-            android:name=".ui.activities.lock.EnhancedSoftLockActivity"
+            android:name=".ui.activities.lock.payment.PaymentOverdueActivity"
             android:exported="false"
             android:launchMode="singleTask"
-            android:taskAffinity=""
             android:excludeFromRecents="true"
-            android:theme="@style/Theme.DEVICEOWNER"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden|navigation" />
-
-        <!-- SIM Change Overlay - Full-screen warning when SIM card is changed -->
-        <activity
-            android:name=".ui.activities.overlay.SIMChangeOverlayActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.DEVICEOWNER" />
-
-        <!-- Hard Lock Activity - Kiosk mode screen when device is hard locked.
-             directBootAware: show before user unlocks on boot.
-             showWhenLocked/turnScreenOn: display over keyguard, turn screen on. -->
-        <activity
-            android:name=".ui.activities.lock.HardLockActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:taskAffinity=""
-            android:excludeFromRecents="true"
-            android:noHistory="false"
-            android:finishOnTaskLaunch="false"
-            android:clearTaskOnLaunch="false"
-            android:directBootAware="true"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:theme="@style/Theme.DEVICEOWNER"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden|navigation" />
+            android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Android 12+ GET_PROVISIONING_MODE handler -->
+        <activity
+            android:name=".ui.activities.lock.security.SecurityViolationActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <activity
+            android:name=".ui.activities.lock.payment.SoftLockReminderActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <activity
+            android:name=".ui.activities.lock.system.DeactivationActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <activity
+            android:name=".ui.activities.lock.system.HardLockGenericActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <activity
+            android:name=".ui.activities.lock.payment.EnhancedSoftLockActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.DEVICEOWNER" />
+
+        <!-- Android 12+ Provisioning Handshake -->
         <activity
             android:name=".ui.activities.provisioning.mode.ProvisioningModeActivity"
             android:exported="true"
@@ -172,33 +169,31 @@
             </intent-filter>
         </activity>
 
-        <!-- Device Compatibility Check Activity - Validates device before provisioning -->
-        <activity
-            android:name=".ui.activities.provisioning.compatibility.DeviceCompatibilityCheckActivity"
-            android:exported="true"
-            android:theme="@style/Theme.DEVICEOWNER" />
+        <activity android:name=".ui.activities.provisioning.consent.DataPrivacyConsentActivity" />
+        <activity android:name=".ui.activities.provisioning.progress.ProvisioningProgressActivity" />
 
-        <!-- Data Privacy Consent - Shown on first install, before loan number input -->
         <activity
-            android:name=".ui.activities.provisioning.consent.DataPrivacyConsentActivity"
+            android:name=".ui.activities.provisioning.compatibility.main.DeviceCompatibilityCheckActivity"
             android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Provisioning Progress Activity - Shows installation status -->
         <activity
-            android:name=".ui.activities.provisioning.progress.ProvisioningProgressActivity"
-            android:exported="true"
+            android:name=".ui.activities.provisioning.compatibility.screens.CompatibilitySuccessActivity"
+            android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
-        <!-- Compatibility Success Activity - Shows when device meets all requirements -->
         <activity
-            android:name=".ui.activities.provisioning.compatibility.CompatibilitySuccessActivity"
-            android:exported="true"
+            android:name=".ui.activities.provisioning.compatibility.screens.CompatibilityFailureActivity"
+            android:exported="false"
             android:theme="@style/Theme.DEVICEOWNER" />
 
+        <activity android:name=".ui.activities.registration.RegistrationSuccessActivity" />
+
+        <!-- Android 12+ Policy Compliance Flow -->
         <activity
             android:name=".ui.activities.provisioning.policy.PolicyComplianceActivity"
-            android:exported="true">
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -207,65 +202,49 @@
         
         <!-- Device Admin Receiver -->
         <receiver
-            android:name=".receivers.AdminReceiver"
+            android:name=".receivers.admin.AdminReceiver"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
-                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
-                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
-                <action android:name="android.app.action.ACTION_PASSWORD_CHANGED" />
-                <action android:name="android.app.action.ACTION_PASSWORD_FAILED" />
-                <action android:name="android.app.action.ACTION_PASSWORD_SUCCEEDED" />
+                <action android:name="android.app.action.PROVISIONING_COMPLETE" />
+                <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
             </intent-filter>
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_receiver" />
+            <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin_receiver" />
         </receiver>
         
-        <!-- QR Code Provisioning Receiver -->
-        <receiver
-            android:name=".receivers.QRProvisioningReceiver"
-            android:exported="true">
-            <intent-filter android:priority="1000">
-                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
-                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
-                <action android:name="android.app.action.PROVISIONING_SUCCESSFUL" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Boot Receiver - High priority so persistent hard lock is re-applied first on boot -->
-        <receiver
-            android:name=".receivers.BootReceiver"
-            android:exported="false"
-            android:enabled="true"
-            android:directBootAware="true">
+        <receiver android:name=".receivers.boot.BootReceiver" android:exported="false" android:enabled="true" android:directBootAware="true">
             <intent-filter android:priority="999">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
 
-        <!-- Update Installation Receiver - handles PackageInstaller callbacks -->
+        <!-- QR Code Provisioning Receiver -->
         <receiver
-            android:name=".update.receiver.UpdateReceiver"
-            android:exported="false">
+            android:name=".receivers.system.QRProvisioningReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
-                <action android:name="com.example.deviceowner.INSTALL_COMPLETE" />
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
+                <action android:name="android.app.action.PROVISIONING_SUCCESSFUL" />
             </intent-filter>
         </receiver>
 
-        <!-- Package Removal Receiver -->
+        <receiver android:name=".receivers.payment.PaymentOverdueReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_OVERDUE" /></intent-filter></receiver>
+        <receiver android:name=".receivers.security.TamperLockReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.TAMPER_LOCK" /></intent-filter></receiver>
+        <receiver android:name=".receivers.payment.PaymentReminderReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.PAYMENT_REMINDER" /></intent-filter></receiver>
+        <receiver android:name=".receivers.system.DeactivationReceiver" android:exported="false"><intent-filter><action android:name="com.microspace.payo.DEACTIVATE_DEVICE" /></intent-filter></receiver>
+
+        <!-- Package Removal Protection Receiver -->
         <receiver
-            android:name=".receivers.PackageRemovalReceiver"
-            android:exported="false"
-            android:enabled="true">
-            <intent-filter android:priority="1000">
+            android:name=".receivers.system.PackageRemovalReceiver"
+            android:exported="true">
+            <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />
                 <action android:name="android.intent.action.PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
@@ -274,71 +253,46 @@
             </intent-filter>
         </receiver>
 
+        <!-- Service Guard Receiver -->
+        <receiver
+            android:name=".receivers.system.ServiceGuardReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.microspace.payo.GUARD_CHECK" />
+            </intent-filter>
+        </receiver>
 
+        <!-- Heartbeat Alarm Receiver -->
+        <receiver
+            android:name=".receivers.system.HeartbeatAlarmReceiver"
+            android:exported="false" />
 
-        <!-- Registration Success Activity - Shows success screen with Nexivo logo -->
-        <!-- IMPORTANT: App stays VISIBLE after registration for better service reliability -->
-        <!-- NO excludeFromRecents, NO noHistory, NO taskAffinity="" -->
-        <!-- This ensures heartbeat sends reliably and services continue working -->
-        <activity
-            android:name=".ui.activities.registration.RegistrationSuccessActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DEVICEOWNER"
-            android:alwaysRetainTaskState="true"
-            android:finishOnTaskLaunch="false" />
-
-
+        <!-- Update Receiver for Silent App Updates -->
+        <receiver
+            android:name=".update.receiver.UpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.microspace.payo.UPDATE_COMPLETE" />
+                <action android:name="com.microspace.payo.ROLLBACK_COMPLETE" />
+            </intent-filter>
+        </receiver>
 
         <!-- Services -->
-        <!-- Critical services marked as directBootAware for zero-second persistence -->
-        <service
-            android:name=".monitoring.SecurityMonitorService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:directBootAware="true" />
+        <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync|systemExempted" />
+        <service android:name=".services.remote.RemoteManagementService" android:foregroundServiceType="dataSync" />
+        <service android:name=".services.lock.SoftLockOverlayService" android:foregroundServiceType="systemExempted" />
+        <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="systemExempted" />
+        <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="systemExempted" />
+        <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="dataSync" />
 
-        <service
-            android:name=".services.remote.RemoteManagementService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:directBootAware="true" />
-
-        <!-- Enhanced Soft Lock Services -->
-        <service
-            android:name=".services.lock.SoftLockOverlayService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
-        <service
-            android:name=".services.lock.SoftLockMonitorService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
-        <service
-            android:name=".services.security.FirmwareSecurityMonitorService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
-        <!-- Local JSON Data Server Service - Serves device data via HTTP -->
-        <service
-            android:name=".services.data.LocalDataServerService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:directBootAware="true" />
-
-        <!-- File Provider for sharing log files -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+                android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
     </application>
-
 </manifest>

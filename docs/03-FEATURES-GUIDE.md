@@ -1,10 +1,10 @@
-# 03 Features Guide
+﻿# 03 Features Guide
 
 Complete documentation of all Device Owner features and capabilities.
 
 ---
 
-## 📋 Feature Overview
+## ðŸ“‹ Feature Overview
 
 Device Owner includes the following major features:
 
@@ -19,7 +19,7 @@ Device Owner includes the following major features:
 
 ---
 
-## 1️⃣ Device Management & Hardening
+## 1ï¸âƒ£ Device Management & Hardening
 
 ### Overview
 
@@ -79,7 +79,7 @@ deviceOwnerManager.disableDeveloperOptions(true)
 
 ---
 
-## 2️⃣ Device Registration & Tracking
+## 2ï¸âƒ£ Device Registration & Tracking
 
 ### Overview
 
@@ -106,3 +106,4 @@ Devices are registered with the backend using a loan number, creating a persiste
    - Assigns unique device_id
    - Stores device metadata
    - Initializ
+

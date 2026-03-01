@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Device Owner Configuration -->
     
@@ -9,10 +9,10 @@
     
     <!-- Allowed services for device owner -->
     <string-array name="allowed_services_for_device_owner">
-        <item>com.example.deviceowner.services.TamperDetectionService</item>
-        <item>com.example.deviceowner.services.InstallmentMonitoringService</item>
-        <item>com.example.deviceowner.services.HeartbeatService</item>
-        <!-- DeviceOwnerInitializationService removed - part of old initialization logic -->
+        <item>com.nexivo.deviceowner.services.TamperDetectionService</item>
+        <item>com.nexivo.deviceowner.services.InstallmentMonitoringService</item>
+        <!-- HeartbeatService removed -->
     </string-array>
     
 </resources>
+
