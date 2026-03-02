@@ -464,9 +464,9 @@ After successful setup:
 - **API Questions**: See [6.0-APIS.md](6.0-APIS.md)
 - **Logging Help**: Review [11.0-DEVICE-LOGS-AND-BUGS.md](11.0-DEVICE-LOGS-AND-BUGS.md)
 - **Architecture**: Read [14.0-FOLDER-STRUCTURE.md](14.0-FOLDER-STRUCTURE.md)
-- **Support**: support@nexivo.io
+- **Support**: [YOUR_SUPPORT_EMAIL]
 
 ---
 
-**Last Updated:** March 2026  
-**Version:** 1.1
+**Last Updated:** [CURRENT_DATE]  
+**Version:** [CURRENT_VERSION]

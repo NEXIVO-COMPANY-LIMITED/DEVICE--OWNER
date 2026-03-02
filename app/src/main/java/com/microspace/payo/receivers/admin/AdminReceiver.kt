@@ -65,44 +65,46 @@ class AdminReceiver : DeviceAdminReceiver() {
     }
 
     override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
-        Log.d(TAG, "✅ Provisioning complete.")
+        Log.d(TAG, "✅ Provisioning complete - starting critical setup")
+        
+        // Use goAsync() to prevent ANR during provisioning handshake
+        val pendingResult = goAsync()
+        
         try {
             val dm = DeviceOwnerManager(context)
             val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
             val admin = ComponentName(context, AdminReceiver::class.java)
             val isOwner = dm.isDeviceOwner()
-            Log.i(TAG, "Provisioning - Is Device Owner: $isOwner")
+            Log.i(TAG, "Is Device Owner: $isOwner")
             
             if (isOwner) {
-                Log.i(TAG, "Applying advanced Device Owner policies...")
-                applyAdvancedPolicies(context, dpm, admin)
+                // CRITICAL: Only do the most essential operations here
+                // Block uninstall immediately
+                dpm.setUninstallBlocked(admin, context.packageName, true)
+                Log.d(TAG, "✓ Uninstall blocked")
                 
-                Log.i(TAG, "Granting required permissions...")
-                dm.grantRequiredPermissions()
-                
-                Log.i(TAG, "Collecting device identifiers...")
-                collectDeviceIdentifiers(context)
-                
-                Log.i(TAG, "Blocking factory reset...")
+                // Block factory reset immediately
                 dm.blockFactoryReset()
+                Log.d(TAG, "✓ Factory reset blocked")
                 
-                Log.i(TAG, "Disabling developer options...")
-                dm.disableDeveloperOptions(true)
+                // Grant critical permissions
+                dm.grantRequiredPermissions()
+                Log.d(TAG, "✓ Permissions granted")
                 
-                // Set up WorkManager for enforcement
-                Log.i(TAG, "Scheduling restriction enforcement...")
+                // Schedule background workers for remaining setup
+                // This prevents timeout during provisioning handshake
                 com.microspace.payo.work.RestrictionEnforcementWorker.schedule(context)
+                Log.d(TAG, "✓ Background setup scheduled")
                 
-                // Enable Silent Mode
-                Log.i(TAG, "Enabling silent mode...")
-                CompleteSilentMode(context).enableCompleteSilentMode()
-                
-                Log.i(TAG, "✅ Provisioning setup complete")
+                Log.i(TAG, "✅ Critical provisioning setup complete")
             } else {
-                Log.e(TAG, "❌ Not device owner after provisioning - provisioning may have failed")
+                Log.e(TAG, "❌ Not device owner after provisioning")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed during provisioning: ${e.message}", e)
+            Log.e(TAG, "Provisioning setup failed: ${e.message}", e)
+        } finally {
+            // Always finish the async operation
+            pendingResult.finish()
         }
     }
 

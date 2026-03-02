@@ -1,4 +1,4 @@
-﻿package com.microspace.payo.ui.activities.data
+package com.microspace.payo.ui.activities.data
 
 import android.content.Context
 import android.content.Intent
@@ -79,8 +79,8 @@ private object DeviceDataCollectionState {
 }
 
 class DeviceDataCollectionActivity : ComponentActivity() {
-    private lateinit var registrationRepository: DeviceRegistrationRepository
-    private lateinit var deviceDataCollector: DeviceDataCollector
+    private val registrationRepository by lazy { DeviceRegistrationRepository(this) }
+    private val deviceDataCollector by lazy { DeviceDataCollector(this) }
     private var deviceData: DeviceRegistrationRequest? = null
 
     companion object {
@@ -97,9 +97,6 @@ class DeviceDataCollectionActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        registrationRepository = DeviceRegistrationRepository(this)
-        deviceDataCollector    = DeviceDataCollector(this)
-        
         val initialLoan = intent.getStringExtra(EXTRA_LOAN_NUMBER) ?: ""
         DeviceDataCollectionState.loanNumber.value = initialLoan
 

@@ -1,4 +1,4 @@
-﻿package com.microspace.payo.data.local.database
+package com.microspace.payo.data.local.database
 
 import androidx.room.Database
 import androidx.room.Room
@@ -76,6 +76,13 @@ abstract class DeviceOwnerDatabase : RoomDatabase() {
         
         fun getDatabase(context: Context): DeviceOwnerDatabase {
             return INSTANCE ?: synchronized(this) {
+                // Ensure SQLCipher native libs are loaded before any DB work
+                try {
+                    SQLiteDatabase.loadLibs(context.applicationContext)
+                } catch (e: Exception) {
+                    android.util.Log.e("DeviceOwnerDatabase", "Failed to load SQLCipher libs", e)
+                }
+
                 val passphrase = DatabasePassphraseManager.getPassphrase(context)
                 val factory = SupportFactory(SQLiteDatabase.getBytes(passphrase.toCharArray()))
                 

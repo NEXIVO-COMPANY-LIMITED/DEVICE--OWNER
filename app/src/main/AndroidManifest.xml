@@ -5,16 +5,16 @@
     <!-- Internet permission for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
+
     <!-- Device information permissions -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE" tools:ignore="ProtectedPermissions" />
-    
+
     <!-- Storage permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    
+
     <!-- Camera permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -23,13 +23,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    
+
     <!-- Boot receiver permission -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    
+
     <!-- Overlay permissions for soft lock -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    
+
     <!-- Device Owner specific permissions -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
@@ -39,7 +39,7 @@
     <uses-permission android:name="android.permission.STATUS_BAR" />
     <uses-permission android:name="android.permission.SYSTEM_UI" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW" tools:ignore="ProtectedPermissions" />
-    
+
     <!-- Wake lock permission -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
@@ -47,11 +47,11 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.INSTALL_PACKAGES" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.DELETE_PACKAGES" tools:ignore="ProtectedPermissions" />
-    
+
     <!-- Power management permissions -->
     <uses-permission android:name="android.permission.DEVICE_POWER" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.REBOOT" tools:ignore="ProtectedPermissions" />
-    
+
     <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -66,7 +66,7 @@
     <!-- Account management permissions -->
     <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
-    
+
     <!-- Battery Optimization -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
@@ -81,6 +81,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DEVICEOWNER"
         android:networkSecurityConfig="@xml/network_security_config"
+        android:directBootAware="true"
         tools:targetApi="31">
 
         <property
@@ -162,6 +163,8 @@
         <activity
             android:name=".ui.activities.provisioning.mode.ProvisioningModeActivity"
             android:exported="true"
+            android:directBootAware="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.app.action.GET_PROVISIONING_MODE" />
@@ -193,17 +196,19 @@
         <activity
             android:name=".ui.activities.provisioning.policy.PolicyComplianceActivity"
             android:exported="true"
+            android:directBootAware="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        
+
         <!-- Device Admin Receiver -->
         <receiver
             android:name=".receivers.admin.AdminReceiver"
             android:exported="true"
+            android:directBootAware="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
@@ -214,7 +219,7 @@
             </intent-filter>
             <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin_receiver" />
         </receiver>
-        
+
         <receiver android:name=".receivers.boot.BootReceiver" android:exported="false" android:enabled="true" android:directBootAware="true">
             <intent-filter android:priority="999">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -227,6 +232,7 @@
         <receiver
             android:name=".receivers.system.QRProvisioningReceiver"
             android:exported="true"
+            android:directBootAware="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <intent-filter>
                 <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
@@ -284,6 +290,7 @@
         <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="systemExempted" />
         <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="systemExempted" />
         <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="dataSync" />
+        <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="systemExempted" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

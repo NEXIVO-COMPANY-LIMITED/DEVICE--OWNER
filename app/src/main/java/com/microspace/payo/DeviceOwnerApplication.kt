@@ -1,4 +1,4 @@
-﻿package com.microspace.payo
+package com.microspace.payo
 
 import android.app.Activity
 import android.app.Application
@@ -24,6 +24,9 @@ import com.microspace.payo.services.reporting.ServerBugAndLogReporter
 import com.microspace.payo.services.sync.OfflineSyncWorker
 import com.microspace.payo.update.scheduler.UpdateScheduler
 import net.sqlcipher.database.SQLiteDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class DeviceOwnerApplication : Application() {
 
@@ -35,37 +38,29 @@ class DeviceOwnerApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
-        // 1. Set up global exception handler FIRST
+
         setupGlobalExceptionHandler()
 
-        Log.d(TAG, "DeviceOwner Application starting...")
-
+        // Initialize SQLCipher and the encryption stack synchronously on the main
+        // thread so that any Activity launched from the PAYO icon can safely use
+        // encrypted preferences and Room/SQLCipher without race conditions.
         try {
-            // 2. Initialize SQLCipher and Encryption System
             SQLiteDatabase.loadLibs(this)
             EncryptionInitializer.initializeEncryption(this)
-            Log.d(TAG, "âœ… SQLCipher and Encryption system initialized")
-        } catch (e: Exception) {
-            Log.e(TAG, "âŒ Failed to initialize core security: ${e.message}", e)
-        }
+            Log.d(TAG, "✅ Security libraries loaded")
 
-        // 3. Repair data consistency
-        DeviceIdProvider.verifyAndRepairConsistency(this)
+            DeviceIdProvider.verifyAndRepairConsistency(this)
 
-        // 4. Initialize critical components
-        try {
             if (DeviceOwnerManager(this).isDeviceOwner()) {
                 CompleteSilentMode(this).enableCompleteSilentMode()
             }
+
+            startServicesAndTasks()
         } catch (e: Exception) {
-            Log.e(TAG, "Silent mode failed: ${e.message}", e)
+            Log.e(TAG, "Failed to initialize security stack: ${e.message}", e)
         }
 
         registerActivityLifecycleCallbacks(AppActivityLifecycleCallbacks())
-        
-        // 5. Start services and other tasks
-        startServicesAndTasks()
     }
 
     private fun startServicesAndTasks() {
@@ -87,7 +82,7 @@ class DeviceOwnerApplication : Application() {
 
         if (!serverDeviceId.isNullOrEmpty()) {
             com.microspace.payo.monitoring.SecurityMonitorService.startService(this)
-            // âœ… START PERIODIC HEARTBEAT WORKER
+            // ✅ START PERIODIC HEARTBEAT WORKER
             HeartbeatWorker.enqueue(this)
         }
     }
@@ -107,13 +102,15 @@ class DeviceOwnerApplication : Application() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
 
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e(TAG, "âŒâŒâŒ UNCAUGHT EXCEPTION âŒâŒâŒ", throwable)
+            Log.e(TAG, "❌❌❌ UNCAUGHT EXCEPTION ❌❌❌", throwable)
             
             // Post bug report to server
             ServerBugAndLogReporter.postException(throwable, "FATAL CRASH: ${throwable.javaClass.simpleName}")
             
             // Give the report a moment to send before crashing
-            Thread.sleep(1000)
+            try {
+                Thread.sleep(1000)
+            } catch (e: InterruptedException) {}
 
             // Let the default handler take over to crash the app
             defaultHandler?.uncaughtException(thread, throwable)
@@ -136,7 +133,3 @@ class DeviceOwnerApplication : Application() {
         }
     }
 }
-
-
-
-

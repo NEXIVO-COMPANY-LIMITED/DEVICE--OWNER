@@ -10,6 +10,12 @@
 # Keep the entity classes used in the Room database
 -keep class com.microspace.payo.data.local.database.entities.** { *; }
 
+# SQLCipher and Gson/TypeToken keep rules to prevent
+# UnsatisfiedLinkError / ExceptionInInitializerError in release builds
+-keep class net.sqlcipher.** { *; }
+-keep class com.google.gson.** { *; }
+-keepclassmembers class com.google.gson.reflect.TypeToken { *; }
+
 # Keep the DAO interfaces
 -keep class com.microspace.payo.data.local.database.dao.** { *; }
 

@@ -1,4 +1,4 @@
-﻿package com.microspace.payo.ui.activities.registration
+package com.microspace.payo.ui.activities.registration
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,7 +11,9 @@ import com.microspace.payo.ui.activities.data.DeviceDataCollectionActivity
 import com.microspace.payo.ui.activities.provisioning.consent.DataPrivacyConsentActivity
 import com.microspace.payo.ui.activities.main.DeviceDetailActivity
 import com.microspace.payo.registration.DeviceRegistrationManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Registration Status Activity - Determines which activity to launch
@@ -31,55 +33,62 @@ class RegistrationStatusActivity : AppCompatActivity() {
         // Ensure keyboard and touch working during registration
         val controlPrefs = getSharedPreferences("control_prefs", MODE_PRIVATE)
         controlPrefs.edit().putBoolean("skip_security_restrictions", true).apply()
-        
-        prefsManager = SharedPreferencesManager(this)
-        registrationRepository = DeviceRegistrationRepository(this)
 
         lifecycleScope.launch {
             try {
-                // 1. Consent Check
+                // 1. Initialize safely on a background thread to prevent Main Thread crashes.
+                //    At this point DeviceOwnerApplication has already synchronously initialized
+                //    SQLCipher and the encryption stack, so this should be safe.
+                withContext(Dispatchers.IO) {
+                    prefsManager = SharedPreferencesManager(this@RegistrationStatusActivity)
+                    registrationRepository = DeviceRegistrationRepository(this@RegistrationStatusActivity)
+                }
+
+                // 2. Consent Check
                 if (!DataPrivacyConsentActivity.hasConsent(this@RegistrationStatusActivity)) {
                     launchDataPrivacyConsent()
                     return@launch
                 }
 
-                // 2. Check registration status
+                // 3. Check registration status
                 var isRegistered = registrationRepository.isDeviceRegistered()
-                
-                // 3. Attempt restore if not found (prevents data loss on update)
+
+                // 4. Attempt restore if not found (prevents data loss on update)
                 if (!isRegistered) {
                     if (registrationRepository.restoreRegistrationDataFromBackup()) {
                         isRegistered = true
                     }
                 }
 
-                // 4. If registered, ensure WiFi cleanup is done and go to MAIN page
+                // 5. If registered, ensure WiFi cleanup is done and go to MAIN page
                 if (isRegistered) {
                     Log.d(TAG, "Device registered - performing cleanup and launching dashboard")
-                    
+
                     // CRITICAL: Ensure provisioning WiFi is forgotten after successful registration
                     try {
                         val regManager = DeviceRegistrationManager(this@RegistrationStatusActivity)
                         regManager.cleanupProvisioningWiFi()
                     } catch (e: Exception) {
-                        Log.e(TAG, "Cleanup failed: ${e.message}")
+                        Log.e(TAG, "Cleanup failed", e)
                     }
 
                     launchMainDashboard()
                     return@launch
                 }
 
-                // 5. Resume in-progress
+                // 6. Resume in-progress
                 val inProgressLoanNumber = registrationRepository.getInProgressLoanNumber()
                 if (!inProgressLoanNumber.isNullOrEmpty()) {
                     launchDataCollectionDirectly(inProgressLoanNumber)
                     return@launch
                 }
 
-                // 6. Fresh start
+                // 7. Fresh start
                 launchRegistrationFlow()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error: ${e.message}")
+            } catch (e: Throwable) {
+                // Global catch so that any remaining SQLCipher/encryption/DB issues during
+                // startup are logged instead of crashing the app.
+                Log.e(TAG, "Fatal startup error in RegistrationStatusActivity", e)
                 launchRegistrationFlow()
             }
         }

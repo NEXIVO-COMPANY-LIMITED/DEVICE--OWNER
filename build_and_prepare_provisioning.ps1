@@ -145,12 +145,95 @@ Component Name: com.microspace.payo/.receivers.admin.AdminReceiver
 
 Provisioning Config Update:
 {
-  "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.microspace.payo/.receivers.admin.AdminReceiver",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.microspace.payo/com.microspace.payo.receivers.admin.AdminReceiver",
   "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": "https://github.com/NEXIVO-COMPANY-LIMITED/DEVICE--OWNER/releases/download/V2.0/app-release.apk",
-  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "$checksum"
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "$checksum",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": "$signatureChecksum"
 }
 "@ | Out-File -FilePath $summaryFile -Encoding UTF8
 
+# Step 10: Calculate Signature Checksum
+Write-Host ""
+Write-Host "Step 7: Calculating signature checksum..." -ForegroundColor Yellow
+
+# Try using apksigner first (more reliable)
+$signatureChecksum = $null
+try {
+    $apksignerOutput = & apksigner verify --print-certs $finalApk 2>&1
+    $sha256Line = $apksignerOutput | Select-String "SHA-256 digest:"
+    if ($sha256Line) {
+        $hexString = ($sha256Line -split ":")[1].Trim().Replace(":", "").Replace(" ", "")
+        $sigBytes = [byte[]]::new($hexString.Length / 2)
+        for ($i = 0; $i -lt $hexString.Length; $i += 2) {
+            $sigBytes[$i / 2] = [Convert]::ToByte($hexString.Substring($i, 2), 16)
+        }
+        $sigBase64 = [Convert]::ToBase64String($sigBytes)
+        $signatureChecksum = $sigBase64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
+        Write-Host "✅ Signature checksum calculated" -ForegroundColor Green
+        Write-Host "   Signature Checksum: $signatureChecksum" -ForegroundColor Cyan
+    }
+} catch {
+    Write-Host "⚠️  apksigner not found, trying keytool..." -ForegroundColor Yellow
+}
+
+# Fallback to keytool if apksigner failed
+if (-not $signatureChecksum) {
+    try {
+        $keystoreFile = "keystore/payo-release.keystore"
+        $keystoreAlias = "payo-release"
+        $certBytes = keytool -exportcert -alias $keystoreAlias -keystore $keystoreFile -storepass payorelease 2>$null
+        if ($certBytes) {
+            $sha256 = [System.Security.Cryptography.SHA256]::Create()
+            $hash = $sha256.ComputeHash($certBytes)
+            $sigBase64 = [Convert]::ToBase64String($hash)
+            $signatureChecksum = $sigBase64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
+            Write-Host "✅ Signature checksum calculated (keytool)" -ForegroundColor Green
+            Write-Host "   Signature Checksum: $signatureChecksum" -ForegroundColor Cyan
+        }
+    } catch {
+        Write-Host "⚠️  Could not calculate signature checksum automatically" -ForegroundColor Yellow
+        $signatureChecksum = "MANUALLY_CALCULATE"
+    }
+}
+
+# Step 11: Update provisioning-config.json
+Write-Host ""
+Write-Host "Step 8: Updating provisioning-config.json..." -ForegroundColor Yellow
+
+$configFile = "provisioning-config.json"
+if (Test-Path $configFile) {
+    try {
+        $config = Get-Content $configFile -Raw | ConvertFrom-Json
+        
+        # Update checksums
+        $config.'android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM' = $checksum
+        if ($signatureChecksum -and $signatureChecksum -ne "MANUALLY_CALCULATE") {
+            $config.'android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM' = $signatureChecksum
+        }
+        
+        # Save updated config
+        $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
+        
+        Write-Host "✅ provisioning-config.json updated" -ForegroundColor Green
+        Write-Host "   Package Checksum: $checksum" -ForegroundColor Cyan
+        if ($signatureChecksum -and $signatureChecksum -ne "MANUALLY_CALCULATE") {
+            Write-Host "   Signature Checksum: $signatureChecksum" -ForegroundColor Cyan
+        }
+    } catch {
+        Write-Host "⚠️  Could not update provisioning-config.json: $_" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "⚠️  provisioning-config.json not found" -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "📄 Build summary saved to: $summaryFile" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "✅ All done! Ready to upload to GitHub." -ForegroundColor Green
+Write-Host "=== ✅ BUILD COMPLETE ===" -ForegroundColor Green
+Write-Host ""
+Write-Host "📋 FINAL CHECKLIST:" -ForegroundColor Cyan
+Write-Host "   [1] Upload app-release.apk to GitHub Release" -ForegroundColor White
+Write-Host "   [2] Verify provisioning-config.json has correct checksums" -ForegroundColor White
+Write-Host "   [3] Generate QR code from provisioning-config.json" -ForegroundColor White
+Write-Host "   [4] Test on factory-reset device" -ForegroundColor White
+Write-Host ""
