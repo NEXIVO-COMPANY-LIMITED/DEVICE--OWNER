@@ -1,4 +1,4 @@
-﻿package com.microspace.payo.presentation.activities
+package com.microspace.payo.presentation.activities
 
 import android.content.Intent
 import android.os.Bundle
@@ -79,11 +79,10 @@ import com.microspace.payo.utils.helpers.LoanNumberValidator
 
 class DeviceRegistrationActivity : ComponentActivity() {
 
-    private lateinit var registrationRepository: DeviceRegistrationRepository
+    private val registrationRepository by lazy { DeviceRegistrationRepository(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        registrationRepository = DeviceRegistrationRepository(this)
         setContent {
             DeviceOwnerTheme {
                 Surface(

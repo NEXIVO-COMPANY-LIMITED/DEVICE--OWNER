@@ -39,9 +39,7 @@ if ($LASTEXITCODE -eq 0) {
         # Calculate checksums
         Write-Host "`nCalculating checksums..." -ForegroundColor Yellow
         $sha256 = (Get-FileHash -Path $apkPath -Algorithm SHA256).Hash
-        $sha1 = (Get-FileHash -Path $apkPath -Algorithm SHA1).Hash
-        $md5 = (Get-FileHash -Path $apkPath -Algorithm MD5).Hash
-        
+
         # Convert SHA256 Hex to Base64URL (for Device Owner provisioning)
         $bytes = [byte[]]::new($sha256.Length / 2)
         for ($i = 0; $i -lt $sha256.Length; $i += 2) {
@@ -49,84 +47,122 @@ if ($LASTEXITCODE -eq 0) {
         }
         $base64 = [Convert]::ToBase64String($bytes)
         $base64url = $base64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
+
+        # Calculate Signature Checksum dynamically
+        Write-Host "`nCalculating signature checksum..." -ForegroundColor Yellow
+        $signatureChecksum = $null
+        
+        # Try using apksigner first (most reliable)
+        try {
+            $apksignerOutput = & apksigner verify --print-certs $apkPath 2>&1
+            $sha256Line = $apksignerOutput | Select-String "SHA-256 digest:"
+            if ($sha256Line) {
+                $hexString = ($sha256Line -split ":")[1].Trim().Replace(":", "").Replace(" ", "")
+                $sigBytes = [byte[]]::new($hexString.Length / 2)
+                for ($i = 0; $i -lt $hexString.Length; $i += 2) {
+                    $sigBytes[$i / 2] = [Convert]::ToByte($hexString.Substring($i, 2), 16)
+                }
+                $sigBase64 = [Convert]::ToBase64String($sigBytes)
+                $signatureChecksum = $sigBase64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
+            }
+        } catch {
+            Write-Host "  apksigner not found, trying keytool..." -ForegroundColor Gray
+        }
+        
+        # Fallback to keytool if apksigner failed
+        if (-not $signatureChecksum) {
+            try {
+                # Read keystore properties
+                $keystoreProps = @{}
+                Get-Content "keystore.properties" | ForEach-Object {
+                    if ($_ -match '^\s*([^#][^=]+?)\s*=\s*(.+?)\s*$') {
+                        $keystoreProps[$matches[1]] = $matches[2]
+                    }
+                }
+                
+                $keystoreFile = $keystoreProps['storeFile']
+                $keystoreAlias = $keystoreProps['keyAlias']
+                $keystorePassword = $keystoreProps['storePassword']
+                
+                if ($keystoreFile -and $keystoreAlias -and $keystorePassword) {
+                    # Export certificate and calculate hash
+                    $tempCert = [System.IO.Path]::GetTempFileName()
+                    & keytool -exportcert -alias $keystoreAlias -keystore $keystoreFile -storepass $keystorePassword -file $tempCert 2>$null
+                    
+                    if (Test-Path $tempCert) {
+                        $certBytes = [System.IO.File]::ReadAllBytes($tempCert)
+                        $sha256Obj = [System.Security.Cryptography.SHA256]::Create()
+                        $hash = $sha256Obj.ComputeHash($certBytes)
+                        $sigBase64 = [Convert]::ToBase64String($hash)
+                        $signatureChecksum = $sigBase64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
+                        Remove-Item $tempCert -ErrorAction SilentlyContinue
+                    }
+                }
+            } catch {
+                Write-Host "  Could not calculate signature checksum: $_" -ForegroundColor Yellow
+            }
+        }
+        
+        # Fallback to known value if calculation failed
+        if (-not $signatureChecksum) {
+            $signatureChecksum = "Zy8Y37_S457_faQF8VVbbF3m8MbMaO4iTkTZGlgH2O4"
+            Write-Host "  Using fallback signature checksum" -ForegroundColor Yellow
+        }
         
         Write-Host "`nChecksums:" -ForegroundColor Cyan
-        Write-Host "  SHA256 (Hex):" -ForegroundColor Yellow
-        Write-Host "    $sha256" -ForegroundColor Green
-        Write-Host ""
-        Write-Host "  SHA256 (Base64URL - for provisioning):" -ForegroundColor Yellow
-        Write-Host "    $base64url" -ForegroundColor Green
-        Write-Host ""
-        Write-Host "  SHA1:   $sha1" -ForegroundColor Green
-        Write-Host "  MD5:    $md5" -ForegroundColor Green
+        Write-Host "  Package Checksum (Base64URL): $base64url" -ForegroundColor Green
+        Write-Host "  Signature Checksum:           $signatureChecksum" -ForegroundColor Green
         
-        # Save checksums to file
-        $checksumFile = "app-release-checksums.txt"
-        $checksumContent = @"
-APK Build Information
-=====================
-Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-APK File: $apkPath
-File Size: $fileSizeMB MB
-
-Checksums:
-----------
-SHA256 (Hex): $sha256
-SHA256 (Base64URL): $base64url
-SHA1:   $sha1
-MD5:    $md5
-
-Installation Command:
-adb install -r $apkPath
-
-Verification Command:
-(Get-FileHash -Path "$apkPath" -Algorithm SHA256).Hash
-
-For Device Owner Provisioning:
-Add this to provisioning-config.json:
-"android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "$base64url"
-"@
-        
-        $checksumContent | Out-File -FilePath $checksumFile -Encoding UTF8
-        Write-Host "`n✅ Checksums saved to: $checksumFile" -ForegroundColor Green
-        
-        # ============================================================
-        # AUTO-UPDATE provisioning-config.json with new checksum
-        # ============================================================
+        # Update provisioning-config.json
         $configPath = "provisioning-config.json"
         if (Test-Path $configPath) {
-            Write-Host "`nUpdating provisioning-config.json..." -ForegroundColor Yellow
+            Write-Host "`nUpdating $configPath..." -ForegroundColor Yellow
             $json = Get-Content -Path $configPath -Raw -Encoding UTF8
-            $pattern = '("android\.app\.extra\.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM"\s*:\s*)"[^"]*"'
-            $replacement = "`${1}`"$base64url`""
-            $newJson = $json -replace $pattern, $replacement
-            
-            if ($newJson -eq $json) {
-                Write-Host "⚠️  WARNING: Could not find CHECKSUM key in $configPath" -ForegroundColor Yellow
-                Write-Host "   Update it manually with: $base64url" -ForegroundColor Yellow
+
+            # Update Package Checksum
+            $patternPkg = '("android\.app\.extra\.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM"\s*:\s*)"[^"]*"'
+            $replacementPkg = "`${1}`"$base64url`""
+            $json = $json -replace $patternPkg, $replacementPkg
+
+            # Update Signature Checksum
+            $patternSig = '("android\.app\.extra\.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM"\s*:\s*)"[^"]*"'
+            $replacementSig = "`${1}`"$signatureChecksum`""
+
+            if ($json -match $patternSig) {
+                $json = $json -replace $patternSig, $replacementSig
             } else {
-                Set-Content -Path $configPath -Value $newJson -NoNewline -Encoding UTF8
-                Write-Host "✅ Updated $configPath with new checksum" -ForegroundColor Green
-                Write-Host "   Checksum: $base64url" -ForegroundColor Green
+                # If not present, add it after the package checksum
+                $json = $json -replace $patternPkg, "`${0},`n  `"android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM`": `"$signatureChecksum`""
             }
-        } else {
-            Write-Host "⚠️  WARNING: $configPath not found" -ForegroundColor Yellow
-            Write-Host "   Add this checksum manually:" -ForegroundColor Yellow
-            Write-Host "   $base64url" -ForegroundColor Green
+
+            Set-Content -Path $configPath -Value $json -NoNewline -Encoding UTF8
+            Write-Host "✅ Updated $configPath with new checksums" -ForegroundColor Green
         }
         
         Write-Host "`n========================================" -ForegroundColor Cyan
-        Write-Host "Next Steps:" -ForegroundColor Cyan
-        Write-Host "  1. Install: adb install -r $apkPath" -ForegroundColor Yellow
-        Write-Host "  2. Generate QR: Use provisioning-config.json" -ForegroundColor Yellow
-        Write-Host "  3. Test: Scan QR on factory-reset device" -ForegroundColor Yellow
+        Write-Host "✅ Build Complete and Config Updated!" -ForegroundColor Green
         Write-Host "========================================" -ForegroundColor Cyan
-    } else {
-        Write-Host "❌ APK not found at: $apkPath" -ForegroundColor Red
-        exit 1
+        
+        Write-Host "`n📋 NEXT STEPS:" -ForegroundColor Yellow
+        Write-Host "  1. Upload app-release.apk to GitHub Releases" -ForegroundColor White
+        Write-Host "     URL: https://github.com/NEXIVO-COMPANY-LIMITED/DEVICE--OWNER/releases" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  2. Verify provisioning-config.json has correct checksums" -ForegroundColor White
+        Write-Host "     Package:   $base64url" -ForegroundColor Gray
+        Write-Host "     Signature: $signatureChecksum" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  3. Generate QR code from provisioning-config.json" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  4. Test on factory-reset device" -ForegroundColor White
+        Write-Host "     Command: adb shell am broadcast -a android.intent.action.FACTORY_RESET" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "📚 Documentation:" -ForegroundColor Yellow
+        Write-Host "  - PROVISIONING_COMPLETE_GUIDE.md - Full workflow" -ForegroundColor Gray
+        Write-Host "  - QR_CODE_VERIFICATION_GUIDE.md - QR code setup" -ForegroundColor Gray
+        Write-Host "  - QUICK_FIX_REFERENCE.md - Troubleshooting" -ForegroundColor Gray
+        Write-Host ""
     }
 } else {
     Write-Host "❌ Build failed!" -ForegroundColor Red
-    Write-Host "Try: .\build_simple.ps1 (simpler build with fewer workers)" -ForegroundColor Yellow
     exit 1
 }

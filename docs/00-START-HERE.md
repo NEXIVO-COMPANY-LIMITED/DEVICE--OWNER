@@ -195,7 +195,7 @@ Follow the complete documentation structure above, from top to bottom.
 - **Root README**: [../README.md](../README.md)
 
 ### Support
-- **Email**: support@nexivo.io
+- **Email**: [YOUR_SUPPORT_EMAIL]
 - **Issues**: GitHub Issues
 - **Logs**: See [11.0-DEVICE-LOGS-AND-BUGS.md](11.0-DEVICE-LOGS-AND-BUGS.md)
 
@@ -229,4 +229,4 @@ Follow the complete documentation structure above, from top to bottom.
 
 ---
 
-*Last Updated: March 2026*
+*Last Updated: [CURRENT_DATE]*
