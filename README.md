@@ -274,8 +274,8 @@ Proprietary - NEXIVO COMPANY LIMITED
 ## Support
 
 For support, contact:
-- Email: support@nexivo.io
-- Website: https://nexivo.io
+- Email: _______________________
+- Website: http://payoplan.com
 
 ## Version History
 

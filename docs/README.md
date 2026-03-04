@@ -238,7 +238,7 @@ For contribution guidelines and code standards, see [Folder Structure](14.0-FOLD
 ## 📞 Support
 
 For technical support:
-- Email: support@nexivo.io
+- Email: ________________________
 - Documentation: This folder
 - Issues: GitHub Issues
 
