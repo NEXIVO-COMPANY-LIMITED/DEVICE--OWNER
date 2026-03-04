@@ -22,14 +22,14 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * HeartbeatService - Simplified Background Service (Silent)
+ * HeartbeatService - Persistent Background Service with Location Transparency
  */
 class HeartbeatService : Service() {
     
     companion object {
         private const val TAG = "HeartbeatService"
         private const val NOTIFICATION_ID = 1003
-        private const val CHANNEL_ID = "heartbeat_channel_v2"
+        private const val CHANNEL_ID = "heartbeat_channel_v3"
         private const val HEARTBEAT_INTERVAL_MS = 10_000L  // 10 SECONDS
         
         fun start(context: Context, deviceId: String? = null) {
@@ -61,10 +61,26 @@ class HeartbeatService : Service() {
         responseHandler = HeartbeatResponseHandler_v2(this)
         createNotificationChannel()
         
-        // Start foreground immediately with a silent notification
-        val notification = createNotification("System process is running")
+        // Start foreground immediately with a visible notification for compliance
+        val notification = createNotification("System is monitoring device security and location")
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            // Android 14+ requires explicit types in startForeground
+            startForeground(
+                NOTIFICATION_ID, 
+                notification, 
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or 
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+ requires location type if location is accessed
+            startForeground(
+                NOTIFICATION_ID, 
+                notification, 
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or 
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
@@ -74,13 +90,13 @@ class HeartbeatService : Service() {
         val deviceId = intent?.getStringExtra("device_id") ?: DeviceIdProvider.getDeviceId(this)
         
         if (deviceId.isNullOrBlank()) {
-            Log.e(TAG, "âŒ Device ID not found. Stopping HeartbeatService.")
+            Log.e(TAG, "❌ Device ID not found. Stopping HeartbeatService.")
             stopSelf()
             return START_NOT_STICKY
         }
 
         if (!isRunning.getAndSet(true)) {
-            Log.i(TAG, "ðŸš€ Heartbeat Loop Started for: $deviceId")
+            Log.i(TAG, "🚀 Heartbeat Loop Started for: $deviceId")
             startHeartbeatLoop()
         }
         
@@ -110,9 +126,9 @@ class HeartbeatService : Service() {
     
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Use IMPORTANCE_MIN to make it silent and not appear in the status bar.
-            val channel = NotificationChannel(CHANNEL_ID, "System Service", NotificationManager.IMPORTANCE_MIN)
-            channel.description = "Essential background service for device monitoring."
+            // Using IMPORTANCE_LOW (visible in drawer, no sound/pop-up) for privacy compliance
+            val channel = NotificationChannel(CHANNEL_ID, "Security Monitoring", NotificationManager.IMPORTANCE_LOW)
+            channel.description = "Ensures device security and location synchronization."
             channel.setSound(null, null)
             channel.enableVibration(false)
             channel.setShowBadge(false)
@@ -123,11 +139,12 @@ class HeartbeatService : Service() {
     
     private fun createNotification(content: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("System Service")
+            .setContentTitle("Security Service")
             .setContentText(content)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done) // A more generic icon
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setVisibility(NotificationCompat.VISIBILITY_SECRET) // Hide from lock screen
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation) // Location icon for transparency
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .build()
     }
@@ -141,7 +158,3 @@ class HeartbeatService : Service() {
         super.onDestroy()
     }
 }
-
-
-
-

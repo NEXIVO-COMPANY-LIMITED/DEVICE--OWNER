@@ -1,7 +1,7 @@
 ﻿{
   "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.microspace.payo/com.microspace.payo.receivers.admin.AdminReceiver",
   "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": "https://github.com/NEXIVO-COMPANY-LIMITED/DEVICE--OWNER/releases/download/V1.1/app-release.apk",
-  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "hoGl3FbGEdWqwzwETF1igXOuGI8bDOYF_1SqGi0mEZo",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "QOBE4Ee6BUgVe5CUnDLc7GbEnxxmAznWA8XSdUaF7kU",
   "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": "Zy8Y37_S457_faQF8VVbbF3m8MbMaO4iTkTZGlgH2O4",
   "android.app.extra.PROVISIONING_WIFI_SSID": "NEXIVO 4G",
   "android.app.extra.PROVISIONING_WIFI_PASSWORD": "Nexivo.io",

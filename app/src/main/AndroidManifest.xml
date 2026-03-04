@@ -52,16 +52,15 @@
     <uses-permission android:name="android.permission.DEVICE_POWER" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.REBOOT" tools:ignore="ProtectedPermissions" />
 
-    <!-- Notifications -->
+    <!-- Notifications and Alarms -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-    <!-- Foreground service permission -->
+    <!-- Foreground service permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
-
-    <!-- Required for systemExempted foreground service -->
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <!-- Account management permissions -->
     <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
@@ -86,7 +85,7 @@
 
         <property
             android:name="android.app.PROPERTY_FOREGROUND_SERVICE_TYPES"
-            android:value="dataSync|systemExempted" />
+            android:value="dataSync|specialUse|location" />
 
         <!-- Registration flow -->
         <activity
@@ -284,13 +283,27 @@
         </receiver>
 
         <!-- Services -->
-        <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync|systemExempted" />
+        <service android:name=".monitoring.SecurityMonitorService" android:foregroundServiceType="dataSync|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="device_security_monitoring" />
+        </service>
+
         <service android:name=".services.remote.RemoteManagementService" android:foregroundServiceType="dataSync" />
-        <service android:name=".services.lock.SoftLockOverlayService" android:foregroundServiceType="systemExempted" />
-        <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="systemExempted" />
-        <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="systemExempted" />
-        <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="dataSync" />
-        <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="systemExempted" />
+
+        <service android:name=".services.lock.SoftLockOverlayService" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="device_lock_management" />
+        </service>
+
+        <service android:name=".services.lock.SoftLockMonitorService" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="device_lock_management" />
+        </service>
+
+        <service android:name=".services.security.FirmwareSecurityMonitorService" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="firmware_integrity_monitoring" />
+        </service>
+
+        <service android:name=".services.heartbeat.HeartbeatService" android:foregroundServiceType="dataSync|location|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="device_status_synchronization" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

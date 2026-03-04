@@ -1,5 +1,6 @@
 ﻿package com.microspace.payo.services.heartbeat
 
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -14,9 +15,7 @@ import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * HeartbeatResponseHandler v2.1 - PRODUCTION-READY IMPLEMENTATION WITH ROBUST AUDIT LOGGING
- * 
- * Securely stores audit state using EncryptedSharedPreferences.
+ * HeartbeatResponseHandler v2.2 - PRODUCTION-READY WITH FULL DEACTIVATION SUPPORT
  */
 class HeartbeatResponseHandler_v2(private val context: Context) {
     
@@ -25,6 +24,7 @@ class HeartbeatResponseHandler_v2(private val context: Context) {
     private val paymentDataManager = PaymentDataManager(context)
     private val auditPrefs = EncryptionManager(context).getEncryptedSharedPreferences("heartbeat_audit_secure")
     private val db = DeviceOwnerDatabase.getDatabase(context)
+    private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     
     private val isProcessing = AtomicBoolean(false)
     private val PROCESSING_TIMEOUT_MS = 30_000L
@@ -35,7 +35,7 @@ class HeartbeatResponseHandler_v2(private val context: Context) {
     
     fun handle(response: HeartbeatResponse) {
         if (!isProcessing.compareAndSet(false, true)) {
-            Log.w(TAG, "âš ï¸ Handler busy, skipping response")
+            Log.w(TAG, "⚠️ Handler busy, skipping response")
             return
         }
         
@@ -45,7 +45,7 @@ class HeartbeatResponseHandler_v2(private val context: Context) {
                     processResponseSafely(response)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "âŒ Fatal error: ${e.message}", e)
+                Log.e(TAG, "❌ Fatal error: ${e.message}", e)
                 logAuditToDb(
                     serverState = "ERROR",
                     before = controlManager.getLockState(),
@@ -68,7 +68,7 @@ class HeartbeatResponseHandler_v2(private val context: Context) {
         val lockReason = response.getLockReason()
         val currentDeviceState = controlManager.getLockState()
         
-        Log.i(TAG, "ðŸ“¡ HEARTBEAT SYNC: Deactivation=$isDeactivationRequested, Locked=$isServerLocked, SoftLock=$isSoftLockRequested, Device=$currentDeviceState")
+        Log.i(TAG, "📡 HEARTBEAT SYNC: Deactivation=$isDeactivationRequested, Locked=$isServerLocked, SoftLock=$isSoftLockRequested, Device=$currentDeviceState")
 
         if (isDeactivationRequested) {
             handleDeactivation(lockReason, currentDeviceState)
@@ -99,24 +99,39 @@ class HeartbeatResponseHandler_v2(private val context: Context) {
     }
 
     private suspend fun handleDeactivation(reason: String, currentState: String) {
+        Log.w(TAG, "🚨 DEACTIVATION REQUESTED: Removing all restrictions and Device Owner")
+        
+        // 1. First, clear all software-level locks and UI
         if (currentState != RemoteDeviceControlManager.LOCK_UNLOCKED) {
             controlManager.unlockDevice()
             sendDismissBroadcast()
         }
+
+        // 2. Revert all DPM policies (Camera, Status Bar, Keyguard, etc.)
+        controlManager.clearAllPoliciesAndRestrictions()
         
-        controlManager.applyHardLock(
-            reason = reason.ifBlank { "System deactivation in progress..." },
-            lockType = RemoteDeviceControlManager.TYPE_DEACTIVATION,
-            forceFromServerOrMismatch = true
-        )
+        // 3. Remove Device Owner (This makes the app unenroll and allows uninstalling)
+        try {
+            if (dpm.isDeviceOwnerApp(context.packageName)) {
+                Log.i(TAG, "✅ Clearing Device Owner status...")
+                dpm.clearDeviceOwnerApp(context.packageName)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to clear Device Owner: ${e.message}")
+        }
         
         logAuditToDb(
-            serverState = "DEACTIVATION",
+            serverState = "DEACTIVATED",
             before = currentState,
-            after = RemoteDeviceControlManager.LOCK_HARD,
-            action = "APPLY_DEACTIVATION_LOCK",
-            details = "Deactivation reason: $reason"
+            after = "DEVICE_OWNER_CLEARED",
+            action = "FULL_DEACTIVATION",
+            details = "Reason: $reason"
         )
+        
+        // Final UI cleanup
+        try {
+            SoftLockOverlayService.stop(context)
+        } catch (_: Exception) {}
     }
 
     private suspend fun handleHardLock(response: HeartbeatResponse, reason: String, currentState: String) {
@@ -272,7 +287,3 @@ class HeartbeatResponseHandler_v2(private val context: Context) {
         } catch (_: Exception) {}
     }
 }
-
-
-
-
